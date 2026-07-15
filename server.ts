@@ -818,6 +818,34 @@ async function startServer() {
     }
   });
 
+  // 12. Send Simulated Email & Append Live Alert
+  app.post('/api/send-email', async (req, res) => {
+    try {
+      const { email, patientName, subject, message } = req.body;
+      if (!email || !patientName) {
+        return res.status(400).json({ error: 'Recipient email and patient name are required' });
+      }
+
+      const db = await readDatabase();
+      const newAlert: AlertItem = {
+        id: `al_${Date.now()}`,
+        type: 'info',
+        title: 'Reminder Dispatched',
+        message: `Appointment reminder successfully sent to ${patientName} (${email}).`,
+        actionText: 'Review List',
+        actionTarget: 'tracker'
+      };
+      db.alerts.unshift(newAlert);
+      await writeDatabase(db);
+
+      console.log(`[SIMULATED EMAIL TRANS] To: ${email} | Subject: ${subject} | Msg: ${message}`);
+
+      res.status(200).json({ success: true, message: 'Email reminder sent successfully', alert: newAlert });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Vite Integration
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

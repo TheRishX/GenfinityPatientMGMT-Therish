@@ -18,6 +18,7 @@ export default function Sidebar({
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     { id: 'patients', label: 'Patients', icon: 'groups' },
+    { id: 'appointments', label: 'Appointments', icon: 'calendar_month' },
     { id: 'tracker', label: 'Tracker', icon: 'monitoring' },
     { id: 'authorization', label: 'Authorization', icon: 'verified_user' },
     { id: 'billing', label: 'Billing', icon: 'payments' },

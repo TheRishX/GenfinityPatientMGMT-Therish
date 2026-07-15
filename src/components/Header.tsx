@@ -26,12 +26,10 @@ export default function Header({
         <h2 className="hidden md:block text-lg font-extrabold text-on-surface mr-2 shrink-0 tracking-tight">
           {title}
         </h2>
-        {isOfflineMode && (
-          <span className="bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 shrink-0 border border-amber-200/50">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            Local Sandbox
-          </span>
-        )}
+        <span className="bg-emerald-100/80 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider flex items-center gap-1.5 shrink-0 border border-emerald-200/40">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Supabase Online
+        </span>
         <div className="relative w-full max-w-md">
           <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">
             search

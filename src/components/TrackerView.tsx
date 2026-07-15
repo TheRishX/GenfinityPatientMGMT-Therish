@@ -17,30 +17,40 @@ export default function TrackerView({
   const [kanbanFilter, setKanbanFilter] = useState<'active' | 'inactive'>('active');
   const [trackerSearch, setTrackerSearch] = useState('');
 
-  // Column config
-  const columns: { id: Patient['status']; label: string; colorClass: string }[] = [
+  // All possible statuses across the app
+  const allStatuses: { id: Patient['status']; label: string; colorClass: string }[] = [
     { id: 'New Referral', label: 'New Referral', colorClass: 'bg-secondary' },
+    { id: 'Consultation', label: 'Consultation', colorClass: 'bg-primary' },
     { id: 'Waiting for Rx', label: 'Waiting for Rx', colorClass: 'bg-outline-variant' },
     { id: 'Ready for Auth', label: 'Ready for Auth', colorClass: 'bg-secondary-container' },
-    { id: 'Auth Pending', label: 'Auth Pending', colorClass: 'bg-tertiary-container' }
+    { id: 'Auth Pending', label: 'Auth Pending', colorClass: 'bg-tertiary-container' },
+    { id: 'Fabrication', label: 'Fabrication', colorClass: 'bg-amber-500' },
+    { id: 'In Progress', label: 'In Progress', colorClass: 'bg-green-500' }
   ];
 
+  // Column config based on filter
+  const columns = kanbanFilter === 'active'
+    ? [
+        { id: 'New Referral' as Patient['status'], label: 'New Referral', colorClass: 'bg-secondary' },
+        { id: 'Consultation' as Patient['status'], label: 'Consultation', colorClass: 'bg-primary' },
+        { id: 'Waiting for Rx' as Patient['status'], label: 'Waiting for Rx', colorClass: 'bg-outline-variant' },
+        { id: 'Ready for Auth' as Patient['status'], label: 'Ready for Auth', colorClass: 'bg-secondary-container' },
+        { id: 'Auth Pending' as Patient['status'], label: 'Auth Pending', colorClass: 'bg-tertiary-container' }
+      ]
+    : [
+        { id: 'Fabrication' as Patient['status'], label: 'Fabrication', colorClass: 'bg-amber-500' },
+        { id: 'In Progress' as Patient['status'], label: 'In Progress', colorClass: 'bg-green-500' }
+      ];
+
   // Optional trailing columns (aesthetic scroll representation)
-  const previewColumns = ['Evaluation', 'Casting/Scanning', 'Fabrication'];
+  const previewColumns = kanbanFilter === 'active' ? ['Fabrication', 'In Progress'] : ['Archive'];
 
   // Filter patients for search
   const filteredPatients = patients.filter(p => {
     if (!p) return false;
     const term = trackerSearch.toLowerCase();
     const matchesSearch = p.name.toLowerCase().includes(term) || p.mrn.toLowerCase().includes(term);
-    
-    if (kanbanFilter === 'active') {
-      // In active tab we show standard workflow states
-      return matchesSearch;
-    } else {
-      // Non-active states
-      return matchesSearch && (p.status === 'In Progress' || p.status === 'Consultation' || p.status === 'Fabrication');
-    }
+    return matchesSearch;
   });
 
   const getPatientsByColumn = (colId: Patient['status']) => {
@@ -239,7 +249,7 @@ export default function TrackerView({
                               <div className="px-3 py-1 border-b border-surface-container-high mb-1">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Move to...</span>
                               </div>
-                              {columns.map(option => (
+                              {allStatuses.map(option => (
                                 <button
                                   key={option.id}
                                   onClick={() => handleStatusChange(p.id, option.id)}

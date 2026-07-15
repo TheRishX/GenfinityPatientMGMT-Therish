@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import DashboardView from './components/DashboardView';
 import PatientsView from './components/PatientsView';
+import AppointmentsView from './components/AppointmentsView';
 import TrackerView from './components/TrackerView';
 import AuthBillingView from './components/AuthBillingView';
 import FabricationView from './components/FabricationView';
@@ -737,6 +738,15 @@ export default function App() {
             setIsNewPatientModalOpen={setIsNewPatientModalOpen}
           />
         );
+      case 'appointments':
+        return (
+          <AppointmentsView
+            patients={db.patients}
+            appointments={db.appointments}
+            onAddAppointment={handleAddAppointment}
+            onUpdateAppointment={handleUpdateAppointment}
+          />
+        );
       case 'tracker':
         return (
           <TrackerView
@@ -823,8 +833,10 @@ export default function App() {
               ? 'Dashboard Overview'
               : activeTab === 'patients'
               ? 'Patient Database'
+              : activeTab === 'appointments'
+              ? 'Appointments Schedule'
               : activeTab === 'tracker'
-              ? 'Clinical Workflow board'
+              ? 'Clinical Workflow Board'
               : activeTab === 'authorization'
               ? 'Approval & Reimbursements'
               : activeTab === 'billing'
