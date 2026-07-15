@@ -10,6 +10,7 @@ import FabricationView from './components/FabricationView';
 import SettingsView from './components/SettingsView';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
 import { DEFAULT_DATABASE, getInitials, generateMRN } from './utils/defaultDb';
+import { supabaseClient } from './utils/supabaseClient';
 
 export default function App() {
   const [db, setDb] = useState<DatabaseSchema | null>(null);
@@ -34,33 +35,97 @@ export default function App() {
     localStorage.setItem('genfinity_db', JSON.stringify(newDb));
   };
 
+  // Fetch from Supabase directly in Vercel/Client-only environments
+  const fetchStateDirectFromSupabase = async (baseDb: DatabaseSchema): Promise<DatabaseSchema> => {
+    const updatedDb = { ...baseDb };
+    try {
+      // 1. Fetch settings from clinic_settings
+      const { data: sData, error: sErr } = await supabaseClient.from('clinic_settings').select('*').limit(1);
+      if (sData && sData.length > 0 && !sErr) {
+        const row = sData[0];
+        updatedDb.settings = {
+          ...updatedDb.settings,
+          clinicName: row.clinic_name || updatedDb.settings.clinicName,
+          primaryAddress: row.clinic_address || updatedDb.settings.primaryAddress,
+          contactPhone: row.clinic_phone || updatedDb.settings.contactPhone,
+          supportEmail: row.clinic_email || updatedDb.settings.supportEmail,
+        };
+      }
+
+      // 2. Fetch patients
+      const { data: pData, error: pErr } = await supabaseClient.from('patients').select('*').order('created_at', { ascending: false });
+      if (pData && !pErr) {
+        updatedDb.patients = pData.map((sp: any) => ({
+          id: sp.id,
+          name: sp.name || '',
+          phone: sp.phone || '',
+          dob: sp.dob || '',
+          email: sp.email || '',
+          referralSource: sp.referral_source || 'other',
+          status: sp.status || 'In Progress',
+          mrn: sp.notes || '#0000-XX',
+          avatarInitials: getInitials(sp.name || 'P'),
+          files: sp.documents?.files || [],
+          insuranceCompany: sp.auth_info?.insurance_company || '',
+          insuranceId: sp.auth_info?.insurance_id || '',
+          address: sp.auth_info?.address || '',
+          gender: sp.auth_info?.gender || 'Not specified',
+          clinicalNotes: sp.auth_info?.clinical_notes || [],
+          billing: sp.billing || { date: '', amount: 0, status: '' }
+        }));
+      }
+
+      // 3. Fetch appointments
+      const { data: aData, error: aErr } = await supabaseClient.from('appointments').select('*').order('created_at', { ascending: false });
+      if (aData && !aErr) {
+        updatedDb.appointments = aData.map((sa: any) => ({
+          id: sa.id,
+          patientName: sa.patient_name || '',
+          time: sa.appt_time || '09:00 AM',
+          type: sa.type || 'Consultation',
+          status: sa.status || 'Scheduled',
+          initials: getInitials(sa.patient_name || 'A'),
+          date: sa.appt_date || ''
+        }));
+      }
+    } catch (err) {
+      console.warn('Failed direct client-side Supabase query:', err);
+    }
+    return updatedDb;
+  };
+
   // Fetch complete dataset
   const fetchState = async () => {
     try {
       setLoading(true);
       const res = await fetch('/api/data');
-      if (!res.ok) throw new Error('Failed to retrieve clinical data ledger');
-      const data: DatabaseSchema = await res.json();
-      setDb(data);
-      setIsOfflineMode(false);
-      setError(null);
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
+        const data: DatabaseSchema = await res.json();
+        setDb(data);
+        setIsOfflineMode(false);
+        setError(null);
+      } else {
+        throw new Error('Static/Vercel or non-JSON API response detected');
+      }
     } catch (err: any) {
-      console.warn('Backend server connection failed. Switching to Local Sandbox Mode for Vercel/offline compatibility.', err);
-      // Fallback to local storage
+      console.warn('Backend server connection failed or static deployment. Switching to direct browser-to-Supabase client connection.', err);
+      
+      let baseDb = DEFAULT_DATABASE;
       const localData = localStorage.getItem('genfinity_db');
       if (localData) {
         try {
-          setDb(JSON.parse(localData));
+          baseDb = JSON.parse(localData);
         } catch (e) {
-          setDb(DEFAULT_DATABASE);
-          localStorage.setItem('genfinity_db', JSON.stringify(DEFAULT_DATABASE));
+          baseDb = DEFAULT_DATABASE;
         }
-      } else {
-        setDb(DEFAULT_DATABASE);
-        localStorage.setItem('genfinity_db', JSON.stringify(DEFAULT_DATABASE));
       }
+
+      const liveDb = await fetchStateDirectFromSupabase(baseDb);
+      setDb(liveDb);
+      localStorage.setItem('genfinity_db', JSON.stringify(liveDb));
       setIsOfflineMode(true);
-      setError(null); // Clear error to allow app to run in local fallback mode
+      setError(null);
     } finally {
       setLoading(false);
     }
@@ -104,6 +169,46 @@ export default function App() {
     if (isOfflineMode || !db) {
       const generatedMrn = generateMRN();
       const initials = getInitials(patientData.name);
+      
+      // Try direct client-side Supabase write if offline/Vercel
+      try {
+        const { data: newSupPatient, error } = await supabaseClient.from('patients').insert({
+          name: patientData.name,
+          phone: patientData.phone || '',
+          dob: patientData.dob || '',
+          email: patientData.email || '',
+          referral_source: patientData.referralSource || 'other',
+          status: patientData.status || 'In Progress',
+          notes: generatedMrn,
+          documents: { files: [] },
+          auth_info: {
+            insurance_company: '',
+            insurance_id: '',
+            address: '',
+            gender: 'Not specified',
+            clinical_notes: []
+          },
+          billing: { date: '', amount: 0, status: '' },
+          pinned_flag: false
+        }).select().single();
+
+        if (error) throw error;
+
+        if (patientData.status === 'Consultation') {
+          await supabaseClient.from('appointments').insert({
+            patient_name: patientData.name,
+            appt_time: '02:00 PM',
+            type: 'Initial Consult',
+            status: 'Scheduled'
+          });
+        }
+        
+        await fetchState();
+        return;
+      } catch (err) {
+        console.warn('Direct client-side Supabase write failed, falling back to local memory only', err);
+      }
+
       const newPatient: Patient = {
         id: 'p_' + Date.now(),
         name: patientData.name,
@@ -169,6 +274,25 @@ export default function App() {
         content: fileData.content || ''
       };
 
+      // Try direct client-side Supabase update
+      try {
+        const target = db.patients.find(p => p.id === patientId);
+        if (target) {
+          const currentFiles = target.files || [];
+          const updatedFiles = [newFile, ...currentFiles];
+          const { error } = await supabaseClient
+            .from('patients')
+            .update({ documents: { files: updatedFiles } })
+            .eq('id', patientId);
+          if (!error) {
+            await fetchState();
+            return;
+          }
+        }
+      } catch (directErr) {
+        console.warn('Direct client-side Supabase file upload failed, using offline fallback:', directErr);
+      }
+
       const updatedPatients = db.patients.map(p => {
         if (p.id === patientId) {
           return {
@@ -202,6 +326,24 @@ export default function App() {
   // API Call: Delete Document File
   const handleDeleteFile = async (patientId: string, fileId: string) => {
     if (isOfflineMode || !db) {
+      // Try direct client-side Supabase update
+      try {
+        const target = db.patients.find(p => p.id === patientId);
+        if (target) {
+          const updatedFiles = (target.files || []).filter(f => f.id !== fileId);
+          const { error } = await supabaseClient
+            .from('patients')
+            .update({ documents: { files: updatedFiles } })
+            .eq('id', patientId);
+          if (!error) {
+            await fetchState();
+            return;
+          }
+        }
+      } catch (directErr) {
+        console.warn('Direct client-side Supabase file delete failed, using offline fallback:', directErr);
+      }
+
       const updatedPatients = db.patients.map(p => {
         if (p.id === patientId) {
           return {
@@ -233,6 +375,32 @@ export default function App() {
   // API Call: Update Patient workflow column
   const handleUpdatePatientStatus = async (patientId: string, status: Patient['status']) => {
     if (isOfflineMode || !db) {
+      // Try direct client-side Supabase status update
+      try {
+        const { error } = await supabaseClient
+          .from('patients')
+          .update({ status })
+          .eq('id', patientId);
+        
+        if (!error) {
+          if (status === 'Consultation') {
+            const targetPatient = db.patients.find(p => p.id === patientId);
+            if (targetPatient) {
+              await supabaseClient.from('appointments').insert({
+                patient_name: targetPatient.name,
+                appt_time: '02:00 PM',
+                type: 'Initial Consult',
+                status: 'Scheduled'
+              });
+            }
+          }
+          await fetchState();
+          return;
+        }
+      } catch (directErr) {
+        console.warn('Direct client-side Supabase status update failed, using offline fallback:', directErr);
+      }
+
       const updatedPatients = db.patients.map(p => {
         if (p.id === patientId) {
           return {
@@ -281,6 +449,38 @@ export default function App() {
   // API Call: Comprehensive Patient Update (Demographics, Insurance, Notes)
   const handleUpdatePatient = async (patientId: string, patientData: any) => {
     if (isOfflineMode || !db) {
+      // Try direct client-side Supabase update
+      try {
+        const { error } = await supabaseClient
+          .from('patients')
+          .update({
+            name: patientData.name,
+            phone: patientData.phone,
+            dob: patientData.dob,
+            email: patientData.email,
+            referral_source: patientData.referralSource,
+            status: patientData.status,
+            notes: patientData.mrn,
+            pinned_flag: patientData.pinned_flag,
+            auth_info: {
+              insurance_company: patientData.insuranceCompany || '',
+              insurance_id: patientData.insuranceId || '',
+              address: patientData.address || '',
+              gender: patientData.gender || 'Not specified',
+              clinical_notes: patientData.clinicalNotes || []
+            },
+            billing: patientData.billing || { date: '', amount: 0, status: '' }
+          })
+          .eq('id', patientId);
+        
+        if (!error) {
+          await fetchState();
+          return;
+        }
+      } catch (directErr) {
+        console.warn('Direct client-side Supabase patient update failed, using offline fallback:', directErr);
+      }
+
       const updatedPatients = db.patients.map(p => {
         if (p.id === patientId) {
           return {
@@ -314,6 +514,23 @@ export default function App() {
   // API Call: Add Appointment in Supabase
   const handleAddAppointment = async (apptData: any) => {
     if (isOfflineMode || !db) {
+      // Try direct client-side Supabase insert
+      try {
+        const { error } = await supabaseClient.from('appointments').insert({
+          patient_name: apptData.patientName,
+          appt_time: apptData.time || '09:00 AM',
+          type: apptData.type || 'Consultation',
+          status: apptData.status || 'Scheduled',
+          appt_date: apptData.date || ''
+        });
+        if (!error) {
+          await fetchState();
+          return;
+        }
+      } catch (directErr) {
+        console.warn('Direct client-side Supabase appointment insert failed, using offline fallback:', directErr);
+      }
+
       const newAppt = {
         id: 'a_' + Date.now(),
         patientName: apptData.patientName,
@@ -346,6 +563,26 @@ export default function App() {
   // API Call: Update Appointment Status / Details
   const handleUpdateAppointment = async (apptId: string, updateData: any) => {
     if (isOfflineMode || !db) {
+      // Try direct client-side Supabase update
+      try {
+        const { error } = await supabaseClient
+          .from('appointments')
+          .update({
+            patient_name: updateData.patientName,
+            appt_time: updateData.time,
+            type: updateData.type,
+            status: updateData.status,
+            appt_date: updateData.date
+          })
+          .eq('id', apptId);
+        if (!error) {
+          await fetchState();
+          return;
+        }
+      } catch (directErr) {
+        console.warn('Direct client-side Supabase appointment update failed, using offline fallback:', directErr);
+      }
+
       const updatedAppointments = db.appointments.map(a => {
         if (a.id === apptId) {
           return {
@@ -379,6 +616,20 @@ export default function App() {
   // API Call: Delete Patient (Admin)
   const handleDeletePatient = async (patientId: string) => {
     if (isOfflineMode || !db) {
+      // Try direct client-side Supabase delete
+      try {
+        const { error } = await supabaseClient
+          .from('patients')
+          .delete()
+          .eq('id', patientId);
+        if (!error) {
+          await fetchState();
+          return;
+        }
+      } catch (directErr) {
+        console.warn('Direct client-side Supabase patient delete failed, using offline fallback:', directErr);
+      }
+
       const updatedPatients = db.patients.filter(p => p.id !== patientId);
       saveStateLocally({
         ...db,
@@ -401,6 +652,20 @@ export default function App() {
   // API Call: Delete Appointment (Admin)
   const handleDeleteAppointment = async (apptId: string) => {
     if (isOfflineMode || !db) {
+      // Try direct client-side Supabase delete
+      try {
+        const { error } = await supabaseClient
+          .from('appointments')
+          .delete()
+          .eq('id', apptId);
+        if (!error) {
+          await fetchState();
+          return;
+        }
+      } catch (directErr) {
+        console.warn('Direct client-side Supabase appointment delete failed, using offline fallback:', directErr);
+      }
+
       const updatedAppointments = db.appointments.filter(a => a.id !== apptId);
       saveStateLocally({
         ...db,
@@ -525,6 +790,37 @@ export default function App() {
   // API Call: Save settings config
   const handleSaveSettings = async (settingsData: ClinicSettings) => {
     if (isOfflineMode || !db) {
+      // Try direct client-side Supabase update for clinic_settings
+      try {
+        const { data: existing } = await supabaseClient.from('clinic_settings').select('id').limit(1);
+        if (existing && existing.length > 0) {
+          await supabaseClient
+            .from('clinic_settings')
+            .update({
+              clinic_name: settingsData.clinicName,
+              clinic_address: settingsData.primaryAddress,
+              clinic_phone: settingsData.contactPhone,
+              clinic_email: settingsData.supportEmail
+            })
+            .eq('id', existing[0].id);
+        } else {
+          await supabaseClient.from('clinic_settings').insert({
+            clinic_name: settingsData.clinicName,
+            clinic_address: settingsData.primaryAddress,
+            clinic_phone: settingsData.contactPhone,
+            clinic_email: settingsData.supportEmail
+          });
+        }
+        saveStateLocally({
+          ...db,
+          settings: settingsData
+        });
+        await fetchState();
+        return;
+      } catch (directErr) {
+        console.warn('Direct client-side Supabase settings update failed, using offline fallback:', directErr);
+      }
+
       saveStateLocally({
         ...db,
         settings: settingsData

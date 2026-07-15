@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ClinicSettings } from '../types';
+import { supabaseClient, getClientConfig, reloadClientSupabaseConfig } from '../utils/supabaseClient';
 
 interface SettingsViewProps {
   settings: ClinicSettings;
@@ -40,13 +41,22 @@ export default function SettingsView({
     const fetchConfig = async () => {
       try {
         const res = await fetch('/api/supabase-config');
-        if (res.ok) {
+        const contentType = res.headers.get('content-type');
+        if (res.ok && contentType && contentType.includes('application/json')) {
           const data = await res.json();
           setSupabaseUrl(data.url || '');
           setSupabaseKey(data.key || '');
+        } else {
+          // Fallback to client config from localStorage
+          const config = getClientConfig();
+          setSupabaseUrl(config.url || '');
+          setSupabaseKey(config.key || '');
         }
       } catch (err) {
-        console.error('Failed to load active Supabase config:', err);
+        // Fallback to client config from localStorage
+        const config = getClientConfig();
+        setSupabaseUrl(config.url || '');
+        setSupabaseKey(config.key || '');
       }
     };
     fetchConfig();
@@ -73,30 +83,53 @@ export default function SettingsView({
     e.preventDefault();
     setIsTesting(true);
     setTestResult(null);
+
+    const urlTrim = supabaseUrl.trim();
+    const keyTrim = supabaseKey.trim();
+
     try {
-      const res = await fetch('/api/supabase-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: supabaseUrl.trim(), key: supabaseKey.trim() })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      // 1. Always update local client configuration first (so testing directly works)
+      reloadClientSupabaseConfig(urlTrim, keyTrim);
+
+      // 2. Try posting to the backend (will work in AI Studio, fails safely on Vercel)
+      try {
+        const res = await fetch('/api/supabase-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: urlTrim, key: keyTrim })
+        });
+        const contentType = res.headers.get('content-type');
+        if (res.ok && contentType && contentType.includes('application/json')) {
+          await res.json();
+        }
+      } catch (backendErr) {
+        console.warn('Backend server unavailable, updating client-side Supabase settings only.');
+      }
+
+      // 3. Perform verification query directly from client using supabaseClient
+      const startTime = Date.now();
+      const { data, error } = await supabaseClient.from('clinic_settings').select('clinic_name').limit(1);
+      const latencyMs = Date.now() - startTime;
+
+      if (!error) {
         setTestResult({
           success: true,
-          message: data.message,
-          connected: data.connected,
-          error: data.error
+          message: 'Supabase configuration applied and validated successfully! Direct connection was established.',
+          connected: true,
+          latencyMs
         });
       } else {
         setTestResult({
           success: false,
-          message: data.error || 'Failed to update credentials'
+          message: 'Supabase configuration saved, but direct connection verification failed. Please check your URL and Key, or ensure the tables and RLS are created.',
+          connected: false,
+          error: error.message
         });
       }
     } catch (err: any) {
       setTestResult({
         success: false,
-        message: err.message || 'Network error while checking connection'
+        message: err.message || 'Error occurred while saving or testing connection'
       });
     } finally {
       setIsTesting(false);

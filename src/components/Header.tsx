@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabaseClient } from '../utils/supabaseClient';
 
 interface HeaderProps {
   title: string;
@@ -27,21 +28,45 @@ export default function Header({
     setIsChecking(true);
     try {
       const res = await fetch('/api/supabase-status');
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         const data = await res.json();
         setSupabaseConnected(!!data.connected);
         if (data.latencyMs !== undefined) {
           setLatency(data.latencyMs);
         }
       } else {
-        setSupabaseConnected(false);
+        // Fallback: check status directly from client using supabaseClient
+        const startTime = Date.now();
+        const { data, error } = await supabaseClient.from('clinic_settings').select('clinic_name').limit(1);
+        const latencyMs = Date.now() - startTime;
+        if (!error) {
+          setSupabaseConnected(true);
+          setLatency(latencyMs);
+        } else {
+          setSupabaseConnected(false);
+        }
       }
     } catch (err) {
-      setSupabaseConnected(false);
+      // If endpoint fails completely, verify directly with supabaseClient
+      try {
+        const startTime = Date.now();
+        const { data, error } = await supabaseClient.from('clinic_settings').select('clinic_name').limit(1);
+        const latencyMs = Date.now() - startTime;
+        if (!error) {
+          setSupabaseConnected(true);
+          setLatency(latencyMs);
+        } else {
+          setSupabaseConnected(false);
+        }
+      } catch (clientErr) {
+        setSupabaseConnected(false);
+      }
     } finally {
       setIsChecking(false);
     }
   };
+
 
   useEffect(() => {
     checkStatus();
