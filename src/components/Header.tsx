@@ -7,6 +7,7 @@ interface HeaderProps {
   onSyncClick?: () => void;
   doctorName?: string;
   clinicName?: string;
+  isOfflineMode?: boolean;
 }
 
 export default function Header({
@@ -15,15 +16,22 @@ export default function Header({
   setSearchTerm,
   onSyncClick,
   doctorName = 'Dr. Sarah Jenkins',
-  clinicName
+  clinicName,
+  isOfflineMode = false
 }: HeaderProps) {
   return (
     <header className="bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md flex justify-between items-center w-full h-20 px-6 z-10 sticky top-0 border-b border-surface-container-highest/20">
       {/* Dynamic Context Title or Search */}
       <div className="flex-1 flex items-center gap-4">
-        <h2 className="hidden md:block text-lg font-extrabold text-on-surface mr-6 shrink-0 tracking-tight">
+        <h2 className="hidden md:block text-lg font-extrabold text-on-surface mr-2 shrink-0 tracking-tight">
           {title}
         </h2>
+        {isOfflineMode && (
+          <span className="bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 shrink-0 border border-amber-200/50">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Local Sandbox
+          </span>
+        )}
         <div className="relative w-full max-w-md">
           <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">
             search

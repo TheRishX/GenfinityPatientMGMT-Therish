@@ -8,11 +8,13 @@ import AuthBillingView from './components/AuthBillingView';
 import FabricationView from './components/FabricationView';
 import SettingsView from './components/SettingsView';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
+import { DEFAULT_DATABASE, getInitials, generateMRN } from './utils/defaultDb';
 
 export default function App() {
   const [db, setDb] = useState<DatabaseSchema | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isOfflineMode, setIsOfflineMode] = useState<boolean>(false);
 
   // Layout navigation & search
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -26,6 +28,11 @@ export default function App() {
   // New patient modal trigger inside PatientsView
   const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState<boolean>(false);
 
+  const saveStateLocally = (newDb: DatabaseSchema) => {
+    setDb(newDb);
+    localStorage.setItem('genfinity_db', JSON.stringify(newDb));
+  };
+
   // Fetch complete dataset
   const fetchState = async () => {
     try {
@@ -34,10 +41,25 @@ export default function App() {
       if (!res.ok) throw new Error('Failed to retrieve clinical data ledger');
       const data: DatabaseSchema = await res.json();
       setDb(data);
+      setIsOfflineMode(false);
       setError(null);
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Server connection failed');
+      console.warn('Backend server connection failed. Switching to Local Sandbox Mode for Vercel/offline compatibility.', err);
+      // Fallback to local storage
+      const localData = localStorage.getItem('genfinity_db');
+      if (localData) {
+        try {
+          setDb(JSON.parse(localData));
+        } catch (e) {
+          setDb(DEFAULT_DATABASE);
+          localStorage.setItem('genfinity_db', JSON.stringify(DEFAULT_DATABASE));
+        }
+      } else {
+        setDb(DEFAULT_DATABASE);
+        localStorage.setItem('genfinity_db', JSON.stringify(DEFAULT_DATABASE));
+      }
+      setIsOfflineMode(true);
+      setError(null); // Clear error to allow app to run in local fallback mode
     } finally {
       setLoading(false);
     }
@@ -78,6 +100,49 @@ export default function App() {
 
   // API Call: Add Patient
   const handleAddPatient = async (patientData: any) => {
+    if (isOfflineMode || !db) {
+      const generatedMrn = generateMRN();
+      const initials = getInitials(patientData.name);
+      const newPatient: Patient = {
+        id: 'p_' + Date.now(),
+        name: patientData.name,
+        phone: patientData.phone || '',
+        dob: patientData.dob || '',
+        email: patientData.email || '',
+        referralSource: patientData.referralSource || 'other',
+        status: patientData.status || 'In Progress',
+        mrn: generatedMrn,
+        avatarInitials: initials,
+        files: [],
+        insuranceCompany: '',
+        insuranceId: '',
+        address: '',
+        gender: 'Not specified',
+        clinicalNotes: []
+      };
+      
+      const updatedPatients = [newPatient, ...db.patients];
+      let updatedAppointments = [...db.appointments];
+      if (newPatient.status === 'Consultation') {
+        const newAppt = {
+          id: 'a_' + Date.now(),
+          patientName: newPatient.name,
+          time: '02:00 PM',
+          type: 'Initial Consult',
+          status: 'Scheduled' as const,
+          initials
+        };
+        updatedAppointments = [newAppt, ...updatedAppointments];
+      }
+
+      saveStateLocally({
+        ...db,
+        patients: updatedPatients,
+        appointments: updatedAppointments
+      });
+      return;
+    }
+
     try {
       const res = await fetch('/api/patients', {
         method: 'POST',
@@ -93,6 +158,33 @@ export default function App() {
 
   // API Call: Add Document File
   const handleAddFile = async (patientId: string, fileData: any) => {
+    if (isOfflineMode || !db) {
+      const newFile = {
+        id: 'f_' + Date.now(),
+        name: fileData.name,
+        type: fileData.type || 'pdf',
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+        size: fileData.size || '1.0 MB',
+        content: fileData.content || ''
+      };
+
+      const updatedPatients = db.patients.map(p => {
+        if (p.id === patientId) {
+          return {
+            ...p,
+            files: [newFile, ...(p.files || [])]
+          };
+        }
+        return p;
+      });
+
+      saveStateLocally({
+        ...db,
+        patients: updatedPatients
+      });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/patients/${patientId}/files`, {
         method: 'POST',
@@ -108,6 +200,24 @@ export default function App() {
 
   // API Call: Delete Document File
   const handleDeleteFile = async (patientId: string, fileId: string) => {
+    if (isOfflineMode || !db) {
+      const updatedPatients = db.patients.map(p => {
+        if (p.id === patientId) {
+          return {
+            ...p,
+            files: (p.files || []).filter(f => f.id !== fileId)
+          };
+        }
+        return p;
+      });
+
+      saveStateLocally({
+        ...db,
+        patients: updatedPatients
+      });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/patients/${patientId}/files/${fileId}`, {
         method: 'DELETE'
@@ -121,6 +231,39 @@ export default function App() {
 
   // API Call: Update Patient workflow column
   const handleUpdatePatientStatus = async (patientId: string, status: Patient['status']) => {
+    if (isOfflineMode || !db) {
+      const updatedPatients = db.patients.map(p => {
+        if (p.id === patientId) {
+          return {
+            ...p,
+            status
+          };
+        }
+        return p;
+      });
+
+      let updatedAppointments = [...db.appointments];
+      const targetPatient = db.patients.find(p => p.id === patientId);
+      if (status === 'Consultation' && targetPatient) {
+        const newAppt = {
+          id: 'a_' + Date.now(),
+          patientName: targetPatient.name,
+          time: '02:00 PM',
+          type: 'Initial Consult',
+          status: 'Scheduled' as const,
+          initials: getInitials(targetPatient.name)
+        };
+        updatedAppointments = [newAppt, ...updatedAppointments];
+      }
+
+      saveStateLocally({
+        ...db,
+        patients: updatedPatients,
+        appointments: updatedAppointments
+      });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/patients/${patientId}/status`, {
         method: 'PATCH',
@@ -136,6 +279,24 @@ export default function App() {
 
   // API Call: Comprehensive Patient Update (Demographics, Insurance, Notes)
   const handleUpdatePatient = async (patientId: string, patientData: any) => {
+    if (isOfflineMode || !db) {
+      const updatedPatients = db.patients.map(p => {
+        if (p.id === patientId) {
+          return {
+            ...p,
+            ...patientData
+          };
+        }
+        return p;
+      });
+
+      saveStateLocally({
+        ...db,
+        patients: updatedPatients
+      });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/patients/${patientId}`, {
         method: 'PATCH',
@@ -151,6 +312,23 @@ export default function App() {
 
   // API Call: Add Appointment in Supabase
   const handleAddAppointment = async (apptData: any) => {
+    if (isOfflineMode || !db) {
+      const newAppt = {
+        id: 'a_' + Date.now(),
+        patientName: apptData.patientName,
+        time: apptData.time || '09:00 AM',
+        type: apptData.type || 'Consultation',
+        status: apptData.status || 'Scheduled',
+        initials: getInitials(apptData.patientName)
+      };
+
+      saveStateLocally({
+        ...db,
+        appointments: [newAppt, ...db.appointments]
+      });
+      return;
+    }
+
     try {
       const res = await fetch('/api/appointments', {
         method: 'POST',
@@ -166,6 +344,24 @@ export default function App() {
 
   // API Call: Update Appointment Status / Details
   const handleUpdateAppointment = async (apptId: string, updateData: any) => {
+    if (isOfflineMode || !db) {
+      const updatedAppointments = db.appointments.map(a => {
+        if (a.id === apptId) {
+          return {
+            ...a,
+            ...updateData
+          };
+        }
+        return a;
+      });
+
+      saveStateLocally({
+        ...db,
+        appointments: updatedAppointments
+      });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/appointments/${apptId}`, {
         method: 'PATCH',
@@ -181,6 +377,24 @@ export default function App() {
 
   // API Call: Update Authorization
   const handleUpdateAuth = async (authId: string, updateData: any) => {
+    if (isOfflineMode || !db) {
+      const updatedAuths = db.authorizations.map(a => {
+        if (a.id === authId) {
+          return {
+            ...a,
+            ...updateData
+          };
+        }
+        return a;
+      });
+
+      saveStateLocally({
+        ...db,
+        authorizations: updatedAuths
+      });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/authorizations/${authId}`, {
         method: 'PATCH',
@@ -196,6 +410,25 @@ export default function App() {
 
   // API Call: Add Authorization request
   const handleAddAuth = async (authData: any) => {
+    if (isOfflineMode || !db) {
+      const newAuth: Authorization = {
+        id: 'au_' + Date.now(),
+        patientName: authData.patientName,
+        device: authData.device,
+        status: authData.status || 'Pending',
+        submittedDate: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+        daysWaiting: 1,
+        payer: authData.payer || 'Private Pay',
+        notes: authData.notes || ''
+      };
+
+      saveStateLocally({
+        ...db,
+        authorizations: [newAuth, ...db.authorizations]
+      });
+      return;
+    }
+
     try {
       const res = await fetch('/api/authorizations', {
         method: 'POST',
@@ -211,6 +444,26 @@ export default function App() {
 
   // API Call: Add Invoice Claim
   const handleAddClaim = async (claimData: any) => {
+    if (isOfflineMode || !db) {
+      const count = db.claims.length + 890;
+      const newClaim: Claim = {
+        id: 'c_' + Date.now(),
+        claimNumber: `INV-2023-0${count}`,
+        patientName: claimData.patientName,
+        payer: claimData.payer || 'Self',
+        doctor: claimData.doctor || 'Dr. Sarah Jenkins',
+        amount: parseFloat(claimData.amount),
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
+        status: claimData.status || 'Billed'
+      };
+
+      saveStateLocally({
+        ...db,
+        claims: [newClaim, ...db.claims]
+      });
+      return;
+    }
+
     try {
       const res = await fetch('/api/claims', {
         method: 'POST',
@@ -226,6 +479,14 @@ export default function App() {
 
   // API Call: Save settings config
   const handleSaveSettings = async (settingsData: ClinicSettings) => {
+    if (isOfflineMode || !db) {
+      saveStateLocally({
+        ...db,
+        settings: settingsData
+      });
+      return;
+    }
+
     try {
       const res = await fetch('/api/settings', {
         method: 'PUT',
@@ -241,6 +502,24 @@ export default function App() {
 
   // API Call: Update Fabrication Workshop item
   const handleUpdateFabrication = async (itemId: string, updateData: any) => {
+    if (isOfflineMode || !db) {
+      const updatedFabs = db.fabrication.map(f => {
+        if (f.id === itemId) {
+          return {
+            ...f,
+            ...updateData
+          };
+        }
+        return f;
+      });
+
+      saveStateLocally({
+        ...db,
+        fabrication: updatedFabs
+      });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/fabrication/${itemId}`, {
         method: 'PATCH',
@@ -525,6 +804,7 @@ export default function App() {
           setSearchTerm={setSearchTerm}
           onSyncClick={fetchState}
           clinicName={db?.settings.clinicName}
+          isOfflineMode={isOfflineMode}
         />
 
         {/* Inner Content stage */}
