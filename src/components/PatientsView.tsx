@@ -1,28 +1,107 @@
-import React, { useState } from 'react';
-import { Patient, PatientFile } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Patient, PatientFile, Appointment, Authorization, Claim, ClinicalNote } from '../types';
 
 interface PatientsViewProps {
   patients: Patient[];
+  appointments: Appointment[];
+  authorizations: Authorization[];
+  claims: Claim[];
   searchTerm: string;
   onAddPatient: (patientData: any) => Promise<void>;
   onAddFile: (patientId: string, fileData: any) => Promise<void>;
   onDeleteFile: (patientId: string, fileId: string) => Promise<void>;
+  onUpdatePatient: (patientId: string, patientData: any) => Promise<void>;
+  onAddAppointment: (apptData: any) => Promise<void>;
+  onUpdateAppointment: (apptId: string, updateData: any) => Promise<void>;
+  onAddAuth: (authData: any) => Promise<void>;
+  onAddClaim: (claimData: any) => Promise<void>;
   isNewPatientModalOpen: boolean;
   setIsNewPatientModalOpen: (open: boolean) => void;
 }
 
 export default function PatientsView({
   patients,
+  appointments,
+  authorizations,
+  claims,
   searchTerm,
   onAddPatient,
   onAddFile,
   onDeleteFile,
+  onUpdatePatient,
+  onAddAppointment,
+  onUpdateAppointment,
+  onAddAuth,
+  onAddClaim,
   isNewPatientModalOpen,
   setIsNewPatientModalOpen
 }: PatientsViewProps) {
   // Active selected patient for profile modal
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [activeProfileTab, setActiveProfileTab] = useState<string>('documents');
+  const [viewingFile, setViewingFile] = useState<PatientFile | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Info Tab States
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [editInfoName, setEditInfoName] = useState('');
+  const [editInfoPhone, setEditInfoPhone] = useState('');
+  const [editInfoDob, setEditInfoDob] = useState('');
+  const [editInfoEmail, setEditInfoEmail] = useState('');
+  const [editInfoReferralSource, setEditInfoReferralSource] = useState('');
+  const [editInfoStatus, setEditInfoStatus] = useState('');
+  const [editInfoInsuranceCompany, setEditInfoInsuranceCompany] = useState('');
+  const [editInfoInsuranceId, setEditInfoInsuranceId] = useState('');
+  const [editInfoAddress, setEditInfoAddress] = useState('');
+  const [editInfoGender, setEditInfoGender] = useState('');
+
+  // Appointments Tab States
+  const [newApptDate, setNewApptDate] = useState('');
+  const [newApptTime, setNewApptTime] = useState('');
+  const [newApptType, setNewApptType] = useState('Consultation');
+  const [newApptStatus, setNewApptStatus] = useState<'Scheduled' | 'Checked In'>('Scheduled');
+
+  // Authorization Tab States
+  const [newAuthDevice, setNewAuthDevice] = useState('');
+  const [newAuthPayer, setNewAuthPayer] = useState('');
+  const [newAuthNotes, setNewAuthNotes] = useState('');
+
+  // Billing Tab States
+  const [newClaimPayer, setNewClaimPayer] = useState('');
+  const [newClaimAmount, setNewClaimAmount] = useState('');
+  const [newClaimDoc, setNewClaimDoc] = useState('');
+
+  // Clinical Notes Tab States
+  const [newNoteText, setNewNoteText] = useState('');
+  const [newNoteAuthor, setNewNoteAuthor] = useState('Dr. Aris Thorne');
+
+  // Keep selectedPatient state in sync with updated database props
+  useEffect(() => {
+    if (selectedPatient) {
+      const updated = patients.find(p => p.id === selectedPatient.id);
+      if (updated) {
+        setSelectedPatient(updated);
+      }
+    }
+  }, [patients]);
+
+  // Pre-fill edit fields on patient selection
+  useEffect(() => {
+    if (selectedPatient) {
+      setEditInfoName(selectedPatient.name || '');
+      setEditInfoPhone(selectedPatient.phone || '');
+      setEditInfoDob(selectedPatient.dob || '');
+      setEditInfoEmail(selectedPatient.email || '');
+      setEditInfoReferralSource(selectedPatient.referralSource || 'other');
+      setEditInfoStatus(selectedPatient.status || 'In Progress');
+      setEditInfoInsuranceCompany(selectedPatient.insuranceCompany || '');
+      setEditInfoInsuranceId(selectedPatient.insuranceId || '');
+      setEditInfoAddress(selectedPatient.address || '');
+      setEditInfoGender(selectedPatient.gender || 'Not specified');
+      setIsEditingInfo(false);
+    }
+  }, [selectedPatient?.id]);
 
   // Add Patient Form State
   const [newName, setNewName] = useState('');
@@ -72,38 +151,70 @@ export default function PatientsView({
     setIsNewPatientModalOpen(false);
   };
 
-  // Mock File Upload dialog
-  const handleMockUpload = async () => {
+  // Real File Upload handlers (drag, drop, click)
+  const processUploadedFile = (file: File) => {
     if (!selectedPatient) return;
-    const filename = prompt('Enter a filename to simulate PDF/JPG upload:', 'Scan_Medical_LMN.pdf');
-    if (!filename) return;
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      const extension = file.name.split('.').pop()?.toLowerCase() || '';
+      let type: 'pdf' | 'jpg' | 'png' | 'doc' = 'pdf';
+      if (['jpg', 'jpeg'].includes(extension)) type = 'jpg';
+      else if (extension === 'png') type = 'png';
+      else if (extension === 'doc' || extension === 'docx') type = 'doc';
 
-    const extension = filename.split('.').pop()?.toLowerCase();
-    const type = (extension === 'jpg' || extension === 'jpeg' || extension === 'png') ? 'jpg' : 'pdf';
-    
-    await onAddFile(selectedPatient.id, {
-      name: filename,
-      type: type,
-      size: `${(Math.random() * 4 + 1).toFixed(1)} MB`
-    });
+      const sizeStr = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
 
-    // Re-sync local selection modal
-    const updatedPatient = patients.find(p => p.id === selectedPatient.id);
-    if (updatedPatient) {
-      setSelectedPatient({
-        ...updatedPatient,
-        files: [
-          {
-            id: `temp_${Date.now()}`,
-            name: filename,
-            type: type,
-            date: 'Today',
-            size: '2.4 MB'
-          },
-          ...(updatedPatient.files || [])
-        ]
+      await onAddFile(selectedPatient.id, {
+        name: file.name,
+        type: type,
+        size: sizeStr,
+        content: base64String
       });
-    }
+
+      // Update selectedPatient's file list locally for instant feedback
+      setSelectedPatient(prev => {
+        if (!prev) return null;
+        const newFile: PatientFile = {
+          id: `f_${Date.now()}`,
+          name: file.name,
+          type: type,
+          date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+          size: sizeStr,
+          content: base64String
+        };
+        return {
+          ...prev,
+          files: [newFile, ...(prev.files || [])]
+        };
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!selectedPatient || !e.target.files || e.target.files.length === 0) return;
+    processUploadedFile(e.target.files[0]);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (!selectedPatient || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
+    processUploadedFile(e.dataTransfer.files[0]);
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
   };
 
   const handleLocalDeleteFile = async (fileId: string) => {
@@ -447,9 +558,21 @@ export default function PatientsView({
 
                     {/* Right column: Drag File action box */}
                     <div
-                      onClick={handleMockUpload}
-                      className="bg-surface-container-low hover:bg-surface-container-high rounded-2xl p-5 flex flex-col items-center justify-center text-center border-2 border-dashed border-outline-variant hover:border-secondary transition-all cursor-pointer group"
+                      onClick={triggerFileInput}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      className={`bg-surface-container-low hover:bg-surface-container-high rounded-2xl p-5 flex flex-col items-center justify-center text-center border-2 border-dashed transition-all cursor-pointer group ${
+                        isDragging ? 'border-primary bg-primary/5 scale-105' : 'border-outline-variant hover:border-secondary'
+                      }`}
                     >
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        style={{ display: 'none' }}
+                        accept="image/*,.pdf,.doc,.docx"
+                      />
                       <div className="w-12 h-12 rounded-full bg-secondary-container/30 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
                         <span className="material-symbols-outlined text-xl text-on-secondary-container">cloud_upload</span>
                       </div>
@@ -496,7 +619,7 @@ export default function PatientsView({
 
                             <div className="flex items-center gap-1.5 mt-4 pt-3 border-t border-surface-container/30">
                               <button
-                                onClick={() => alert(`Simulating viewing file: ${file.name}`)}
+                                onClick={() => setViewingFile(file)}
                                 className="flex-1 py-1.5 rounded-full bg-surface-container-low text-on-surface hover:bg-surface-container-high transition-colors text-xs font-bold flex items-center justify-center gap-1 cursor-pointer"
                               >
                                 <span className="material-symbols-outlined text-xs">visibility</span> View
@@ -519,6 +642,739 @@ export default function PatientsView({
                     </div>
                   </div>
                 </div>
+              ) : activeProfileTab === 'info' ? (
+                <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
+                  <div className="flex justify-between items-center bg-surface-container-low p-4 rounded-2xl border border-surface-container-highest/20">
+                    <div>
+                      <h2 className="text-sm font-black text-on-surface flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-lg">contact_page</span>
+                        Patient Demographics & Clinical Profile
+                      </h2>
+                      <p className="text-[10px] text-on-surface-variant font-semibold mt-0.5">
+                        Manage HIPAA-compliant records, insurance verification, and address details.
+                      </p>
+                    </div>
+                    <button
+                      id="toggle-edit-info-btn"
+                      onClick={() => setIsEditingInfo(!isEditingInfo)}
+                      className="px-4 py-1.5 rounded-full bg-secondary text-white text-xs font-bold flex items-center gap-1.5 hover:bg-secondary-container transition-all cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-xs">
+                        {isEditingInfo ? 'visibility' : 'edit'}
+                      </span>
+                      {isEditingInfo ? 'Cancel / View' : 'Edit Demographics'}
+                    </button>
+                  </div>
+
+                  {isEditingInfo ? (
+                    <form
+                      id="edit-patient-info-form"
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        await onUpdatePatient(selectedPatient.id, {
+                          name: editInfoName,
+                          phone: editInfoPhone,
+                          dob: editInfoDob,
+                          email: editInfoEmail,
+                          referralSource: editInfoReferralSource,
+                          status: editInfoStatus,
+                          insuranceCompany: editInfoInsuranceCompany,
+                          insuranceId: editInfoInsuranceId,
+                          address: editInfoAddress,
+                          gender: editInfoGender
+                        });
+                        setIsEditingInfo(false);
+                      }}
+                      className="bg-surface-container-lowest rounded-3xl p-6 border border-surface-container-highest/40 space-y-4"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Full Name</label>
+                          <input
+                            type="text"
+                            required
+                            value={editInfoName}
+                            onChange={(e) => setEditInfoName(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Phone Number</label>
+                          <input
+                            type="text"
+                            value={editInfoPhone}
+                            onChange={(e) => setEditInfoPhone(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Date of Birth</label>
+                          <input
+                            type="date"
+                            value={editInfoDob}
+                            onChange={(e) => setEditInfoDob(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Email Address</label>
+                          <input
+                            type="email"
+                            value={editInfoEmail}
+                            onChange={(e) => setEditInfoEmail(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Referral Source</label>
+                          <select
+                            value={editInfoReferralSource}
+                            onChange={(e) => setEditInfoReferralSource(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          >
+                            <option value="physician">Primary Care Physician</option>
+                            <option value="hospital">Hospital Discharge</option>
+                            <option value="specialist">Orthopedic Specialist</option>
+                            <option value="other">Other</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Workflow Status</label>
+                          <select
+                            value={editInfoStatus}
+                            onChange={(e) => setEditInfoStatus(e.target.value as any)}
+                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          >
+                            <option value="In Progress">In Progress</option>
+                            <option value="Consultation">Consultation</option>
+                            <option value="Fabrication">Fabrication</option>
+                            <option value="New Referral">New Referral</option>
+                            <option value="Waiting for Rx">Waiting for Rx</option>
+                            <option value="Ready for Auth">Ready for Auth</option>
+                            <option value="Auth Pending">Auth Pending</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Gender</label>
+                          <select
+                            value={editInfoGender}
+                            onChange={(e) => setEditInfoGender(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          >
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Non-binary">Non-binary</option>
+                            <option value="Not specified">Not specified</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Insurance Carrier</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Medicare Blue Cross"
+                            value={editInfoInsuranceCompany}
+                            onChange={(e) => setEditInfoInsuranceCompany(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Member ID / Insurance ID</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. MB-9283-X"
+                            value={editInfoInsuranceId}
+                            onChange={(e) => setEditInfoInsuranceId(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Primary Address</label>
+                          <input
+                            type="text"
+                            placeholder="123 Clinical Street, Apt 101"
+                            value={editInfoAddress}
+                            onChange={(e) => setEditInfoAddress(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-surface-container flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingInfo(false)}
+                          className="px-5 py-2 rounded-full border border-surface-container-highest text-xs font-bold hover:bg-surface-container-low transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-6 py-2 bg-primary text-white text-xs font-bold rounded-full hover:bg-primary-container transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-sm font-bold">check</span>
+                          Save Changes
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Demographics Card */}
+                      <div className="bg-surface-container-lowest rounded-3xl p-6 border border-surface-container-highest/40 space-y-4">
+                        <h3 className="text-xs font-black text-on-surface flex items-center gap-1.5 border-b border-surface-container pb-2">
+                          <span className="material-symbols-outlined text-secondary text-sm">person</span>
+                          General Profile
+                        </h3>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-on-surface-variant font-bold">MRN:</span>
+                            <span className="font-mono bg-surface-container-low px-2 py-0.5 rounded-md font-bold text-on-surface">{selectedPatient.mrn}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-on-surface-variant font-bold">Gender:</span>
+                            <span className="font-semibold text-on-surface">{selectedPatient.gender || 'Not specified'}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-on-surface-variant font-bold">Email:</span>
+                            <span className="font-semibold text-on-surface break-all">{selectedPatient.email || 'No email registered'}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-on-surface-variant font-bold">Phone:</span>
+                            <span className="font-semibold text-on-surface">{selectedPatient.phone || 'No phone registered'}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-on-surface-variant font-bold">Birth Date:</span>
+                            <span className="font-semibold text-on-surface">{selectedPatient.dob || '01/01/1980'}</span>
+                          </div>
+                          <div className="flex justify-between items-start text-xs">
+                            <span className="text-on-surface-variant font-bold shrink-0">Address:</span>
+                            <span className="font-semibold text-on-surface text-right">{selectedPatient.address || 'No address registered'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Insurance & Status Card */}
+                      <div className="bg-surface-container-lowest rounded-3xl p-6 border border-surface-container-highest/40 space-y-4">
+                        <h3 className="text-xs font-black text-on-surface flex items-center gap-1.5 border-b border-surface-container pb-2">
+                          <span className="material-symbols-outlined text-secondary text-sm">shield</span>
+                          Payer &amp; Referrals
+                        </h3>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-on-surface-variant font-bold">Insurance Carrier:</span>
+                            <span className="font-semibold text-on-surface">{selectedPatient.insuranceCompany || 'No carrier verified'}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-on-surface-variant font-bold">Insurance Member ID:</span>
+                            <span className="font-mono bg-surface-container-low px-2 py-0.5 rounded-md font-bold text-on-surface">{selectedPatient.insuranceId || 'Pending'}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-on-surface-variant font-bold">Workflow State:</span>
+                            <span className="px-2.5 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-full">{selectedPatient.status}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-on-surface-variant font-bold">Referral Source:</span>
+                            <span className="capitalize font-semibold text-on-surface">{selectedPatient.referralSource || 'Other'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : activeProfileTab === 'appointments' ? (
+                <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left Column: Schedule Appointment Form */}
+                    <div className="lg:col-span-1 bg-surface-container-lowest rounded-3xl p-5 border border-surface-container-highest/40 flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-xs font-black text-on-surface flex items-center gap-1.5 border-b border-surface-container pb-2 mb-4">
+                          <span className="material-symbols-outlined text-primary text-sm">edit_calendar</span>
+                          Schedule Session
+                        </h3>
+                        <form
+                          id="add-appointment-form"
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            if (!newApptDate || !newApptTime) return;
+                            await onAddAppointment({
+                              patientName: selectedPatient.name,
+                              time: newApptTime,
+                              type: newApptType,
+                              status: newApptStatus,
+                              appt_date: newApptDate
+                            });
+                            // Reset
+                            setNewApptDate('');
+                            setNewApptTime('');
+                          }}
+                          className="space-y-3"
+                        >
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Date</label>
+                            <input
+                              type="date"
+                              required
+                              value={newApptDate}
+                              onChange={(e) => setNewApptDate(e.target.value)}
+                              className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Time</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 10:30 AM"
+                              required
+                              value={newApptTime}
+                              onChange={(e) => setNewApptTime(e.target.value)}
+                              className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Session Type</label>
+                            <select
+                              value={newApptType}
+                              onChange={(e) => setNewApptType(e.target.value)}
+                              className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            >
+                              <option value="Initial Consult">Initial Consult</option>
+                              <option value="Device Fitting">Device Fitting</option>
+                              <option value="Device Checkout">Device Checkout</option>
+                              <option value="Gait Evaluation">Gait Evaluation</option>
+                              <option value="Adjustment Session">Adjustment Session</option>
+                              <option value="Follow-up">Follow-up</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Status</label>
+                            <select
+                              value={newApptStatus}
+                              onChange={(e) => setNewApptStatus(e.target.value as any)}
+                              className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            >
+                              <option value="Scheduled">Scheduled</option>
+                              <option value="Checked In">Checked In</option>
+                            </select>
+                          </div>
+                          <button
+                            type="submit"
+                            className="w-full py-2.5 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary-container transition-all cursor-pointer mt-4"
+                          >
+                            <span className="material-symbols-outlined text-xs">add</span>
+                            Schedule Now
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Appointments List */}
+                    <div className="lg:col-span-2 space-y-4">
+                      <h3 className="text-sm font-black text-on-surface flex items-center gap-2">
+                        <span className="material-symbols-outlined text-secondary text-lg">calendar_today</span>
+                        Scheduled Appointments ({appointments.filter(a => a.patientName === selectedPatient.name).length})
+                      </h3>
+
+                      <div className="space-y-3">
+                        {appointments.filter(a => a.patientName === selectedPatient.name).length > 0 ? (
+                          appointments
+                            .filter(a => a.patientName === selectedPatient.name)
+                            .map((appt) => (
+                              <div
+                                key={appt.id}
+                                className="bg-surface-container-lowest rounded-2xl p-4 border border-surface-container-highest/60 flex justify-between items-center shadow-xs hover:border-secondary transition-all"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-secondary-container/10 text-on-secondary-container flex items-center justify-center text-sm font-black">
+                                    {appt.type[0] || 'C'}
+                                  </div>
+                                  <div>
+                                    <h4 className="text-xs font-bold text-on-surface">{appt.type}</h4>
+                                    <p className="text-[10px] font-semibold text-on-surface-variant mt-0.5 flex items-center gap-1">
+                                      <span className="material-symbols-outlined text-xs">schedule</span>
+                                      {appt.time} • {appt.status}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${
+                                    appt.status === 'Checked In'
+                                      ? 'bg-secondary/10 text-secondary'
+                                      : 'bg-primary/10 text-primary'
+                                  }`}>
+                                    {appt.status}
+                                  </span>
+
+                                  <button
+                                    onClick={async () => {
+                                      const nextStatus = appt.status === 'Scheduled' ? 'Checked In' : 'Scheduled';
+                                      await onUpdateAppointment(appt.id, { status: nextStatus });
+                                    }}
+                                    title="Toggle Status"
+                                    className="p-1.5 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant cursor-pointer"
+                                  >
+                                    <span className="material-symbols-outlined text-sm">sync_alt</span>
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                        ) : (
+                          <div className="bg-surface-container-lowest border border-dashed border-surface-container-highest/60 rounded-2xl p-8 text-center text-on-surface-variant text-xs font-bold">
+                            No scheduled appointments for this patient. Use the form to schedule a session.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : activeProfileTab === 'authorization' ? (
+                <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left Column: Submit Authorization Form */}
+                    <div className="lg:col-span-1 bg-surface-container-lowest rounded-3xl p-5 border border-surface-container-highest/40">
+                      <h3 className="text-xs font-black text-on-surface flex items-center gap-1.5 border-b border-surface-container pb-2 mb-4">
+                        <span className="material-symbols-outlined text-primary text-sm">verified_user</span>
+                        Submit Request
+                      </h3>
+                      <form
+                        id="add-auth-form"
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (!newAuthDevice || !newAuthPayer) return;
+                          await onAddAuth({
+                            patientName: selectedPatient.name,
+                            device: newAuthDevice,
+                            payer: newAuthPayer,
+                            notes: newAuthNotes
+                          });
+                          // Reset
+                          setNewAuthDevice('');
+                          setNewAuthPayer('');
+                          setNewAuthNotes('');
+                        }}
+                        className="space-y-3"
+                      >
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Device Spec</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Custom Carbon KAFO"
+                            required
+                            value={newAuthDevice}
+                            onChange={(e) => setNewAuthDevice(e.target.value)}
+                            className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Insurance Payer</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Medicare Part B"
+                            required
+                            value={newAuthPayer}
+                            onChange={(e) => setNewAuthPayer(e.target.value)}
+                            className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Clinical Justification Notes</label>
+                          <textarea
+                            rows={3}
+                            placeholder="Add brief clinical reasoning..."
+                            value={newAuthNotes}
+                            onChange={(e) => setNewAuthNotes(e.target.value)}
+                            className="w-full px-4 py-2 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none resize-none"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          className="w-full py-2.5 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary-container transition-all cursor-pointer mt-4"
+                        >
+                          <span className="material-symbols-outlined text-xs">send</span>
+                          Submit Request
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Right Column: Authorizations List */}
+                    <div className="lg:col-span-2 space-y-4">
+                      <h3 className="text-sm font-black text-on-surface flex items-center gap-2">
+                        <span className="material-symbols-outlined text-secondary text-lg">shield</span>
+                        Insurance Authorizations ({authorizations.filter(a => a.patientName === selectedPatient.name).length})
+                      </h3>
+
+                      <div className="space-y-3">
+                        {authorizations.filter(a => a.patientName === selectedPatient.name).length > 0 ? (
+                          authorizations
+                            .filter(a => a.patientName === selectedPatient.name)
+                            .map((auth) => (
+                              <div
+                                key={auth.id}
+                                className="bg-surface-container-lowest rounded-2xl p-4 border border-surface-container-highest/60 shadow-xs hover:border-secondary transition-all space-y-3"
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <h4 className="text-xs font-bold text-on-surface">{auth.device}</h4>
+                                    <p className="text-[10px] font-semibold text-on-surface-variant mt-0.5">
+                                      Payer: {auth.payer} • Submitted {auth.submittedDate}
+                                    </p>
+                                  </div>
+                                  <span className={`px-2.5 py-0.5 text-[9px] font-bold rounded-full ${
+                                    auth.status === 'Approved'
+                                      ? 'bg-secondary/15 text-secondary'
+                                      : auth.status === 'Denied'
+                                      ? 'bg-primary/10 text-primary'
+                                      : auth.status === 'Needs More Info'
+                                      ? 'bg-cyan-500/10 text-cyan-700'
+                                      : 'bg-amber-500/10 text-amber-700'
+                                  }`}>
+                                    {auth.status}
+                                  </span>
+                                </div>
+
+                                {auth.authNumber && (
+                                  <div className="flex items-center gap-2 text-[10px] font-bold text-on-surface bg-surface p-2 rounded-lg">
+                                    <span className="material-symbols-outlined text-xs text-secondary">verified</span>
+                                    <span>Auth Code: {auth.authNumber}</span>
+                                  </div>
+                                )}
+
+                                {auth.notes && (
+                                  <p className="text-[10px] italic text-on-surface-variant leading-relaxed">
+                                    "{auth.notes}"
+                                  </p>
+                                )}
+                              </div>
+                            ))
+                        ) : (
+                          <div className="bg-surface-container-lowest border border-dashed border-surface-container-highest/60 rounded-2xl p-8 text-center text-on-surface-variant text-xs font-bold">
+                            No prior authorization filings. Use the form to submit a new claim request.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : activeProfileTab === 'billing' ? (
+                <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left Column: Create Claim / Invoice */}
+                    <div className="lg:col-span-1 bg-surface-container-lowest rounded-3xl p-5 border border-surface-container-highest/40">
+                      <h3 className="text-xs font-black text-on-surface flex items-center gap-1.5 border-b border-surface-container pb-2 mb-4">
+                        <span className="material-symbols-outlined text-primary text-sm">receipt_long</span>
+                        Generate Invoice
+                      </h3>
+                      <form
+                        id="add-claim-form"
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (!newClaimPayer || !newClaimAmount) return;
+                          await onAddClaim({
+                            patientName: selectedPatient.name,
+                            payer: newClaimPayer,
+                            amount: newClaimAmount,
+                            doctor: newClaimDoc || 'Dr. Sarah Jenkins'
+                          });
+                          // Reset
+                          setNewClaimPayer('');
+                          setNewClaimAmount('');
+                          setNewClaimDoc('');
+                        }}
+                        className="space-y-3"
+                      >
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Billing Payer</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Self Pay / Medicare"
+                            required
+                            value={newClaimPayer}
+                            onChange={(e) => setNewClaimPayer(e.target.value)}
+                            className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Invoice Amount ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="e.g. 1250.00"
+                            required
+                            value={newClaimAmount}
+                            onChange={(e) => setNewClaimAmount(e.target.value)}
+                            className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Billing Clinician</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Dr. Sarah Jenkins"
+                            value={newClaimDoc}
+                            onChange={(e) => setNewClaimDoc(e.target.value)}
+                            className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          className="w-full py-2.5 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary-container transition-all cursor-pointer mt-4"
+                        >
+                          <span className="material-symbols-outlined text-xs">post_add</span>
+                          Generate Claim
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Right Column: Claims / Invoices List */}
+                    <div className="lg:col-span-2 space-y-4">
+                      <h3 className="text-sm font-black text-on-surface flex items-center gap-2">
+                        <span className="material-symbols-outlined text-secondary text-lg">credit_card</span>
+                        Invoices &amp; Claims ({claims.filter(c => c.patientName === selectedPatient.name).length})
+                      </h3>
+
+                      <div className="space-y-3">
+                        {claims.filter(c => c.patientName === selectedPatient.name).length > 0 ? (
+                          claims
+                            .filter(c => c.patientName === selectedPatient.name)
+                            .map((claim) => (
+                              <div
+                                key={claim.id}
+                                className="bg-surface-container-lowest rounded-2xl p-4 border border-surface-container-highest/60 flex justify-between items-center shadow-xs hover:border-secondary transition-all"
+                              >
+                                <div>
+                                  <h4 className="text-xs font-bold text-on-surface">{claim.claimNumber}</h4>
+                                  <p className="text-[10px] font-semibold text-on-surface-variant mt-0.5">
+                                    Payer: {claim.payer} • {claim.date} • Clinician: {claim.doctor}
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xs font-bold text-on-surface">
+                                    ${claim.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                  </span>
+                                  <span className={`px-2.5 py-0.5 text-[9px] font-bold rounded-full ${
+                                    claim.status === 'Paid'
+                                      ? 'bg-secondary/15 text-secondary'
+                                      : claim.status === 'Denied'
+                                      ? 'bg-primary/10 text-primary'
+                                      : 'bg-blue-500/10 text-blue-700'
+                                  }`}>
+                                    {claim.status}
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                        ) : (
+                          <div className="bg-surface-container-lowest border border-dashed border-surface-container-highest/60 rounded-2xl p-8 text-center text-on-surface-variant text-xs font-bold">
+                            No billing history exists. Use the invoice generator to log new billing claims.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : activeProfileTab === 'notes' ? (
+                <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left Column: Write Clinical Note Form */}
+                    <div className="lg:col-span-1 bg-surface-container-lowest rounded-3xl p-5 border border-surface-container-highest/40">
+                      <h3 className="text-xs font-black text-on-surface flex items-center gap-1.5 border-b border-surface-container pb-2 mb-4">
+                        <span className="material-symbols-outlined text-primary text-sm">history_edu</span>
+                        Add Progress Note
+                      </h3>
+                      <form
+                        id="add-clinical-note-form"
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (!newNoteText.trim()) return;
+
+                          const newNote: ClinicalNote = {
+                            id: `note_${Date.now()}`,
+                            date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                            author: newNoteAuthor || 'Dr. Aris Thorne',
+                            text: newNoteText
+                          };
+
+                          const existingNotes = selectedPatient.clinicalNotes || [];
+                          const updatedNotes = [newNote, ...existingNotes];
+
+                          await onUpdatePatient(selectedPatient.id, {
+                            clinicalNotes: updatedNotes
+                          });
+
+                          // Reset
+                          setNewNoteText('');
+                        }}
+                        className="space-y-3"
+                      >
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Note Text</label>
+                          <textarea
+                            rows={5}
+                            required
+                            placeholder="Enter clinical assessment, physical findings, or prescription comments..."
+                            value={newNoteText}
+                            onChange={(e) => setNewNoteText(e.target.value)}
+                            className="w-full px-4 py-2 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none resize-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Clinician / Author</label>
+                          <select
+                            value={newNoteAuthor}
+                            onChange={(e) => setNewNoteAuthor(e.target.value)}
+                            className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                          >
+                            <option value="Dr. Aris Thorne">Dr. Aris Thorne</option>
+                            <option value="Dr. Sarah Jenkins">Dr. Sarah Jenkins</option>
+                            <option value="Dr. Michael Jenkins">Dr. Michael Jenkins</option>
+                          </select>
+                        </div>
+                        <button
+                          type="submit"
+                          className="w-full py-2.5 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary-container transition-all cursor-pointer mt-4"
+                        >
+                          <span className="material-symbols-outlined text-xs">save</span>
+                          Save Progress Note
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Right Column: Clinical Note Timeline */}
+                    <div className="lg:col-span-2 space-y-4">
+                      <h3 className="text-sm font-black text-on-surface flex items-center gap-2">
+                        <span className="material-symbols-outlined text-secondary text-lg">description</span>
+                        Clinical Progress Log ({selectedPatient.clinicalNotes?.length || 0})
+                      </h3>
+
+                      <div className="relative border-l border-surface-container-highest/60 ml-4 pl-6 space-y-6">
+                        {selectedPatient.clinicalNotes && selectedPatient.clinicalNotes.length > 0 ? (
+                          selectedPatient.clinicalNotes.map((note) => (
+                            <div key={note.id} className="relative group">
+                              {/* Timeline indicator node */}
+                              <span className="absolute -left-10 top-1.5 w-7 h-7 rounded-full bg-surface-container border-2 border-primary-container flex items-center justify-center">
+                                <span className="material-symbols-outlined text-xs text-primary font-bold">medical_information</span>
+                              </span>
+
+                              <div className="bg-surface-container-lowest rounded-2xl p-4 border border-surface-container-highest/60 shadow-xs hover:border-secondary transition-all">
+                                <div className="flex justify-between items-center border-b border-surface-container/50 pb-2 mb-2">
+                                  <span className="text-[10px] font-extrabold text-secondary">{note.author}</span>
+                                  <span className="text-[9px] font-bold text-on-surface-variant">{note.date}</span>
+                                </div>
+                                <p className="text-xs text-on-surface-variant font-semibold leading-relaxed whitespace-pre-wrap">
+                                  {note.text}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="-ml-6 bg-surface-container-lowest border border-dashed border-surface-container-highest/60 rounded-2xl p-8 text-center text-on-surface-variant text-xs font-bold">
+                            No clinical notes recorded yet. Use the note writer to document treatments.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <div className="py-12 text-center max-w-md mx-auto">
                   <span className="material-symbols-outlined text-4xl text-on-surface-variant opacity-60 mb-2">
@@ -529,6 +1385,65 @@ export default function PatientsView({
                   </h3>
                   <p className="text-xs text-on-surface-variant leading-relaxed">
                     This subsection is sync'd live to Genfinity clinical state. Detailed logs can be generated using standard Export tool.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: VIEW FILE / PREVIEW IMAGE */}
+      {viewingFile && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-on-surface/50 modal-backdrop-blur">
+          <div className="bg-surface-container-lowest w-full max-w-2xl rounded-3xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="px-6 py-4 flex justify-between items-center border-b border-surface-container-highest bg-surface-bright">
+              <div className="min-w-0">
+                <h3 className="text-sm font-black text-on-surface truncate">{viewingFile.name}</h3>
+                <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">
+                  {viewingFile.date} • {viewingFile.size}
+                </p>
+              </div>
+              <button
+                onClick={() => setViewingFile(null)}
+                className="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-variant text-on-surface-variant flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xs font-bold">close</span>
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-6 bg-surface-container-low flex items-center justify-center min-h-[300px]">
+              {viewingFile.content ? (
+                viewingFile.content.startsWith('data:image/') || viewingFile.type === 'jpg' || viewingFile.type === 'png' ? (
+                  <img
+                    src={viewingFile.content}
+                    alt={viewingFile.name}
+                    className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-sm border border-surface-container-highest"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="text-center p-8 bg-surface-container-lowest rounded-2xl border border-surface-container-highest/50 max-w-sm">
+                    <span className="material-symbols-outlined text-4xl text-primary mb-3">description</span>
+                    <h4 className="font-extrabold text-sm text-on-surface mb-1">Document Content Loaded</h4>
+                    <p className="text-xs text-on-surface-variant leading-relaxed mb-4">
+                      This PDF file structure is stored securely on the live clinical database.
+                    </p>
+                    <a
+                      href={viewingFile.content}
+                      download={viewingFile.name}
+                      className="px-5 py-2 bg-secondary text-white text-xs font-bold rounded-full hover:bg-secondary-container transition-colors shadow-sm inline-block"
+                    >
+                      Download File
+                    </a>
+                  </div>
+                )
+              ) : (
+                <div className="text-center p-8">
+                  <span className="material-symbols-outlined text-4xl text-on-surface-variant opacity-40 mb-3">
+                    {viewingFile.type === 'pdf' ? 'picture_as_pdf' : 'image'}
+                  </span>
+                  <h4 className="font-bold text-sm text-on-surface mb-1">Pre-Seeded Sample Document</h4>
+                  <p className="text-xs text-on-surface-variant max-w-xs mx-auto leading-relaxed">
+                    This document record represents an existing medical archive for {selectedPatient.name}. Real uploads will show direct visual rendering.
                   </p>
                 </div>
               )}

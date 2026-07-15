@@ -134,6 +134,51 @@ export default function App() {
     }
   };
 
+  // API Call: Comprehensive Patient Update (Demographics, Insurance, Notes)
+  const handleUpdatePatient = async (patientId: string, patientData: any) => {
+    try {
+      const res = await fetch(`/api/patients/${patientId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patientData)
+      });
+      if (!res.ok) throw new Error('Failed to update patient data');
+      await fetchState();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  // API Call: Add Appointment in Supabase
+  const handleAddAppointment = async (apptData: any) => {
+    try {
+      const res = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(apptData)
+      });
+      if (!res.ok) throw new Error('Failed to create appointment');
+      await fetchState();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  // API Call: Update Appointment Status / Details
+  const handleUpdateAppointment = async (apptId: string, updateData: any) => {
+    try {
+      const res = await fetch(`/api/appointments/${apptId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData)
+      });
+      if (!res.ok) throw new Error('Failed to update appointment');
+      await fetchState();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   // API Call: Update Authorization
   const handleUpdateAuth = async (authId: string, updateData: any) => {
     try {
@@ -364,10 +409,18 @@ export default function App() {
         return (
           <PatientsView
             patients={db.patients}
+            appointments={db.appointments}
+            authorizations={db.authorizations}
+            claims={db.claims}
             searchTerm={searchTerm}
             onAddPatient={handleAddPatient}
             onAddFile={handleAddFile}
             onDeleteFile={handleDeleteFile}
+            onUpdatePatient={handleUpdatePatient}
+            onAddAppointment={handleAddAppointment}
+            onUpdateAppointment={handleUpdateAppointment}
+            onAddAuth={handleAddAuth}
+            onAddClaim={handleAddClaim}
             isNewPatientModalOpen={isNewPatientModalOpen}
             setIsNewPatientModalOpen={setIsNewPatientModalOpen}
           />

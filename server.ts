@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { DatabaseSchema, Patient, PatientFile, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './src/types.js';
+import { supabase } from './src/utils/supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -304,15 +305,63 @@ const DEFAULT_DATABASE: DatabaseSchema = {
 
 // Database Accessor Helpers
 async function readDatabase(): Promise<DatabaseSchema> {
+  let db: DatabaseSchema;
   try {
     const data = await fs.readFile(DB_PATH, 'utf-8');
-    return JSON.parse(data);
+    db = JSON.parse(data);
   } catch (e) {
-    // If it does not exist, initialize with default
-    await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
-    await fs.writeFile(DB_PATH, JSON.stringify(DEFAULT_DATABASE, null, 2));
-    return DEFAULT_DATABASE;
+    db = JSON.parse(JSON.stringify(DEFAULT_DATABASE));
   }
+
+  try {
+    // A. Fetch Clinic Settings from Supabase
+    const { data: sData, error: sErr } = await supabase.from('clinic_settings').select('*').single();
+    if (sData && !sErr) {
+      db.settings.clinicName = sData.clinic_name || db.settings.clinicName;
+      db.settings.primaryAddress = sData.clinic_address || db.settings.primaryAddress;
+      db.settings.contactPhone = sData.clinic_phone || db.settings.contactPhone;
+      db.settings.supportEmail = sData.clinic_email || db.settings.supportEmail;
+    }
+
+    // B. Fetch Patients from Supabase
+    const { data: pData, error: pErr } = await supabase.from('patients').select('*').order('created_at', { ascending: false });
+    if (pData && !pErr) {
+      db.patients = pData.map((sp: any) => ({
+        id: sp.id,
+        name: sp.name || '',
+        phone: sp.phone || '',
+        dob: sp.dob || '',
+        email: sp.email || '',
+        referralSource: sp.referral_source || 'other',
+        status: sp.status || 'In Progress',
+        mrn: sp.notes || '#0000-XX',
+        avatarInitials: getInitials(sp.name || 'P'),
+        files: sp.documents?.files || [],
+        insuranceCompany: sp.auth_info?.insurance_company || '',
+        insuranceId: sp.auth_info?.insurance_id || '',
+        address: sp.auth_info?.address || '',
+        gender: sp.auth_info?.gender || 'Not specified',
+        clinicalNotes: sp.auth_info?.clinical_notes || []
+      }));
+    }
+
+    // C. Fetch Appointments from Supabase
+    const { data: aData, error: aErr } = await supabase.from('appointments').select('*').order('appt_date', { ascending: true });
+    if (aData && !aErr) {
+      db.appointments = aData.map((sa: any) => ({
+        id: sa.id,
+        patientName: sa.patient_name || '',
+        time: sa.appt_time || '09:00 AM',
+        type: sa.type || 'Consultation',
+        status: sa.status || 'Scheduled',
+        initials: getInitials(sa.patient_name || 'A')
+      }));
+    }
+  } catch (supErr) {
+    console.error('Supabase read synchronization failed:', supErr);
+  }
+
+  return db;
 }
 
 async function writeDatabase(db: DatabaseSchema): Promise<void> {
@@ -345,37 +394,50 @@ async function startServer() {
         return res.status(400).json({ error: 'Name is required' });
       }
 
-      const db = await readDatabase();
-      const newPatient: Patient = {
-        id: `p_${Date.now()}`,
+      const generatedMrn = generateMRN();
+
+      // Insert directly into live Supabase patients table!
+      const { data: newSupPatient, error } = await supabase.from('patients').insert({
         name,
         phone: phone || '',
         dob: dob || '',
         email: email || '',
-        referralSource: referralSource || 'other',
+        referral_source: referralSource || 'other',
         status: status || 'In Progress',
-        mrn: generateMRN(),
-        avatarInitials: getInitials(name),
-        files: []
-      };
+        notes: generatedMrn, // Store MRN here
+        documents: { files: [] },
+        auth_info: { insurance_company: '' },
+        billing: { date: '', amount: 0, status: '' },
+        pinned_flag: false
+      }).select().single();
 
-      db.patients.push(newPatient);
-
-      // Create a potential appointment automatically if in "Consultation"
-      if (newPatient.status === 'Consultation') {
-        const newAppt: Appointment = {
-          id: `appt_${Date.now()}`,
-          patientName: name,
-          time: '02:00 PM',
-          type: 'Initial Consult',
-          status: 'Scheduled',
-          initials: newPatient.avatarInitials
-        };
-        db.appointments.push(newAppt);
+      if (error) {
+        throw new Error(error.message);
       }
 
-      await writeDatabase(db);
-      res.status(201).json(newPatient);
+      // Automatically schedule a consult appointment if patient is in Consultation stage
+      if (status === 'Consultation') {
+        const { error: apptErr } = await supabase.from('appointments').insert({
+          patient_name: name,
+          appt_time: '02:00 PM',
+          type: 'Initial Consult',
+          status: 'Scheduled'
+        });
+        if (apptErr) console.error('Auto appointment insert failed:', apptErr.message);
+      }
+
+      res.status(201).json({
+        id: newSupPatient.id,
+        name: newSupPatient.name,
+        phone: newSupPatient.phone,
+        dob: newSupPatient.dob,
+        email: newSupPatient.email,
+        referralSource: newSupPatient.referral_source,
+        status: newSupPatient.status,
+        mrn: generatedMrn,
+        avatarInitials: getInitials(newSupPatient.name),
+        files: []
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -387,16 +449,144 @@ async function startServer() {
       const { id } = req.params;
       const { status } = req.body;
 
-      const db = await readDatabase();
-      const patient = db.patients.find(p => p.id === id);
+      const { data: updatedPatient, error } = await supabase
+        .from('patients')
+        .update({ status })
+        .eq('id', id)
+        .select()
+        .single();
 
-      if (!patient) {
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // If transition to "Consultation", auto-schedule appointment in Supabase
+      if (status === 'Consultation') {
+        const { error: apptErr } = await supabase.from('appointments').insert({
+          patient_name: updatedPatient.name,
+          appt_time: '02:00 PM',
+          type: 'Initial Consult',
+          status: 'Scheduled'
+        });
+        if (apptErr) console.error('Auto appointment transition insert failed:', apptErr.message);
+      }
+
+      res.json({
+        id: updatedPatient.id,
+        name: updatedPatient.name,
+        status: updatedPatient.status
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 3a. Comprehensive Patient Update (Demographics, Insurance, Notes)
+  app.patch('/api/patients/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, phone, dob, email, referralSource, status, insuranceCompany, insuranceId, address, gender, clinicalNotes } = req.body;
+
+      // Fetch current row to merge auth_info properly
+      const { data: patient, error: fetchErr } = await supabase.from('patients').select('*').eq('id', id).single();
+      if (fetchErr || !patient) {
         return res.status(404).json({ error: 'Patient not found' });
       }
 
-      patient.status = status;
-      await writeDatabase(db);
-      res.json(patient);
+      const updatedAuthInfo = {
+        ...(patient.auth_info || {}),
+        ...(insuranceCompany !== undefined ? { insurance_company: insuranceCompany } : {}),
+        ...(insuranceId !== undefined ? { insurance_id: insuranceId } : {}),
+        ...(address !== undefined ? { address } : {}),
+        ...(gender !== undefined ? { gender } : {}),
+        ...(clinicalNotes !== undefined ? { clinical_notes: clinicalNotes } : {})
+      };
+
+      const updatePayload: any = {};
+      if (name !== undefined) updatePayload.name = name;
+      if (phone !== undefined) updatePayload.phone = phone;
+      if (dob !== undefined) updatePayload.dob = dob;
+      if (email !== undefined) updatePayload.email = email;
+      if (referralSource !== undefined) updatePayload.referral_source = referralSource;
+      if (status !== undefined) updatePayload.status = status;
+      updatePayload.auth_info = updatedAuthInfo;
+
+      const { data: updatedPatient, error: updateErr } = await supabase
+        .from('patients')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateErr) {
+        throw new Error(updateErr.message);
+      }
+
+      res.json({
+        id: updatedPatient.id,
+        name: updatedPatient.name,
+        phone: updatedPatient.phone,
+        dob: updatedPatient.dob,
+        email: updatedPatient.email,
+        referralSource: updatedPatient.referral_source,
+        status: updatedPatient.status,
+        mrn: updatedPatient.notes || '#0000-XX',
+        avatarInitials: getInitials(updatedPatient.name),
+        files: updatedPatient.documents?.files || [],
+        insuranceCompany: updatedPatient.auth_info?.insurance_company || '',
+        insuranceId: updatedPatient.auth_info?.insurance_id || '',
+        address: updatedPatient.auth_info?.address || '',
+        gender: updatedPatient.auth_info?.gender || 'Not specified',
+        clinicalNotes: updatedPatient.auth_info?.clinical_notes || []
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 3b. Add Appointment in Supabase
+  app.post('/api/appointments', async (req, res) => {
+    try {
+      const { patientName, time, type, status, appt_date } = req.body;
+      if (!patientName) {
+        return res.status(400).json({ error: 'Patient name is required' });
+      }
+
+      const { data, error } = await supabase.from('appointments').insert({
+        patient_name: patientName,
+        appt_time: time || '09:00 AM',
+        type: type || 'Consultation',
+        status: status || 'Scheduled',
+        appt_date: appt_date || new Date().toISOString().split('T')[0]
+      }).select().single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      res.status(201).json(data);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 3c. Update Appointment Status / Details
+  app.patch('/api/appointments/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, time, type } = req.body;
+
+      const updateData: any = {};
+      if (status !== undefined) updateData.status = status;
+      if (time !== undefined) updateData.appt_time = time;
+      if (type !== undefined) updateData.type = type;
+
+      const { data, error } = await supabase.from('appointments').update(updateData).eq('id', id).select().single();
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      res.json(data);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -406,31 +596,39 @@ async function startServer() {
   app.post('/api/patients/:id/files', async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, type, size } = req.body;
+      const { name, type, size, content } = req.body;
 
       if (!name) {
         return res.status(400).json({ error: 'Filename is required' });
       }
 
-      const db = await readDatabase();
-      const patient = db.patients.find(p => p.id === id);
-
-      if (!patient) {
+      // Get current files to append the new file
+      const { data: patient, error: fetchErr } = await supabase.from('patients').select('documents').eq('id', id).single();
+      if (fetchErr || !patient) {
         return res.status(404).json({ error: 'Patient not found' });
       }
 
-      const newFile: PatientFile = {
+      const existingFiles = patient.documents?.files || [];
+      const newFile = {
         id: `f_${Date.now()}`,
         name,
         type: type || 'pdf',
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
-        size: size || '1.0 MB'
+        size: size || '1.0 MB',
+        content: content || '' // Direct base64 content
       };
 
-      patient.files = patient.files || [];
-      patient.files.unshift(newFile);
+      const updatedFiles = [newFile, ...existingFiles];
 
-      await writeDatabase(db);
+      const { error: updateErr } = await supabase
+        .from('patients')
+        .update({ documents: { files: updatedFiles } })
+        .eq('id', id);
+
+      if (updateErr) {
+        throw new Error(updateErr.message);
+      }
+
       res.status(201).json(newFile);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -442,15 +640,23 @@ async function startServer() {
     try {
       const { id, fileId } = req.params;
 
-      const db = await readDatabase();
-      const patient = db.patients.find(p => p.id === id);
-
-      if (!patient) {
+      const { data: patient, error: fetchErr } = await supabase.from('patients').select('documents').eq('id', id).single();
+      if (fetchErr || !patient) {
         return res.status(404).json({ error: 'Patient not found' });
       }
 
-      patient.files = (patient.files || []).filter(f => f.id !== fileId);
-      await writeDatabase(db);
+      const existingFiles = patient.documents?.files || [];
+      const updatedFiles = existingFiles.filter((f: any) => f.id !== fileId);
+
+      const { error: updateErr } = await supabase
+        .from('patients')
+        .update({ documents: { files: updatedFiles } })
+        .eq('id', id);
+
+      if (updateErr) {
+        throw new Error(updateErr.message);
+      }
+
       res.json({ success: true, message: 'File deleted' });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -543,6 +749,18 @@ async function startServer() {
   app.put('/api/settings', async (req, res) => {
     try {
       const { clinicName, primaryAddress, contactPhone, supportEmail, requirePin, pinCode, appearance } = req.body;
+
+      try {
+        // Update live database row with id=1
+        await supabase.from('clinic_settings').update({
+          clinic_name: clinicName,
+          clinic_address: primaryAddress,
+          clinic_phone: contactPhone,
+          clinic_email: supportEmail
+        }).eq('id', 1);
+      } catch (err) {
+        console.error('Supabase settings update failed:', err);
+      }
 
       const db = await readDatabase();
       db.settings = {

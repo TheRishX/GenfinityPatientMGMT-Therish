@@ -4,6 +4,14 @@ export interface PatientFile {
   type: 'pdf' | 'jpg' | 'png' | 'doc';
   date: string;
   size: string;
+  content?: string;
+}
+
+export interface ClinicalNote {
+  id: string;
+  date: string;
+  author: string;
+  text: string;
 }
 
 export interface Patient {
@@ -17,6 +25,11 @@ export interface Patient {
   mrn: string;
   avatarInitials: string;
   files: PatientFile[];
+  insuranceCompany?: string;
+  insuranceId?: string;
+  address?: string;
+  gender?: string;
+  clinicalNotes?: ClinicalNote[];
 }
 
 export interface Appointment {
