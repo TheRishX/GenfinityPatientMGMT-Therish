@@ -106,31 +106,62 @@ export default function SettingsView({
         console.warn('Backend server unavailable, updating client-side Supabase settings only.');
       }
 
-      // 3. Perform verification query directly from client using supabaseClient
-      const startTime = Date.now();
-      const { data, error } = await supabaseClient.from('clinic_settings').select('clinic_name').limit(1);
-      const latencyMs = Date.now() - startTime;
+      // 3. Perform verification query directly from client using supabaseClient with robust error parsing
+      try {
+        const startTime = Date.now();
+        const { data, error } = await supabaseClient.from('clinic_settings').select('clinic_name').limit(1);
+        const latencyMs = Date.now() - startTime;
 
-      if (!error) {
+        if (!error) {
+          setTestResult({
+            success: true,
+            message: 'Supabase configuration applied and validated successfully! Direct connection was established.',
+            connected: true,
+            latencyMs
+          });
+        } else {
+          setTestResult({
+            success: false,
+            message: 'Supabase configuration saved, but direct connection verification failed. Please check your URL and Key, or ensure the tables and RLS are created.',
+            connected: false,
+            error: error.message
+          });
+        }
+      } catch (queryErr: any) {
+        const errorMsg = queryErr?.message || String(queryErr);
+        if (errorMsg.includes('Unexpected token') || errorMsg.includes('is not valid JSON') || errorMsg.includes('JSON')) {
+          setTestResult({
+            success: false,
+            message: 'The connection returned an HTML response instead of JSON. This usually indicates that the Supabase project is currently paused/inactive, or the URL is incorrect. Please log into your Supabase Dashboard to restore or verify your project.',
+            connected: false,
+            error: `JSON Parse Exception: ${errorMsg}`
+          });
+        } else {
+          setTestResult({
+            success: false,
+            message: 'An exception occurred while executing the verification query on the Supabase client.',
+            connected: false,
+            error: errorMsg
+          });
+        }
+      }
+    } catch (err: any) {
+      const errorMsg = err?.message || String(err);
+      if (errorMsg.includes('Unexpected token') || errorMsg.includes('is not valid JSON') || errorMsg.includes('JSON')) {
         setTestResult({
-          success: true,
-          message: 'Supabase configuration applied and validated successfully! Direct connection was established.',
-          connected: true,
-          latencyMs
+          success: false,
+          message: 'The connection returned an HTML response instead of JSON. This usually indicates that your Supabase project is paused, inactive, or the credentials/URL are incorrect.',
+          connected: false,
+          error: errorMsg
         });
       } else {
         setTestResult({
           success: false,
-          message: 'Supabase configuration saved, but direct connection verification failed. Please check your URL and Key, or ensure the tables and RLS are created.',
+          message: 'Error occurred while saving or testing connection.',
           connected: false,
-          error: error.message
+          error: errorMsg
         });
       }
-    } catch (err: any) {
-      setTestResult({
-        success: false,
-        message: err.message || 'Error occurred while saving or testing connection'
-      });
     } finally {
       setIsTesting(false);
     }

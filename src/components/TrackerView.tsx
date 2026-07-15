@@ -5,47 +5,71 @@ interface TrackerViewProps {
   patients: Patient[];
   onUpdatePatientStatus: (patientId: string, status: Patient['status']) => Promise<void>;
   onNewPatientClick: () => void;
+  onAddPatient: (patientData: any) => Promise<any>;
+  isWorkspaceEditMode?: boolean;
+  customLabels?: Record<string, string>;
+  onUpdateLabel?: (key: string, value: string) => void;
 }
 
 export default function TrackerView({
   patients,
   onUpdatePatientStatus,
-  onNewPatientClick
+  onNewPatientClick,
+  onAddPatient,
+  isWorkspaceEditMode = false,
+  customLabels = {},
+  onUpdateLabel
 }: TrackerViewProps) {
   // State to manage which card's status picker popup is currently open
   const [activePickerPatientId, setActivePickerPatientId] = useState<string | null>(null);
   const [kanbanFilter, setKanbanFilter] = useState<'active' | 'inactive'>('active');
   const [trackerSearch, setTrackerSearch] = useState('');
 
+  // Add Patient to Stage Modal State
+  const [addingToStage, setAddingToStage] = useState<Patient['status'] | null>(null);
+  const [addMethod, setAddMethod] = useState<'existing' | 'new'>('existing');
+  const [selectedExistingPatientId, setSelectedExistingPatientId] = useState<string>('');
+  const [existingPatientSearch, setExistingPatientSearch] = useState<string>('');
+
+  // Quick register patient form
+  const [newPatientName, setNewPatientName] = useState('');
+  const [newPatientPhone, setNewPatientPhone] = useState('');
+  const [newPatientDob, setNewPatientDob] = useState('');
+  const [newPatientEmail, setNewPatientEmail] = useState('');
+  const [newPatientReferral, setNewPatientReferral] = useState('physician');
+
+  // Helpers to get stage label safely
+  const getStageLabel = (id: string, defaultLabel: string) => {
+    const key = `stage_${id.toLowerCase().replace(/\s+/g, '_')}`;
+    return customLabels[key] || defaultLabel;
+  };
+
   // All possible statuses across the app
   const allStatuses: { id: Patient['status']; label: string; colorClass: string }[] = [
-    { id: 'New Referral', label: 'New Referral', colorClass: 'bg-secondary' },
-    { id: 'Consultation', label: 'Consultation', colorClass: 'bg-primary' },
-    { id: 'Waiting for Rx', label: 'Waiting for Rx', colorClass: 'bg-outline-variant' },
-    { id: 'Ready for Auth', label: 'Ready for Auth', colorClass: 'bg-secondary-container' },
-    { id: 'Auth Pending', label: 'Auth Pending', colorClass: 'bg-tertiary-container' },
-    { id: 'Fabrication', label: 'Fabrication', colorClass: 'bg-amber-500' },
-    { id: 'In Progress', label: 'In Progress', colorClass: 'bg-green-500' },
-    { id: 'Archived', label: 'Archived', colorClass: 'bg-slate-500' }
+    { id: 'New Referral', label: getStageLabel('New Referral', 'New Referral'), colorClass: 'bg-secondary' },
+    { id: 'Consultation', label: getStageLabel('Consultation', 'Consultation'), colorClass: 'bg-primary' },
+    { id: 'Waiting for Rx', label: getStageLabel('Waiting for Rx', 'Waiting for Rx'), colorClass: 'bg-outline-variant' },
+    { id: 'Ready for Auth', label: getStageLabel('Ready for Auth', 'Ready for Auth'), colorClass: 'bg-secondary-container' },
+    { id: 'Auth Pending', label: getStageLabel('Auth Pending', 'Auth Pending'), colorClass: 'bg-tertiary-container' },
+    { id: 'Fabrication', label: getStageLabel('Fabrication', 'Fabrication'), colorClass: 'bg-amber-500' },
+    { id: 'In Progress', label: getStageLabel('In Progress', 'In Progress'), colorClass: 'bg-green-500' },
+    { id: 'Archived', label: getStageLabel('Archived', 'Archived'), colorClass: 'bg-slate-500' }
   ];
 
   // Column config based on filter
   const columns = kanbanFilter === 'active'
     ? [
-        { id: 'New Referral' as Patient['status'], label: 'New Referral', colorClass: 'bg-secondary' },
-        { id: 'Consultation' as Patient['status'], label: 'Consultation', colorClass: 'bg-primary' },
-        { id: 'Waiting for Rx' as Patient['status'], label: 'Waiting for Rx', colorClass: 'bg-outline-variant' },
-        { id: 'Ready for Auth' as Patient['status'], label: 'Ready for Auth', colorClass: 'bg-secondary-container' },
-        { id: 'Auth Pending' as Patient['status'], label: 'Auth Pending', colorClass: 'bg-tertiary-container' }
+        { id: 'New Referral' as Patient['status'], label: getStageLabel('New Referral', 'New Referral'), colorClass: 'bg-secondary' },
+        { id: 'Consultation' as Patient['status'], label: getStageLabel('Consultation', 'Consultation'), colorClass: 'bg-primary' },
+        { id: 'Waiting for Rx' as Patient['status'], label: getStageLabel('Waiting for Rx', 'Waiting for Rx'), colorClass: 'bg-outline-variant' },
+        { id: 'Ready for Auth' as Patient['status'], label: getStageLabel('Ready for Auth', 'Ready for Auth'), colorClass: 'bg-secondary-container' },
+        { id: 'Auth Pending' as Patient['status'], label: getStageLabel('Auth Pending', 'Auth Pending'), colorClass: 'bg-tertiary-container' }
       ]
     : [
-        { id: 'Fabrication' as Patient['status'], label: 'Fabrication', colorClass: 'bg-amber-500' },
-        { id: 'In Progress' as Patient['status'], label: 'In Progress', colorClass: 'bg-green-500' },
-        { id: 'Archived' as Patient['status'], label: 'Archived', colorClass: 'bg-slate-500' }
+        { id: 'Fabrication' as Patient['status'], label: getStageLabel('Fabrication', 'Fabrication'), colorClass: 'bg-amber-500' },
+        { id: 'In Progress' as Patient['status'], label: getStageLabel('In Progress', 'In Progress'), colorClass: 'bg-green-500' },
+        { id: 'Archived' as Patient['status'], label: getStageLabel('Archived', 'Archived'), colorClass: 'bg-slate-500' }
       ];
-
-  // Optional trailing columns (aesthetic scroll representation)
-  const previewColumns = kanbanFilter === 'active' ? ['Fabrication', 'In Progress'] : [];
 
   // Filter patients for search
   const filteredPatients = patients.filter(p => {
@@ -64,12 +88,67 @@ export default function TrackerView({
     setActivePickerPatientId(null);
   };
 
+  const handleAddPatientSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addingToStage) return;
+
+    if (addMethod === 'existing') {
+      if (!selectedExistingPatientId) return;
+      await onUpdatePatientStatus(selectedExistingPatientId, addingToStage);
+    } else {
+      if (!newPatientName.trim()) return;
+      await onAddPatient({
+        name: newPatientName,
+        phone: newPatientPhone,
+        dob: newPatientDob,
+        email: newPatientEmail,
+        referralSource: newPatientReferral,
+        status: addingToStage
+      });
+    }
+
+    // Reset Form
+    setAddingToStage(null);
+    setSelectedExistingPatientId('');
+    setNewPatientName('');
+    setNewPatientPhone('');
+    setNewPatientDob('');
+    setNewPatientEmail('');
+    setNewPatientReferral('physician');
+    setExistingPatientSearch('');
+  };
+
+  // List of existing patients not currently in the selected stage
+  const eligibleExistingPatients = patients.filter(p => {
+    if (!p) return false;
+    if (addingToStage && p.status === addingToStage) return false;
+    if (existingPatientSearch) {
+      return p.name.toLowerCase().includes(existingPatientSearch.toLowerCase()) || 
+             p.mrn.toLowerCase().includes(existingPatientSearch.toLowerCase());
+    }
+    return true;
+  });
+
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] animate-fade-in relative">
+    <div id="tracker-workflow-container" className="flex flex-col h-[calc(100vh-120px)] animate-fade-in relative">
       {/* Tracker Header Area */}
       <div className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
-          <h2 className="text-3xl font-extrabold text-on-surface tracking-tight">Workflow Tracker</h2>
+          {isWorkspaceEditMode ? (
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-xs text-primary">edit</span>
+              <input
+                type="text"
+                value={customLabels['tracker_page_title'] || 'Workflow Tracker'}
+                onChange={(e) => onUpdateLabel?.('tracker_page_title', e.target.value)}
+                className="bg-surface border border-primary text-2xl font-extrabold text-on-surface tracking-tight px-2 py-0.5 rounded outline-none"
+              />
+            </div>
+          ) : (
+            <h2 className="text-3xl font-extrabold text-on-surface tracking-tight">
+              {customLabels['tracker_page_title'] || 'Workflow Tracker'}
+            </h2>
+          )}
           <p className="text-xs font-semibold text-on-surface-variant opacity-85 mt-0.5">
             Manage patient journey through clinical and fabrication stages
           </p>
@@ -110,7 +189,7 @@ export default function TrackerView({
             </button>
           </div>
 
-          {/* New Patient CTA */}
+          {/* New Patient CTA (Fixed linking to Central Patients Modal) */}
           <button
             onClick={onNewPatientClick}
             className="bg-primary hover:bg-primary-container text-white font-bold text-xs py-2 px-4 rounded-full flex items-center gap-1.5 transition-all shadow-xs cursor-pointer select-none shrink-0"
@@ -121,7 +200,7 @@ export default function TrackerView({
         </div>
       </div>
 
-      {/* Kanban Board Layout (Horizontal scroll) */}
+      {/* Kanban Board Layout */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden kanban-scroll pb-4 -mx-6 px-6">
         <div className="flex gap-5 h-full w-max py-2">
           {columns.map(col => {
@@ -129,26 +208,47 @@ export default function TrackerView({
             return (
               <div key={col.id} className="w-80 flex flex-col h-full bg-surface-container-low/20 p-2.5 rounded-2xl border border-surface-container-highest/20 shrink-0">
                 {/* Column header */}
-                <div className="flex items-center justify-between mb-4 px-1.5 shrink-0">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2.5 h-2.5 rounded-full ${col.colorClass}`} />
-                    <h3 className="font-extrabold text-sm text-on-surface tracking-tight">{col.label}</h3>
+                <div className="flex items-center justify-between mb-3 px-1.5 shrink-0">
+                  <div className="flex items-center gap-2 max-w-[80%] min-w-0">
+                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${col.colorClass}`} />
+                    {isWorkspaceEditMode ? (
+                      <input
+                        type="text"
+                        value={col.label}
+                        onChange={(e) => onUpdateLabel?.(`stage_${col.id.toLowerCase().replace(/\s+/g, '_')}`, e.target.value)}
+                        className="bg-surface border border-primary text-xs font-extrabold text-on-surface px-1 py-0.5 rounded outline-none w-full"
+                        title="Rename Stage"
+                      />
+                    ) : (
+                      <h3 className="font-extrabold text-sm text-on-surface tracking-tight truncate">{col.label}</h3>
+                    )}
                   </div>
-                  <span className="bg-surface-container-high text-on-surface-variant font-bold text-[10px] px-2 py-0.5 rounded-full">
-                    {colPatients.length}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="bg-surface-container-high text-on-surface-variant font-bold text-[10px] px-2 py-0.5 rounded-full">
+                      {colPatients.length}
+                    </span>
+                    {/* Add patient directly to this stage button */}
+                    <button
+                      onClick={() => {
+                        setAddingToStage(col.id);
+                        setAddMethod('existing');
+                      }}
+                      className="w-6 h-6 rounded-full bg-primary/10 hover:bg-primary hover:text-white transition-all flex items-center justify-center text-primary text-xs cursor-pointer"
+                      title={`Add patient to ${col.label}`}
+                    >
+                      <span className="material-symbols-outlined text-sm font-bold">add</span>
+                    </button>
+                  </div>
                 </div>
 
-                {/* Column Cards (Vertical Scrollable) */}
+                {/* Column Cards */}
                 <div className="flex-1 overflow-y-auto pr-1 space-y-3 kanban-scroll">
                   {colPatients.length > 0 ? (
                     colPatients.map(p => {
                       const isPickerOpen = activePickerPatientId === p.id;
-                      
-                      // Custom rendering elements based on patients from mockups
                       const isRobertChen = p.name.includes('Robert');
-                      const isJamesWilson = p.name.includes('James');
                       const isThomasWright = p.name.includes('Thomas');
+                      const isJamesWilson = p.name.includes('James');
                       const isElenaDavis = p.name.includes('Elena');
 
                       return (
@@ -159,7 +259,6 @@ export default function TrackerView({
                           }`}
                         >
                           <div className="flex justify-between items-start mb-3">
-                            {/* Urgent or Standard Badge */}
                             {isRobertChen ? (
                               <span className="bg-primary/10 text-primary font-bold text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
                                 <span className="material-symbols-outlined text-[10px] font-bold">priority_high</span> Urgent
@@ -174,7 +273,6 @@ export default function TrackerView({
                               </span>
                             )}
 
-                            {/* Dropdown status switcher action trigger */}
                             <button
                               onClick={() => setActivePickerPatientId(isPickerOpen ? null : p.id)}
                               className={`p-1 hover:bg-surface-container rounded-full cursor-pointer transition-colors ${
@@ -190,7 +288,6 @@ export default function TrackerView({
                             <span className="material-symbols-outlined text-xs">id_card</span> ID: {p.mrn}
                           </p>
 
-                          {/* Specific contextual descriptions based on mockups */}
                           {isRobertChen && (
                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-on-surface-variant bg-surface p-2 rounded-lg mb-3">
                               <span className="material-symbols-outlined text-xs text-primary">description</span>
@@ -224,30 +321,20 @@ export default function TrackerView({
                             </div>
                           )}
 
-                          {/* Timeline / Footer */}
+                          {/* Footer */}
                           <div className="flex items-center justify-between mt-3 pt-3 border-t border-surface-container/60 shrink-0">
                             <span className="text-[10px] font-semibold text-on-surface-variant opacity-80">
                               {isRobertChen ? 'Added Today' : isJamesWilson ? 'Waiting 4 days' : isThomasWright ? 'Aetna' : 'Standard Case'}
                             </span>
 
-                            {/* Avatar or Initials bubble */}
-                            {isThomasWright ? (
-                              <img
-                                className="w-7 h-7 rounded-full object-cover border border-surface shadow-xs shrink-0"
-                                referrerPolicy="no-referrer"
-                                alt={p.name}
-                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDXOe40kmOfAjhO_cGJ9XZMzE8s3yvEW-lCDZIdF64og-2sEuH-NiqGWPOnNzPHnWHV0wRyekUe4FfxPTiSolT-OQYPYXjgJW-vBgfGVyz2mjhC6xOPKNHzxlQEJqBhvV4iUGfsvbQl1MgbB1rr-HyMgCUwev5QphUEjMKWE-nqcspiE7spSSVSyp3LJW1nY3-ZCiODT65SpaptCHJDWtt7FhfnvKBM4DXCtGdAt_oI-smRAvgUKC513g"
-                              />
-                            ) : (
-                              <div className="w-7 h-7 rounded-full bg-secondary-container/35 text-on-secondary-container flex items-center justify-center font-bold text-[9px] shrink-0">
-                                {p.avatarInitials}
-                              </div>
-                            )}
+                            <div className="w-7 h-7 rounded-full bg-secondary-container/35 text-on-secondary-container flex items-center justify-center font-bold text-[9px] shrink-0">
+                              {p.avatarInitials}
+                            </div>
                           </div>
 
-                          {/* Dynamic move-to status picker menu popups (matching Image 3 exactly) */}
+                          {/* Move to dropdown picker menu */}
                           {isPickerOpen && (
-                            <div className="absolute top-[35px] right-2 w-48 bg-surface-container-lowest rounded-xl shadow-md border border-surface-container-high z-40 py-1.5 overflow-hidden animate-fade-in animate-duration-150">
+                            <div className="absolute top-[35px] right-2 w-48 bg-surface-container-lowest rounded-xl shadow-md border border-surface-container-high z-40 py-1.5 overflow-hidden">
                               <div className="px-3 py-1 border-b border-surface-container-high mb-1">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Move to...</span>
                               </div>
@@ -255,7 +342,7 @@ export default function TrackerView({
                                 <button
                                   key={option.id}
                                   onClick={() => handleStatusChange(p.id, option.id)}
-                                  className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-surface-container-low flex items-center justify-between transition-colors cursor-pointer ${
+                                  className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-surface-container-low flex items-center justify-between transition-colors cursor-pointer border-0 bg-transparent ${
                                     p.status === option.id ? 'bg-primary/5 text-primary font-bold' : 'text-on-surface'
                                   }`}
                                 >
@@ -275,28 +362,190 @@ export default function TrackerView({
                     })
                   ) : (
                     <div className="py-8 text-center rounded-2xl border border-dashed border-surface-container-highest/60 bg-surface-container-low/20">
-                      <p className="text-[11px] font-bold text-on-surface-variant opacity-75">Drop card here</p>
+                      <p className="text-[11px] font-bold text-on-surface-variant opacity-75">Empty stage</p>
                     </div>
                   )}
+
+                  {/* Inline quick + button at bottom of columns */}
+                  <button
+                    onClick={() => {
+                      setAddingToStage(col.id);
+                      setAddMethod('existing');
+                    }}
+                    className="w-full py-2.5 border border-dashed border-surface-container-highest hover:border-primary rounded-2xl flex items-center justify-center gap-1.5 text-xs font-bold text-on-surface-variant hover:text-primary transition-all bg-surface-container-lowest/40 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm">add_circle</span>
+                    Add Patient to Stage
+                  </button>
                 </div>
               </div>
             );
           })}
-
-          {/* Aesthetic preview columns (to convey 16-column scroll mockup style) */}
-          {previewColumns.map(label => (
-            <div key={label} className="w-80 flex flex-col h-full opacity-40 p-2.5 rounded-2xl border border-dashed border-surface-container-highest/60 shrink-0 select-none">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-2.5 h-2.5 rounded-full bg-surface-dim" />
-                <h3 className="font-extrabold text-sm text-on-surface truncate">{label}</h3>
-              </div>
-              <div className="flex-1 rounded-2xl border border-dashed border-surface-container-high bg-surface-container-low/10 flex items-center justify-center p-8">
-                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Empty stage</span>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
+
+      {/* POPUP MODAL: ADD PATIENT DIRECTLY TO CLINICAL STAGE */}
+      {addingToStage && (
+        <div id="add-to-stage-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-on-surface/40 modal-backdrop-blur">
+          <div className="bg-surface-container-lowest w-full max-w-md rounded-3xl shadow-lg overflow-hidden flex flex-col">
+            <div className="px-6 py-5 border-b border-surface-container bg-surface-bright flex justify-between items-center">
+              <div>
+                <h3 className="font-extrabold text-base text-on-surface">
+                  Add Patient to "{getStageLabel(addingToStage, addingToStage)}"
+                </h3>
+                <p className="text-[11px] text-on-surface-variant font-medium mt-0.5">
+                  Link an existing registered record or check-in a new profile.
+                </p>
+              </div>
+              <button
+                onClick={() => setAddingToStage(null)}
+                className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant cursor-pointer border-0"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+
+            {/* Methods toggler pills */}
+            <div className="px-6 pt-5">
+              <div className="flex bg-surface-container p-0.5 rounded-full border border-surface-container-highest">
+                <button
+                  type="button"
+                  onClick={() => setAddMethod('existing')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
+                    addMethod === 'existing' ? 'bg-surface shadow-xs text-on-surface' : 'text-on-surface-variant'
+                  }`}
+                >
+                  Get Existing Patient
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddMethod('new')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
+                    addMethod === 'new' ? 'bg-surface shadow-xs text-on-surface' : 'text-on-surface-variant'
+                  }`}
+                >
+                  Create New Patient
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleAddPatientSubmit} className="p-6 space-y-4">
+              {addMethod === 'existing' ? (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-xs">
+                      search
+                    </span>
+                    <input
+                      type="text"
+                      value={existingPatientSearch}
+                      onChange={e => setExistingPatientSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 rounded-full border border-surface-container-highest bg-surface-container-lowest text-xs focus:border-secondary outline-none transition-all placeholder:text-on-surface-variant/55"
+                      placeholder="Type name or MRN to filter list..."
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-on-surface uppercase tracking-wide">
+                      Select Patient
+                    </label>
+                    <select
+                      required
+                      value={selectedExistingPatientId}
+                      onChange={e => setSelectedExistingPatientId(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs focus:border-secondary outline-none"
+                    >
+                      <option value="">-- Choose Patient --</option>
+                      {eligibleExistingPatients.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.mrn}) - Currently: {p.status}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-on-surface uppercase tracking-wide">Patient Full Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={newPatientName}
+                      onChange={e => setNewPatientName(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs focus:border-secondary outline-none"
+                      placeholder="e.g. Liam Sterling"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-on-surface uppercase tracking-wide">Date of Birth</label>
+                    <input
+                      type="date"
+                      required
+                      value={newPatientDob}
+                      onChange={e => setNewPatientDob(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs focus:border-secondary outline-none"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-on-surface uppercase tracking-wide">Phone Number</label>
+                    <input
+                      type="text"
+                      value={newPatientPhone}
+                      onChange={e => setNewPatientPhone(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs focus:border-secondary outline-none"
+                      placeholder="e.g. (555) 012-3456"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-on-surface uppercase tracking-wide">Email Address</label>
+                    <input
+                      type="email"
+                      value={newPatientEmail}
+                      onChange={e => setNewPatientEmail(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs focus:border-secondary outline-none"
+                      placeholder="e.g. liam@example.com"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-on-surface uppercase tracking-wide">Referral Source</label>
+                    <select
+                      value={newPatientReferral}
+                      onChange={e => setNewPatientReferral(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs focus:border-secondary outline-none"
+                    >
+                      <option value="physician">Physician Referral</option>
+                      <option value="hospital">Hospital Discharge</option>
+                      <option value="specialist">Specialist</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-surface-container flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAddingToStage(null)}
+                  className="px-4 py-2 border border-surface-container-highest rounded-full text-xs font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-primary text-white rounded-full text-xs font-bold cursor-pointer"
+                >
+                  {addMethod === 'existing' ? 'Link Existing Patient' : 'Register & Add Patient'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

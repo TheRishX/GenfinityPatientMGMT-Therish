@@ -341,7 +341,8 @@ async function readDatabase(): Promise<DatabaseSchema> {
         insuranceId: sp.auth_info?.insurance_id || '',
         address: sp.auth_info?.address || '',
         gender: sp.auth_info?.gender || 'Not specified',
-        clinicalNotes: sp.auth_info?.clinical_notes || []
+        clinicalNotes: sp.auth_info?.clinical_notes || [],
+        avatarUrl: sp.auth_info?.avatar_url || ''
       }));
     }
 
@@ -547,7 +548,7 @@ async function startServer() {
   app.patch('/api/patients/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, phone, dob, email, referralSource, status, insuranceCompany, insuranceId, address, gender, clinicalNotes } = req.body;
+      const { name, phone, dob, email, referralSource, status, insuranceCompany, insuranceId, address, gender, clinicalNotes, avatarUrl } = req.body;
 
       // Fetch current row to merge auth_info properly
       const { data: patient, error: fetchErr } = await supabase.from('patients').select('*').eq('id', id).single();
@@ -561,7 +562,8 @@ async function startServer() {
         ...(insuranceId !== undefined ? { insurance_id: insuranceId } : {}),
         ...(address !== undefined ? { address } : {}),
         ...(gender !== undefined ? { gender } : {}),
-        ...(clinicalNotes !== undefined ? { clinical_notes: clinicalNotes } : {})
+        ...(clinicalNotes !== undefined ? { clinical_notes: clinicalNotes } : {}),
+        ...(avatarUrl !== undefined ? { avatar_url: avatarUrl } : {})
       };
 
       const updatePayload: any = {};
@@ -599,7 +601,8 @@ async function startServer() {
         insuranceId: updatedPatient.auth_info?.insurance_id || '',
         address: updatedPatient.auth_info?.address || '',
         gender: updatedPatient.auth_info?.gender || 'Not specified',
-        clinicalNotes: updatedPatient.auth_info?.clinical_notes || []
+        clinicalNotes: updatedPatient.auth_info?.clinical_notes || [],
+        avatarUrl: updatedPatient.auth_info?.avatar_url || ''
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -859,6 +862,24 @@ async function startServer() {
       db.claims.unshift(newClaim);
       await writeDatabase(db);
       res.status(201).json(newClaim);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 8a. Update Claim Status
+  app.patch('/api/claims/:id/status', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const db = await readDatabase();
+      const claim = db.claims.find(c => c.id === id);
+      if (!claim) {
+        return res.status(404).json({ error: 'Claim not found' });
+      }
+      claim.status = status;
+      await writeDatabase(db);
+      res.json(claim);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

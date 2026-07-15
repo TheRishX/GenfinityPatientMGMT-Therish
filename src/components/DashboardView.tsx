@@ -9,6 +9,10 @@ interface DashboardViewProps {
   onNavigateToTab: (tab: string) => void;
   onAlertAction: (actionTarget: string, alertId: string) => void;
   onDismissAlert: (alertId: string) => void;
+  onPatientClick?: (patientName: string) => void;
+  isWorkspaceEditMode?: boolean;
+  customLabels?: Record<string, string>;
+  onUpdateLabel?: (key: string, value: string) => void;
 }
 
 export default function DashboardView({
@@ -17,15 +21,24 @@ export default function DashboardView({
   alerts,
   onNavigateToTab,
   onAlertAction,
-  onDismissAlert
+  onDismissAlert,
+  onPatientClick,
+  isWorkspaceEditMode = false,
+  customLabels = {},
+  onUpdateLabel
 }: DashboardViewProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+  // Helper to safely fetch labels
+  const getLabel = (key: string, defaultValue: string) => {
+    return customLabels[key] || defaultValue;
+  };
+
   // Dynamic counts for Stats Grid
   const apptCount = appointments.length;
-  const newReferralsCount = patients.filter(p => p.status === 'New Referral').length;
-  const waitingAuthCount = patients.filter(p => p.status === 'Waiting for Rx' || p.status === 'Auth Pending').length;
-  const readyDeliveryCount = patients.filter(p => p.status === 'Fabrication').length; // Fabrication represents items in active shop
+  const newReferralsCount = patients.filter(p => p?.status === 'New Referral').length;
+  const waitingAuthCount = patients.filter(p => p?.status === 'Waiting for Rx' || p?.status === 'Auth Pending').length;
+  const readyDeliveryCount = patients.filter(p => p?.status === 'Fabrication').length;
 
   // Dynamically filter Today's Appointments based on selected D3 category
   const filteredAppointments = appointments.filter(appt => {
@@ -38,43 +51,86 @@ export default function DashboardView({
   });
 
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
+    <div id="dashboard-view-container" className="space-y-8 animate-fade-in pb-16">
       {/* Greeting Banner */}
       <div>
-        <h2 className="text-4xl font-extrabold text-primary mb-1 tracking-tight">
-          Good morning!
-        </h2>
-        <p className="text-lg font-semibold text-on-surface-variant opacity-85">
-          Here's today at Genfinity O&amp;P
-        </p>
+        {isWorkspaceEditMode ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-xs text-primary">edit</span>
+              <input
+                type="text"
+                value={getLabel('dashboard_greeting', 'Good morning!')}
+                onChange={(e) => onUpdateLabel?.('dashboard_greeting', e.target.value)}
+                className="bg-surface border border-primary text-3xl font-extrabold text-primary tracking-tight px-2 py-0.5 rounded outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-xs text-primary">edit</span>
+              <input
+                type="text"
+                value={getLabel('dashboard_subgreeting', "Here's today at Genfinity O&P")}
+                onChange={(e) => onUpdateLabel?.('dashboard_subgreeting', e.target.value)}
+                className="bg-surface border border-primary text-sm font-semibold text-on-surface-variant px-2 py-0.5 rounded outline-none w-80"
+              />
+            </div>
+          </div>
+        ) : (
+          <>
+            <h2 className="text-4xl font-extrabold text-primary mb-1 tracking-tight">
+              {getLabel('dashboard_greeting', 'Good morning!')}
+            </h2>
+            <p className="text-lg font-semibold text-on-surface-variant opacity-85">
+              {getLabel('dashboard_subgreeting', "Here's today at Genfinity O&P")}
+            </p>
+          </>
+        )}
       </div>
 
       {/* Stats Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div id="dashboard-stats-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Stat 1: Appointments */}
         <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-highest/20 flex flex-col justify-between min-h-[140px] hover:border-secondary/20 transition-all group">
           <div className="flex justify-between items-start">
-            <h3 className="text-xs font-bold text-on-surface-variant tracking-wider uppercase">
-              Appointments
-            </h3>
-            <div className="w-9 h-9 rounded-full bg-secondary-container/60 flex items-center justify-center shrink-0">
+            {isWorkspaceEditMode ? (
+              <input
+                type="text"
+                value={getLabel('stat_label_appointments', 'Appointments')}
+                onChange={(e) => onUpdateLabel?.('stat_label_appointments', e.target.value)}
+                className="bg-surface border border-primary text-xs font-bold text-on-surface-variant px-1.5 py-0.5 rounded outline-none w-full"
+              />
+            ) : (
+              <h3 className="text-xs font-bold text-on-surface-variant tracking-wider uppercase">
+                {getLabel('stat_label_appointments', 'Appointments')}
+              </h3>
+            )}
+            <div className="w-9 h-9 rounded-full bg-secondary-container/60 flex items-center justify-center shrink-0 ml-2">
               <span className="material-symbols-outlined text-sm text-on-secondary-container">
                 calendar_today
               </span>
             </div>
           </div>
           <div className="text-4xl font-black text-on-surface mt-2 group-hover:text-secondary transition-colors">
-            {apptCount + 8} {/* Adding offset to match mockup count of 12 */}
+            {apptCount}
           </div>
         </div>
 
         {/* Stat 2: New Referrals */}
         <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-highest/20 flex flex-col justify-between min-h-[140px] hover:border-primary/20 transition-all group">
           <div className="flex justify-between items-start">
-            <h3 className="text-xs font-bold text-on-surface-variant tracking-wider uppercase">
-              New Referrals
-            </h3>
-            <div className="w-9 h-9 rounded-full bg-primary-container/10 flex items-center justify-center shrink-0">
+            {isWorkspaceEditMode ? (
+              <input
+                type="text"
+                value={getLabel('stat_label_referrals', 'New Referrals')}
+                onChange={(e) => onUpdateLabel?.('stat_label_referrals', e.target.value)}
+                className="bg-surface border border-primary text-xs font-bold text-on-surface-variant px-1.5 py-0.5 rounded outline-none w-full"
+              />
+            ) : (
+              <h3 className="text-xs font-bold text-on-surface-variant tracking-wider uppercase">
+                {getLabel('stat_label_referrals', 'New Referrals')}
+              </h3>
+            )}
+            <div className="w-9 h-9 rounded-full bg-primary-container/10 flex items-center justify-center shrink-0 ml-2">
               <span className="material-symbols-outlined text-sm text-primary">
                 person_add
               </span>
@@ -88,34 +144,52 @@ export default function DashboardView({
         {/* Stat 3: Waiting Auth */}
         <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-highest/20 flex flex-col justify-between min-h-[140px] hover:border-on-surface-variant/20 transition-all group">
           <div className="flex justify-between items-start">
-            <h3 className="text-xs font-bold text-on-surface-variant tracking-wider uppercase">
-              Waiting Auth
-            </h3>
-            <div className="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center shrink-0">
+            {isWorkspaceEditMode ? (
+              <input
+                type="text"
+                value={getLabel('stat_label_waiting_auth', 'Waiting Auth')}
+                onChange={(e) => onUpdateLabel?.('stat_label_waiting_auth', e.target.value)}
+                className="bg-surface border border-primary text-xs font-bold text-on-surface-variant px-1.5 py-0.5 rounded outline-none w-full"
+              />
+            ) : (
+              <h3 className="text-xs font-bold text-on-surface-variant tracking-wider uppercase">
+                {getLabel('stat_label_waiting_auth', 'Waiting Auth')}
+              </h3>
+            )}
+            <div className="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center shrink-0 ml-2">
               <span className="material-symbols-outlined text-sm text-on-surface-variant">
                 hourglass_empty
               </span>
             </div>
           </div>
           <div className="text-4xl font-black text-on-surface mt-2">
-            {waitingAuthCount + 5} {/* Matching mockup count of 8 */}
+            {waitingAuthCount}
           </div>
         </div>
 
         {/* Stat 4: Ready Delivery */}
         <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-highest/20 flex flex-col justify-between min-h-[140px] hover:border-on-surface-variant/20 transition-all group">
           <div className="flex justify-between items-start">
-            <h3 className="text-xs font-bold text-on-surface-variant tracking-wider uppercase">
-              Ready Delivery
-            </h3>
-            <div className="w-9 h-9 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0">
+            {isWorkspaceEditMode ? (
+              <input
+                type="text"
+                value={getLabel('stat_label_delivery', 'Ready Delivery')}
+                onChange={(e) => onUpdateLabel?.('stat_label_delivery', e.target.value)}
+                className="bg-surface border border-primary text-xs font-bold text-on-surface-variant px-1.5 py-0.5 rounded outline-none w-full"
+              />
+            ) : (
+              <h3 className="text-xs font-bold text-on-surface-variant tracking-wider uppercase">
+                {getLabel('stat_label_delivery', 'Ready Delivery')}
+              </h3>
+            )}
+            <div className="w-9 h-9 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 ml-2">
               <span className="material-symbols-outlined text-sm text-on-surface-variant">
                 local_shipping
               </span>
             </div>
           </div>
           <div className="text-4xl font-black text-on-surface mt-2">
-            3
+            {readyDeliveryCount}
           </div>
         </div>
       </div>
@@ -129,23 +203,32 @@ export default function DashboardView({
       />
 
       {/* Bottom Bento Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div id="dashboard-bento-grid" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Today's Appointments (Takes 2 columns) */}
         <div className="lg:col-span-2 bg-surface-container-lowest rounded-3xl p-6 shadow-xs border border-surface-container-highest/25">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h3 className="text-lg font-extrabold text-on-surface tracking-tight">
-                Today's Appointments
-              </h3>
+              {isWorkspaceEditMode ? (
+                <input
+                  type="text"
+                  value={getLabel('dashboard_heading_appointments', "Today's Appointments")}
+                  onChange={(e) => onUpdateLabel?.('dashboard_heading_appointments', e.target.value)}
+                  className="bg-surface border border-primary text-lg font-extrabold text-on-surface tracking-tight px-1.5 py-0.5 rounded outline-none"
+                />
+              ) : (
+                <h3 className="text-lg font-extrabold text-on-surface tracking-tight">
+                  {getLabel('dashboard_heading_appointments', "Today's Appointments")}
+                </h3>
+              )}
               {selectedCategory && (
-                <p className="text-xs text-secondary font-semibold">
+                <p className="text-xs text-secondary font-semibold mt-1">
                   Filtered by category: <strong className="uppercase">{selectedCategory}</strong>
                 </p>
               )}
             </div>
             <button
-              onClick={() => onNavigateToTab('patients')}
-              className="text-secondary font-bold text-xs hover:underline cursor-pointer flex items-center gap-1"
+              onClick={() => onNavigateToTab('appointments')}
+              className="text-secondary font-bold text-xs hover:underline cursor-pointer flex items-center gap-1 bg-transparent border-0"
             >
               View All
               <span className="material-symbols-outlined text-xs">arrow_forward</span>
@@ -157,13 +240,15 @@ export default function DashboardView({
               filteredAppointments.map(appt => (
                 <div
                   key={appt.id}
-                  className="flex items-center gap-4 p-4 rounded-2xl bg-surface hover:bg-surface-container transition-colors border border-surface-container-highest/45 hover:border-secondary/20"
+                  onClick={() => onPatientClick?.(appt.patientName)}
+                  className="flex items-center gap-4 p-4 rounded-2xl bg-surface hover:bg-surface-container transition-all border border-surface-container-highest/45 hover:border-secondary/25 cursor-pointer hover:shadow-xs"
+                  title={`Click to open profile details for ${appt.patientName}`}
                 >
                   <div className="w-12 h-12 rounded-full overflow-hidden shrink-0 bg-surface-container-highest flex items-center justify-center text-on-surface-variant font-black text-sm">
                     {appt.initials}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-on-surface truncate">
+                    <h4 className="text-sm font-bold text-on-surface hover:text-secondary transition-colors truncate">
                       {appt.patientName}
                     </h4>
                     <p className="text-xs font-semibold text-on-surface-variant truncate">
@@ -199,9 +284,18 @@ export default function DashboardView({
           <div>
             <div className="flex items-center gap-2.5 mb-6 text-primary">
               <span className="material-symbols-outlined font-extrabold text-lg">warning</span>
-              <h3 className="text-lg font-extrabold text-on-surface tracking-tight">
-                Needs Attention
-              </h3>
+              {isWorkspaceEditMode ? (
+                <input
+                  type="text"
+                  value={getLabel('dashboard_heading_attention', 'Needs Attention')}
+                  onChange={(e) => onUpdateLabel?.('dashboard_heading_attention', e.target.value)}
+                  className="bg-surface border border-primary text-lg font-extrabold text-on-surface tracking-tight px-1.5 py-0.5 rounded outline-none"
+                />
+              ) : (
+                <h3 className="text-lg font-extrabold text-on-surface tracking-tight">
+                  {getLabel('dashboard_heading_attention', 'Needs Attention')}
+                </h3>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -218,7 +312,7 @@ export default function DashboardView({
                   >
                     <button
                       onClick={() => onDismissAlert(alert.id)}
-                      className="absolute top-3 right-3 text-on-surface-variant/40 hover:text-primary transition-colors p-1 cursor-pointer"
+                      className="absolute top-3 right-3 text-on-surface-variant/40 hover:text-primary transition-colors p-1 cursor-pointer border-0 bg-transparent"
                       title="Dismiss Alert"
                     >
                       <span className="material-symbols-outlined text-sm font-bold">close</span>
@@ -231,7 +325,7 @@ export default function DashboardView({
                     </p>
                     <button
                       onClick={() => onAlertAction(alert.actionTarget, alert.id)}
-                      className={`text-xs font-extrabold underline cursor-pointer hover:opacity-80 flex items-center gap-1 ${
+                      className={`text-xs font-extrabold underline cursor-pointer hover:opacity-80 flex items-center gap-1 bg-transparent border-0 ${
                         isUrgent ? 'text-primary' : 'text-on-surface'
                       }`}
                     >

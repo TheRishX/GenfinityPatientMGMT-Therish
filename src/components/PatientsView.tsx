@@ -18,6 +18,8 @@ interface PatientsViewProps {
   onAddClaim: (claimData: any) => Promise<void>;
   isNewPatientModalOpen: boolean;
   setIsNewPatientModalOpen: (open: boolean) => void;
+  selectedPatient?: Patient | null;
+  setSelectedPatient?: (patient: Patient | null) => void;
 }
 
 export default function PatientsView({
@@ -36,10 +38,15 @@ export default function PatientsView({
   onAddAuth,
   onAddClaim,
   isNewPatientModalOpen,
-  setIsNewPatientModalOpen
+  setIsNewPatientModalOpen,
+  selectedPatient: selectedPatientProp,
+  setSelectedPatient: setSelectedPatientProp
 }: PatientsViewProps) {
-  // Active selected patient for profile modal
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  // Active selected patient for profile modal (supports prop integration and local fallback)
+  const [localSelectedPatient, setLocalSelectedPatient] = useState<Patient | null>(null);
+  const selectedPatient = selectedPatientProp !== undefined ? selectedPatientProp : localSelectedPatient;
+  const setSelectedPatient = setSelectedPatientProp !== undefined ? setSelectedPatientProp : setLocalSelectedPatient;
+
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
   const [activeProfileTab, setActiveProfileTab] = useState<string>('documents');
   const [viewingFile, setViewingFile] = useState<PatientFile | null>(null);
@@ -58,6 +65,7 @@ export default function PatientsView({
   const [editInfoInsuranceId, setEditInfoInsuranceId] = useState('');
   const [editInfoAddress, setEditInfoAddress] = useState('');
   const [editInfoGender, setEditInfoGender] = useState('');
+  const [editInfoAvatarUrl, setEditInfoAvatarUrl] = useState('');
 
   // Appointments Tab States
   const [newApptDate, setNewApptDate] = useState('');
@@ -102,6 +110,7 @@ export default function PatientsView({
       setEditInfoInsuranceId(selectedPatient.insuranceId || '');
       setEditInfoAddress(selectedPatient.address || '');
       setEditInfoGender(selectedPatient.gender || 'Not specified');
+      setEditInfoAvatarUrl(selectedPatient.avatarUrl || '');
       setIsEditingInfo(false);
     }
   }, [selectedPatient?.id]);
@@ -310,8 +319,24 @@ export default function PatientsView({
               className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-highest/50 cursor-pointer hover:border-primary/35 transition-all hover:shadow-sm group flex flex-col justify-between min-h-[190px]"
             >
               <div className="flex justify-between items-start">
-                <div className="w-12 h-12 rounded-full bg-secondary-container/30 text-on-secondary-container flex items-center justify-center font-extrabold text-sm">
-                  {p.avatarInitials}
+                <div className="w-12 h-12 rounded-full bg-secondary-container/30 text-on-secondary-container flex items-center justify-center font-extrabold text-sm overflow-hidden">
+                  {p.avatarUrl ? (
+                    <img
+                      className="w-full h-full object-cover"
+                      alt={p.name}
+                      referrerPolicy="no-referrer"
+                      src={p.avatarUrl}
+                    />
+                  ) : p.id === 'p4' ? (
+                    <img
+                      className="w-full h-full object-cover"
+                      alt="Eleanor Vance"
+                      referrerPolicy="no-referrer"
+                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrDX68ppEAqs_qFiQjVZ-pjvW7nzC-y8ew8jUnTQi7M9LMden4EQEWwD2_PRQqRVHVV3n7ttr8RpOpeaz60eJLFdqbjCSOnjD8r_W0OjndDWD52zlRvf8D_DEfPtq6gyyyu7r8kvL-YqlXnRZscJ8nufW2zl8p2wwoAcWoy8h0qLy227ryQ2OwvXAQsDdt9aZluBpQRPTd0bCQV8WFXtfOpEXnI3cOUsvRMaqWGuJVo9o1eJdyf4mpZg"
+                    />
+                  ) : (
+                    <span>{p.avatarInitials}</span>
+                  )}
                 </div>
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${statusStyle}`}>
                   {p.status}
@@ -494,7 +519,14 @@ export default function PatientsView({
             <div className="px-6 pt-8 pb-5 border-b border-surface-container-highest">
               <div className="flex items-center gap-5">
                 <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-surface shadow-xs shrink-0 bg-surface-container-highest flex items-center justify-center font-black">
-                  {selectedPatient.id === 'p4' ? (
+                  {selectedPatient.avatarUrl ? (
+                    <img
+                      className="w-full h-full object-cover"
+                      alt={selectedPatient.name}
+                      referrerPolicy="no-referrer"
+                      src={selectedPatient.avatarUrl}
+                    />
+                  ) : selectedPatient.id === 'p4' ? (
                     <img
                       className="w-full h-full object-cover"
                       alt="Eleanor Vance"
@@ -753,7 +785,8 @@ export default function PatientsView({
                           insuranceCompany: editInfoInsuranceCompany,
                           insuranceId: editInfoInsuranceId,
                           address: editInfoAddress,
-                          gender: editInfoGender
+                          gender: editInfoGender,
+                          avatarUrl: editInfoAvatarUrl
                         });
                         setIsEditingInfo(false);
                       }}
@@ -868,6 +901,43 @@ export default function PatientsView({
                             onChange={(e) => setEditInfoAddress(e.target.value)}
                             className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Profile Image</label>
+                          <div className="flex items-center gap-4">
+                            <input
+                              type="text"
+                              placeholder="Paste a profile image URL, or click 'Browse' to upload"
+                              value={editInfoAvatarUrl}
+                              onChange={(e) => setEditInfoAvatarUrl(e.target.value)}
+                              className="flex-1 px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            />
+                            <div className="relative">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                      setEditInfoAvatarUrl(reader.result as string);
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                                className="hidden"
+                                id="avatar-file-input"
+                              />
+                              <label
+                                htmlFor="avatar-file-input"
+                                className="px-4 py-2.5 rounded-md bg-surface border border-surface-container-highest text-xs font-bold hover:bg-surface-container-low transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                              >
+                                <span className="material-symbols-outlined text-sm">upload</span>
+                                Browse...
+                              </label>
+                            </div>
+                          </div>
                         </div>
                       </div>
 

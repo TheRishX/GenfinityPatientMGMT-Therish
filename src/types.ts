@@ -24,6 +24,7 @@ export interface Patient {
   status: 'In Progress' | 'Consultation' | 'Fabrication' | 'New Referral' | 'Waiting for Rx' | 'Ready for Auth' | 'Auth Pending' | 'Archived';
   mrn: string;
   avatarInitials: string;
+  avatarUrl?: string;
   files: PatientFile[];
   insuranceCompany?: string;
   insuranceId?: string;

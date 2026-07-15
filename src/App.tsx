@@ -5,7 +5,8 @@ import DashboardView from './components/DashboardView';
 import PatientsView from './components/PatientsView';
 import AppointmentsView from './components/AppointmentsView';
 import TrackerView from './components/TrackerView';
-import AuthBillingView from './components/AuthBillingView';
+import AuthView from './components/AuthView';
+import BillingView from './components/BillingView';
 import FabricationView from './components/FabricationView';
 import SettingsView from './components/SettingsView';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
@@ -29,6 +30,83 @@ export default function App() {
 
   // New patient modal trigger inside PatientsView
   const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState<boolean>(false);
+
+  // Selected patient state for syncing between Dashboard and Patient Profile Modal
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+
+  // Workspace Customization (Edit Mode) States
+  const [isWorkspaceEditMode, setIsWorkspaceEditMode] = useState<boolean>(false);
+  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem('genfinity_custom_labels');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [enabledModules, setEnabledModules] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('genfinity_enabled_modules');
+      return saved ? JSON.parse(saved) : {
+        dashboard: true,
+        patients: true,
+        appointments: true,
+        tracker: true,
+        authorization: true,
+        billing: true,
+        documents: true,
+        fabrication: true,
+        settings: true,
+        support: true
+      };
+    } catch {
+      return {
+        dashboard: true,
+        patients: true,
+        appointments: true,
+        tracker: true,
+        authorization: true,
+        billing: true,
+        documents: true,
+        fabrication: true,
+        settings: true,
+        support: true
+      };
+    }
+  });
+
+  const handleUpdateLabel = (key: string, value: string) => {
+    setCustomLabels(prev => {
+      const updated = { ...prev, [key]: value };
+      localStorage.setItem('genfinity_custom_labels', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleToggleModule = (moduleId: string) => {
+    setEnabledModules(prev => {
+      const current = prev[moduleId] !== false;
+      const updated = { ...prev, [moduleId]: !current };
+      localStorage.setItem('genfinity_enabled_modules', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleSelectPatientByName = (patientName: string) => {
+    if (!db) return;
+    const target = db.patients.find(
+      p => p.name.trim().toLowerCase() === patientName.trim().toLowerCase()
+    );
+    if (target) {
+      setSelectedPatient(target);
+      setActiveTab('patients');
+    } else {
+      // If the patient is not yet registered in patient list, set search term to let them find/add them easily
+      setSearchTerm(patientName);
+      setActiveTab('patients');
+    }
+  };
 
   const saveStateLocally = (newDb: DatabaseSchema) => {
     setDb(newDb);
@@ -71,6 +149,7 @@ export default function App() {
           address: sp.auth_info?.address || '',
           gender: sp.auth_info?.gender || 'Not specified',
           clinicalNotes: sp.auth_info?.clinical_notes || [],
+          avatarUrl: sp.auth_info?.avatar_url || '',
           billing: sp.billing || { date: '', amount: 0, status: '' }
         }));
       }
@@ -467,7 +546,8 @@ export default function App() {
               insurance_id: patientData.insuranceId || '',
               address: patientData.address || '',
               gender: patientData.gender || 'Not specified',
-              clinical_notes: patientData.clinicalNotes || []
+              clinical_notes: patientData.clinicalNotes || [],
+              avatar_url: patientData.avatarUrl || ''
             },
             billing: patientData.billing || { date: '', amount: 0, status: '' }
           })
@@ -787,6 +867,30 @@ export default function App() {
     }
   };
 
+  // API Call: Update Invoice Claim Status
+  const handleUpdateClaimStatus = async (claimId: string, status: Claim['status']) => {
+    if (isOfflineMode || !db) {
+      const updatedClaims = db.claims.map(c => c.id === claimId ? { ...c, status } : c);
+      saveStateLocally({
+        ...db,
+        claims: updatedClaims
+      });
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/claims/${claimId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (!res.ok) throw new Error('Failed to update claim status');
+      await fetchState();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   // API Call: Save settings config
   const handleSaveSettings = async (settingsData: ClinicSettings) => {
     if (isOfflineMode || !db) {
@@ -1041,6 +1145,11 @@ export default function App() {
     );
   }
 
+  // Helper to safely access custom labels
+  const getSidebarLabel = (id: string, defaultLabel: string) => {
+    return customLabels[`sidebar_${id}`] || defaultLabel;
+  };
+
   // Active Tab Rendering Router
   const renderTabContent = () => {
     if (!db) return null;
@@ -1055,6 +1164,10 @@ export default function App() {
             onNavigateToTab={(tab) => setActiveTab(tab)}
             onAlertAction={handleAlertActionRedirect}
             onDismissAlert={handleDismissAlert}
+            onPatientClick={handleSelectPatientByName}
+            isWorkspaceEditMode={isWorkspaceEditMode}
+            customLabels={customLabels}
+            onUpdateLabel={handleUpdateLabel}
           />
         );
       case 'patients':
@@ -1077,6 +1190,8 @@ export default function App() {
             onAddClaim={handleAddClaim}
             isNewPatientModalOpen={isNewPatientModalOpen}
             setIsNewPatientModalOpen={setIsNewPatientModalOpen}
+            selectedPatient={selectedPatient}
+            setSelectedPatient={setSelectedPatient}
           />
         );
       case 'appointments':
@@ -1095,17 +1210,32 @@ export default function App() {
             patients={db.patients}
             onUpdatePatientStatus={handleUpdatePatientStatus}
             onNewPatientClick={() => setIsNewPatientModalOpen(true)}
+            onAddPatient={handleAddPatient}
+            isWorkspaceEditMode={isWorkspaceEditMode}
+            customLabels={customLabels}
+            onUpdateLabel={handleUpdateLabel}
           />
         );
       case 'authorization':
-      case 'billing':
         return (
-          <AuthBillingView
+          <AuthView
             authorizations={db.authorizations}
-            claims={db.claims}
             onUpdateAuth={handleUpdateAuth}
             onAddAuth={handleAddAuth}
+            isWorkspaceEditMode={isWorkspaceEditMode}
+            customLabels={customLabels}
+            onUpdateLabel={handleUpdateLabel}
+          />
+        );
+      case 'billing':
+        return (
+          <BillingView
+            claims={db.claims}
             onAddClaim={handleAddClaim}
+            onUpdateClaimStatus={handleUpdateClaimStatus}
+            isWorkspaceEditMode={isWorkspaceEditMode}
+            customLabels={customLabels}
+            onUpdateLabel={handleUpdateLabel}
           />
         );
       case 'fabrication':
@@ -1164,6 +1294,12 @@ export default function App() {
           setIsNewPatientModalOpen(true);
         }}
         clinicName={db?.settings.clinicName}
+        isWorkspaceEditMode={isWorkspaceEditMode}
+        setIsWorkspaceEditMode={setIsWorkspaceEditMode}
+        customLabels={customLabels}
+        onUpdateLabel={handleUpdateLabel}
+        enabledModules={enabledModules}
+        onToggleModule={handleToggleModule}
       />
 
       {/* Main Content Area */}
@@ -1172,19 +1308,21 @@ export default function App() {
         <Header
           title={
             activeTab === 'dashboard'
-              ? 'Dashboard Overview'
+              ? getSidebarLabel('dashboard', 'Dashboard Overview')
               : activeTab === 'patients'
-              ? 'Patient Database'
+              ? getSidebarLabel('patients', 'Patient Database')
               : activeTab === 'appointments'
-              ? 'Appointments Schedule'
+              ? getSidebarLabel('appointments', 'Appointments Schedule')
               : activeTab === 'tracker'
-              ? 'Clinical Workflow Board'
+              ? getSidebarLabel('tracker', 'Clinical Workflow Board')
               : activeTab === 'authorization'
-              ? 'Approval & Reimbursements'
+              ? getSidebarLabel('authorization', 'Approval & Reimbursements')
               : activeTab === 'billing'
-              ? 'Invoices Ledger'
+              ? getSidebarLabel('billing', 'Invoices Ledger')
               : activeTab === 'fabrication'
-              ? 'Active Workshop'
+              ? getSidebarLabel('fabrication', 'Active Workshop')
+              : activeTab === 'settings'
+              ? getSidebarLabel('settings', 'System Settings')
               : 'Genfinity Clinical Portal'
           }
           searchTerm={searchTerm}
@@ -1192,6 +1330,10 @@ export default function App() {
           onSyncClick={fetchState}
           clinicName={db?.settings.clinicName}
           isOfflineMode={isOfflineMode}
+          appointments={db.appointments}
+          alerts={db.alerts}
+          onAlertAction={handleAlertActionRedirect}
+          onDismissAlert={handleDismissAlert}
         />
 
         {/* Inner Content stage */}
