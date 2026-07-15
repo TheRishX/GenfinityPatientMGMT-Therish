@@ -8,6 +8,7 @@ interface DashboardViewProps {
   alerts: AlertItem[];
   onNavigateToTab: (tab: string) => void;
   onAlertAction: (actionTarget: string, alertId: string) => void;
+  onDismissAlert: (alertId: string) => void;
 }
 
 export default function DashboardView({
@@ -15,7 +16,8 @@ export default function DashboardView({
   appointments,
   alerts,
   onNavigateToTab,
-  onAlertAction
+  onAlertAction,
+  onDismissAlert
 }: DashboardViewProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -208,16 +210,23 @@ export default function DashboardView({
                 return (
                   <div
                     key={alert.id}
-                    className={`p-4 rounded-2xl ${
+                    className={`p-4 rounded-2xl relative ${
                       isUrgent
                         ? 'bg-primary-container/10 text-primary border border-primary-container/15'
                         : 'bg-surface-container-high text-on-surface-variant border border-surface-container-highest/40'
                     }`}
                   >
-                    <h4 className="font-bold text-xs uppercase tracking-wider mb-1">
+                    <button
+                      onClick={() => onDismissAlert(alert.id)}
+                      className="absolute top-3 right-3 text-on-surface-variant/40 hover:text-primary transition-colors p-1 cursor-pointer"
+                      title="Dismiss Alert"
+                    >
+                      <span className="material-symbols-outlined text-sm font-bold">close</span>
+                    </button>
+                    <h4 className="font-bold text-xs uppercase tracking-wider mb-1 pr-6">
                       {alert.title}
                     </h4>
-                    <p className="text-xs font-semibold opacity-90 leading-normal mb-3">
+                    <p className="text-xs font-semibold opacity-90 leading-normal mb-3 pr-6">
                       {alert.message}
                     </p>
                     <button
@@ -232,6 +241,11 @@ export default function DashboardView({
                   </div>
                 );
               })}
+              {alerts.length === 0 && (
+                <div className="p-6 text-center border border-dashed border-surface-container-highest rounded-2xl bg-surface-container-lowest">
+                  <p className="text-xs font-bold text-on-surface-variant opacity-75">All clear! No pending items needing attention.</p>
+                </div>
+              )}
             </div>
           </div>
 

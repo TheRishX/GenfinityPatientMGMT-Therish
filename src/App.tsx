@@ -539,10 +539,42 @@ export default function App() {
       setActiveTab('authorization');
     } else if (target === 'documents') {
       setActiveTab('patients');
-      // For demonstration, filter to patient
-      setSearchTerm('Sarah Davis');
+      // Resolve patient from alert message (e.g. "Jane Doe needs LMN signed." or similar)
+      const foundAlert = db?.alerts?.find(a => a.id === alertId);
+      if (foundAlert) {
+        const matched = foundAlert.message.match(/^([^'s]+)('s)?\s+(needs|expires)/i);
+        if (matched && matched[1]) {
+          setSearchTerm(matched[1].trim());
+          return;
+        }
+      }
+      setSearchTerm('Jane Doe');
     } else {
       setActiveTab(target);
+    }
+  };
+
+  // API Call: Dismiss Alert
+  const handleDismissAlert = async (alertId: string) => {
+    if (isOfflineMode || !db) {
+      const updatedAlerts = db ? db.alerts.filter(a => a.id !== alertId) : [];
+      if (db) {
+        saveStateLocally({
+          ...db,
+          alerts: updatedAlerts
+        });
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/alerts/${alertId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Failed to dismiss alert');
+      await fetchState();
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
@@ -681,6 +713,7 @@ export default function App() {
             alerts={db.alerts}
             onNavigateToTab={(tab) => setActiveTab(tab)}
             onAlertAction={handleAlertActionRedirect}
+            onDismissAlert={handleDismissAlert}
           />
         );
       case 'patients':

@@ -685,7 +685,7 @@ export default function PatientsView({
                         });
                         setIsEditingInfo(false);
                       }}
-                      className="bg-surface-container-lowest rounded-3xl p-6 border border-surface-container-highest/40 space-y-4"
+                      className="bg-surface-container-lowest rounded-lg p-6 border border-surface-container-highest/40 space-y-4"
                     >
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
@@ -695,7 +695,7 @@ export default function PatientsView({
                             required
                             value={editInfoName}
                             onChange={(e) => setEditInfoName(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           />
                         </div>
                         <div className="space-y-1">
@@ -704,7 +704,7 @@ export default function PatientsView({
                             type="text"
                             value={editInfoPhone}
                             onChange={(e) => setEditInfoPhone(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           />
                         </div>
                         <div className="space-y-1">
@@ -713,7 +713,7 @@ export default function PatientsView({
                             type="date"
                             value={editInfoDob}
                             onChange={(e) => setEditInfoDob(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           />
                         </div>
                         <div className="space-y-1">
@@ -722,7 +722,7 @@ export default function PatientsView({
                             type="email"
                             value={editInfoEmail}
                             onChange={(e) => setEditInfoEmail(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           />
                         </div>
                         <div className="space-y-1">
@@ -730,7 +730,7 @@ export default function PatientsView({
                           <select
                             value={editInfoReferralSource}
                             onChange={(e) => setEditInfoReferralSource(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           >
                             <option value="physician">Primary Care Physician</option>
                             <option value="hospital">Hospital Discharge</option>
@@ -743,7 +743,7 @@ export default function PatientsView({
                           <select
                             value={editInfoStatus}
                             onChange={(e) => setEditInfoStatus(e.target.value as any)}
-                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           >
                             <option value="In Progress">In Progress</option>
                             <option value="Consultation">Consultation</option>
@@ -759,7 +759,7 @@ export default function PatientsView({
                           <select
                             value={editInfoGender}
                             onChange={(e) => setEditInfoGender(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           >
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
@@ -774,7 +774,7 @@ export default function PatientsView({
                             placeholder="e.g. Medicare Blue Cross"
                             value={editInfoInsuranceCompany}
                             onChange={(e) => setEditInfoInsuranceCompany(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           />
                         </div>
                         <div className="space-y-1">
@@ -784,7 +784,7 @@ export default function PatientsView({
                             placeholder="e.g. MB-9283-X"
                             value={editInfoInsuranceId}
                             onChange={(e) => setEditInfoInsuranceId(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           />
                         </div>
                         <div className="space-y-1 md:col-span-2">
@@ -794,7 +794,7 @@ export default function PatientsView({
                             placeholder="123 Clinical Street, Apt 101"
                             value={editInfoAddress}
                             onChange={(e) => setEditInfoAddress(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           />
                         </div>
                       </div>
@@ -803,13 +803,13 @@ export default function PatientsView({
                         <button
                           type="button"
                           onClick={() => setIsEditingInfo(false)}
-                          className="px-5 py-2 rounded-full border border-surface-container-highest text-xs font-bold hover:bg-surface-container-low transition-colors cursor-pointer"
+                          className="px-5 py-2 rounded-md border border-surface-container-highest text-xs font-bold hover:bg-surface-container-low transition-colors cursor-pointer"
                         >
                           Cancel
                         </button>
                         <button
                           type="submit"
-                          className="px-6 py-2 bg-primary text-white text-xs font-bold rounded-full hover:bg-primary-container transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                          className="px-6 py-2 bg-primary text-white text-xs font-bold rounded-md hover:bg-primary-container transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-sm font-bold">check</span>
                           Save Changes
@@ -1189,7 +1189,7 @@ export default function PatientsView({
                             required
                             value={newClaimPayer}
                             onChange={(e) => setNewClaimPayer(e.target.value)}
-                            className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           />
                         </div>
                         <div className="space-y-1">
@@ -1201,7 +1201,7 @@ export default function PatientsView({
                             required
                             value={newClaimAmount}
                             onChange={(e) => setNewClaimAmount(e.target.value)}
-                            className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           />
                         </div>
                         <div className="space-y-1">
@@ -1211,12 +1211,12 @@ export default function PatientsView({
                             placeholder="e.g. Dr. Sarah Jenkins"
                             value={newClaimDoc}
                             onChange={(e) => setNewClaimDoc(e.target.value)}
-                            className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           />
                         </div>
                         <button
                           type="submit"
-                          className="w-full py-2.5 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary-container transition-all cursor-pointer mt-4"
+                          className="w-full py-2.5 rounded-md bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary-container transition-all cursor-pointer mt-4"
                         >
                           <span className="material-symbols-outlined text-xs">post_add</span>
                           Generate Claim
@@ -1314,7 +1314,7 @@ export default function PatientsView({
                             placeholder="Enter clinical assessment, physical findings, or prescription comments..."
                             value={newNoteText}
                             onChange={(e) => setNewNoteText(e.target.value)}
-                            className="w-full px-4 py-2 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none resize-none"
+                            className="w-full px-4 py-2 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none resize-none"
                           />
                         </div>
                         <div className="space-y-1">
@@ -1322,7 +1322,7 @@ export default function PatientsView({
                           <select
                             value={newNoteAuthor}
                             onChange={(e) => setNewNoteAuthor(e.target.value)}
-                            className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           >
                             <option value="Dr. Aris Thorne">Dr. Aris Thorne</option>
                             <option value="Dr. Sarah Jenkins">Dr. Sarah Jenkins</option>
@@ -1331,7 +1331,7 @@ export default function PatientsView({
                         </div>
                         <button
                           type="submit"
-                          className="w-full py-2.5 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary-container transition-all cursor-pointer mt-4"
+                          className="w-full py-2.5 rounded-md bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary-container transition-all cursor-pointer mt-4"
                         >
                           <span className="material-symbols-outlined text-xs">save</span>
                           Save Progress Note

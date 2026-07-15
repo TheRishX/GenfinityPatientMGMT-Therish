@@ -805,6 +805,19 @@ async function startServer() {
     }
   });
 
+  // 11. Dismiss Alert Notification
+  app.delete('/api/alerts/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const db = await readDatabase();
+      db.alerts = db.alerts.filter(a => a.id !== id);
+      await writeDatabase(db);
+      res.json({ success: true, message: 'Alert notification dismissed' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Vite Integration
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

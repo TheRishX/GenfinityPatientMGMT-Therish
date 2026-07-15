@@ -55,12 +55,12 @@ export default function FabricationView({
         {stages.map(st => {
           const stageItems = getItemsByStage(st.id);
           return (
-            <div key={st.id} className="bg-surface-container-low/30 rounded-2xl p-4 border border-surface-container-highest/20 flex flex-col min-h-[400px] w-72 lg:w-auto">
+            <div key={st.id} className="bg-surface-container-low/30 rounded-lg p-4 border border-surface-container-highest/20 flex flex-col min-h-[400px] w-72 lg:w-auto">
               {/* Lane Header */}
               <div className="flex items-center gap-2 border-b border-surface-container pb-3 mb-4">
                 <span className="material-symbols-outlined text-secondary text-base shrink-0">{st.icon}</span>
                 <h3 className="font-extrabold text-xs text-on-surface tracking-tight truncate flex-1">{st.label}</h3>
-                <span className="bg-surface-container-high text-on-surface-variant text-[10px] font-black px-2 py-0.5 rounded-full shrink-0">
+                <span className="bg-surface-container-high text-on-surface-variant text-[10px] font-black px-2 py-0.5 rounded-md shrink-0">
                   {stageItems.length}
                 </span>
               </div>
@@ -78,11 +78,11 @@ export default function FabricationView({
                         setEditNotes(item.techNotes);
                         setEditPriority(item.priority);
                       }}
-                      className="bg-surface-container-lowest border border-surface-container-highest rounded-xl p-3.5 shadow-xs hover:border-primary/45 transition-all cursor-pointer relative group flex flex-col justify-between min-h-[140px]"
+                      className="bg-surface-container-lowest border border-surface-container-highest rounded-md p-3.5 shadow-xs hover:border-primary/45 transition-all cursor-pointer relative group flex flex-col justify-between min-h-[140px]"
                     >
                       <div>
                         <div className="flex justify-between items-start mb-2">
-                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-sm ${
                             isUrgent ? 'bg-primary-container/10 text-primary' : 'bg-surface-container-high text-on-surface-variant'
                           }`}>
                             {item.priority}
@@ -93,7 +93,7 @@ export default function FabricationView({
                         <p className="text-[10px] text-on-surface-variant font-bold mt-0.5 truncate">{item.device}</p>
                         
                         {item.techNotes && (
-                          <p className="text-[10px] font-medium text-on-surface bg-surface p-2 rounded-lg border border-surface-container mt-2.5 line-clamp-2">
+                          <p className="text-[10px] font-medium text-on-surface bg-surface p-2 rounded-sm border border-surface-container mt-2.5 line-clamp-2">
                             {item.techNotes}
                           </p>
                         )}
@@ -109,7 +109,7 @@ export default function FabricationView({
                 })}
 
                 {stageItems.length === 0 && (
-                  <div className="h-28 rounded-xl border border-dashed border-surface-container-highest flex items-center justify-center p-4 text-center">
+                  <div className="h-28 rounded-md border border-dashed border-surface-container-highest flex items-center justify-center p-4 text-center">
                     <p className="text-[10px] font-bold text-on-surface-variant opacity-60">Ready for job</p>
                   </div>
                 )}
@@ -144,7 +144,7 @@ export default function FabricationView({
                 <select
                   value={editStage}
                   onChange={e => setEditStage(e.target.value as FabricationItem['stage'])}
-                  className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs text-on-surface focus:border-secondary outline-none"
+                  className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs text-on-surface focus:border-secondary outline-none"
                 >
                   {stages.map(s => (
                     <option key={s.id} value={s.id}>{s.label}</option>
@@ -160,7 +160,7 @@ export default function FabricationView({
                       key={pr}
                       type="button"
                       onClick={() => setEditPriority(pr)}
-                      className={`flex-1 py-2 text-xs font-bold rounded-full border transition-all cursor-pointer ${
+                      className={`flex-1 py-2 text-xs font-bold rounded-md border transition-all cursor-pointer ${
                         editPriority === pr
                           ? pr === 'Urgent'
                             ? 'bg-primary text-white border-primary shadow-xs'
@@ -180,7 +180,7 @@ export default function FabricationView({
                   value={editNotes}
                   onChange={e => setEditNotes(e.target.value)}
                   rows={3}
-                  className="w-full px-4 py-2.5 bg-surface rounded-2xl border border-surface-container-highest text-xs text-on-surface focus:border-secondary outline-none resize-none"
+                  className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs text-on-surface focus:border-secondary outline-none resize-none"
                   placeholder="E.g., Check scan measurements. Needs custom joint pin size."
                 />
               </div>
@@ -189,13 +189,13 @@ export default function FabricationView({
                 <button
                   type="button"
                   onClick={() => setSelectedItem(null)}
-                  className="px-4.5 py-2 border border-surface-container-highest rounded-full text-xs font-bold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                  className="px-4.5 py-2 border border-surface-container-highest rounded-md text-xs font-bold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5.5 py-2 bg-primary text-white text-xs font-bold rounded-full hover:bg-primary-container transition-all cursor-pointer"
+                  className="px-5.5 py-2 bg-primary text-white text-xs font-bold rounded-md hover:bg-primary-container transition-all cursor-pointer"
                 >
                   Save Tech Specs
                 </button>
