@@ -1,0 +1,6 @@
+{
+  "name": "Genfinity Clinical Portal",
+  "description": "A comprehensive patient management, workflow tracking, and interactive analytics portal for Genfinity O&P.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
