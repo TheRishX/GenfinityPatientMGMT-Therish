@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface HeaderProps {
   title: string;
@@ -19,6 +19,36 @@ export default function Header({
   clinicName,
   isOfflineMode = false
 }: HeaderProps) {
+  const [supabaseConnected, setSupabaseConnected] = useState<boolean | null>(null);
+  const [latency, setLatency] = useState<number | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
+
+  const checkStatus = async () => {
+    setIsChecking(true);
+    try {
+      const res = await fetch('/api/supabase-status');
+      if (res.ok) {
+        const data = await res.json();
+        setSupabaseConnected(!!data.connected);
+        if (data.latencyMs !== undefined) {
+          setLatency(data.latencyMs);
+        }
+      } else {
+        setSupabaseConnected(false);
+      }
+    } catch (err) {
+      setSupabaseConnected(false);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  useEffect(() => {
+    checkStatus();
+    const interval = setInterval(checkStatus, 15000); // Check every 15s
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <header className="bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md flex justify-between items-center w-full h-20 px-6 z-10 sticky top-0 border-b border-surface-container-highest/20">
       {/* Dynamic Context Title or Search */}
@@ -26,10 +56,32 @@ export default function Header({
         <h2 className="hidden md:block text-lg font-extrabold text-on-surface mr-2 shrink-0 tracking-tight">
           {title}
         </h2>
-        <span className="bg-emerald-100/80 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider flex items-center gap-1.5 shrink-0 border border-emerald-200/40">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          Supabase Online
-        </span>
+
+        {/* Real-Time Connection Pulse Indicator */}
+        <button
+          onClick={checkStatus}
+          disabled={isChecking}
+          title="Click to manually re-verify live Supabase connection"
+          className="flex items-center shrink-0"
+        >
+          {supabaseConnected === null ? (
+            <span className="bg-amber-100/80 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider flex items-center gap-1.5 border border-amber-200/40 select-none cursor-pointer hover:bg-amber-200/50 transition-all">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Verifying Link...
+            </span>
+          ) : supabaseConnected ? (
+            <span className="bg-emerald-100/80 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider flex items-center gap-1.5 border border-emerald-200/40 select-none cursor-pointer hover:bg-emerald-200/50 transition-all shadow-[0_0_8px_rgba(16,185,129,0.1)]">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 relative" />
+              Live Connected {latency !== null ? `(${latency}ms)` : ''}
+            </span>
+          ) : (
+            <span className="bg-primary/10 text-primary text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider flex items-center gap-1.5 border border-primary/20 select-none cursor-pointer hover:bg-primary/20 transition-all shadow-[0_0_8px_rgba(239,68,68,0.1)]">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              Local Sandbox / Offline
+            </span>
+          )}
+        </button>
         <div className="relative w-full max-w-md">
           <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">
             search

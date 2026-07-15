@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { DatabaseSchema, Patient, PatientFile, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './src/types.js';
-import { supabase } from './src/utils/supabase.js';
+import { supabase, reloadSupabaseConfig, getActiveConfig } from './src/utils/supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -354,7 +354,8 @@ async function readDatabase(): Promise<DatabaseSchema> {
         time: sa.appt_time || '09:00 AM',
         type: sa.type || 'Consultation',
         status: sa.status || 'Scheduled',
-        initials: getInitials(sa.patient_name || 'A')
+        initials: getInitials(sa.patient_name || 'A'),
+        date: sa.appt_date || ''
       }));
     }
   } catch (supErr) {
@@ -376,6 +377,67 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
+  // Supabase Real-Time Status & Config Checkers
+  app.get('/api/supabase-status', async (req, res) => {
+    try {
+      const startTime = Date.now();
+      const { data, error } = await supabase.from('clinic_settings').select('clinic_name').limit(1);
+      const latencyMs = Date.now() - startTime;
+      
+      if (error) {
+        return res.json({
+          connected: false,
+          error: error.message,
+          latencyMs
+        });
+      }
+      
+      res.json({
+        connected: true,
+        latencyMs,
+        details: data
+      });
+    } catch (err: any) {
+      res.json({
+        connected: false,
+        error: err.message
+      });
+    }
+  });
+
+  app.get('/api/supabase-config', (req, res) => {
+    try {
+      const config = getActiveConfig();
+      res.json(config);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/supabase-config', async (req, res) => {
+    try {
+      const { url, key } = req.body;
+      if (!url || !key) {
+        return res.status(400).json({ error: 'Both URL and Publishable Key are required' });
+      }
+      
+      // Update config
+      reloadSupabaseConfig(url, key);
+      
+      // Perform immediate validation test
+      const { error } = await supabase.from('clinic_settings').select('clinic_name').limit(1);
+      
+      res.json({
+        success: true,
+        message: 'Supabase configuration updated successfully',
+        connected: !error,
+        error: error ? error.message : null
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // 1. Get complete DB state
   app.get('/api/data', async (req, res) => {
     try {
@@ -574,19 +636,76 @@ async function startServer() {
   app.patch('/api/appointments/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      const { status, time, type } = req.body;
+      const { status, time, type, patientName, appt_date } = req.body;
 
       const updateData: any = {};
       if (status !== undefined) updateData.status = status;
       if (time !== undefined) updateData.appt_time = time;
       if (type !== undefined) updateData.type = type;
+      if (patientName !== undefined) updateData.patient_name = patientName;
+      if (appt_date !== undefined) updateData.appt_date = appt_date;
 
       const { data, error } = await supabase.from('appointments').update(updateData).eq('id', id).select().single();
       if (error) {
+        // Fallback for local sandbox mode
+        const db = await readDatabase();
+        const apptIndex = db.appointments.findIndex(a => a.id === id);
+        if (apptIndex !== -1) {
+          if (status !== undefined) db.appointments[apptIndex].status = status;
+          if (time !== undefined) db.appointments[apptIndex].time = time;
+          if (type !== undefined) db.appointments[apptIndex].type = type;
+          if (patientName !== undefined) db.appointments[apptIndex].patientName = patientName;
+          await writeDatabase(db);
+          return res.json(db.appointments[apptIndex]);
+        }
         throw new Error(error.message);
       }
 
       res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 3d. Delete Patient completely (Admin)
+  app.delete('/api/patients/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Delete from live Supabase
+      const { error: supErr } = await supabase.from('patients').delete().eq('id', id);
+      if (supErr) {
+        console.warn('Supabase delete warning:', supErr.message);
+      }
+
+      // Delete from local file
+      const db = await readDatabase();
+      db.patients = db.patients.filter(p => p.id !== id);
+      await writeDatabase(db);
+
+      res.json({ success: true, message: 'Patient record deleted successfully' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 3e. Delete Appointment completely (Admin)
+  app.delete('/api/appointments/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Delete from live Supabase
+      const { error: supErr } = await supabase.from('appointments').delete().eq('id', id);
+      if (supErr) {
+        console.warn('Supabase delete warning:', supErr.message);
+      }
+
+      // Delete from local file
+      const db = await readDatabase();
+      db.appointments = db.appointments.filter(a => a.id !== id);
+      await writeDatabase(db);
+
+      res.json({ success: true, message: 'Appointment deleted successfully' });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

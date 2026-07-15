@@ -25,7 +25,8 @@ export default function TrackerView({
     { id: 'Ready for Auth', label: 'Ready for Auth', colorClass: 'bg-secondary-container' },
     { id: 'Auth Pending', label: 'Auth Pending', colorClass: 'bg-tertiary-container' },
     { id: 'Fabrication', label: 'Fabrication', colorClass: 'bg-amber-500' },
-    { id: 'In Progress', label: 'In Progress', colorClass: 'bg-green-500' }
+    { id: 'In Progress', label: 'In Progress', colorClass: 'bg-green-500' },
+    { id: 'Archived', label: 'Archived', colorClass: 'bg-slate-500' }
   ];
 
   // Column config based on filter
@@ -39,11 +40,12 @@ export default function TrackerView({
       ]
     : [
         { id: 'Fabrication' as Patient['status'], label: 'Fabrication', colorClass: 'bg-amber-500' },
-        { id: 'In Progress' as Patient['status'], label: 'In Progress', colorClass: 'bg-green-500' }
+        { id: 'In Progress' as Patient['status'], label: 'In Progress', colorClass: 'bg-green-500' },
+        { id: 'Archived' as Patient['status'], label: 'Archived', colorClass: 'bg-slate-500' }
       ];
 
   // Optional trailing columns (aesthetic scroll representation)
-  const previewColumns = kanbanFilter === 'active' ? ['Fabrication', 'In Progress'] : ['Archive'];
+  const previewColumns = kanbanFilter === 'active' ? ['Fabrication', 'In Progress'] : [];
 
   // Filter patients for search
   const filteredPatients = patients.filter(p => {

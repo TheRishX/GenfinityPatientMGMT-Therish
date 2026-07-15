@@ -21,7 +21,7 @@ export interface Patient {
   dob: string;
   email: string;
   referralSource?: string;
-  status: 'In Progress' | 'Consultation' | 'Fabrication' | 'New Referral' | 'Waiting for Rx' | 'Ready for Auth' | 'Auth Pending';
+  status: 'In Progress' | 'Consultation' | 'Fabrication' | 'New Referral' | 'Waiting for Rx' | 'Ready for Auth' | 'Auth Pending' | 'Archived';
   mrn: string;
   avatarInitials: string;
   files: PatientFile[];
@@ -40,6 +40,7 @@ export interface Appointment {
   type: string;
   status: 'Checked In' | 'Scheduled';
   initials: string;
+  date?: string;
 }
 
 export interface Authorization {

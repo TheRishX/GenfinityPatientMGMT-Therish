@@ -11,6 +11,7 @@ interface PatientsViewProps {
   onAddFile: (patientId: string, fileData: any) => Promise<void>;
   onDeleteFile: (patientId: string, fileId: string) => Promise<void>;
   onUpdatePatient: (patientId: string, patientData: any) => Promise<void>;
+  onDeletePatient: (patientId: string) => Promise<void>;
   onAddAppointment: (apptData: any) => Promise<void>;
   onUpdateAppointment: (apptId: string, updateData: any) => Promise<void>;
   onAddAuth: (authData: any) => Promise<void>;
@@ -29,6 +30,7 @@ export default function PatientsView({
   onAddFile,
   onDeleteFile,
   onUpdatePatient,
+  onDeletePatient,
   onAddAppointment,
   onUpdateAppointment,
   onAddAuth,
@@ -38,6 +40,7 @@ export default function PatientsView({
 }: PatientsViewProps) {
   // Active selected patient for profile modal
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
   const [activeProfileTab, setActiveProfileTab] = useState<string>('documents');
   const [viewingFile, setViewingFile] = useState<PatientFile | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -119,13 +122,22 @@ export default function PatientsView({
 
   // Filtered patients list
   const filteredPatients = patients.filter(p => {
+    if (!p) return false;
     const term = searchTerm.toLowerCase();
-    return (
+    const matchesSearch = (
       p.name.toLowerCase().includes(term) ||
       p.mrn.toLowerCase().includes(term) ||
       p.status.toLowerCase().includes(term) ||
       (p.phone && p.phone.includes(term))
     );
+    if (!matchesSearch) return false;
+
+    if (archiveFilter === 'active') {
+      return p.status !== 'Archived';
+    } else if (archiveFilter === 'archived') {
+      return p.status === 'Archived';
+    }
+    return true;
   });
 
   // Handle saving new patient
@@ -250,6 +262,34 @@ export default function PatientsView({
         </button>
       </div>
 
+      {/* Patient archive filter tabs */}
+      <div className="flex bg-surface-container-high rounded-full p-0.5 border border-surface-container-highest/60 w-fit select-none">
+        <button
+          onClick={() => setArchiveFilter('active')}
+          className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            archiveFilter === 'active' ? 'bg-surface shadow-xs text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          Active Records
+        </button>
+        <button
+          onClick={() => setArchiveFilter('archived')}
+          className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            archiveFilter === 'archived' ? 'bg-surface shadow-xs text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          Archived / Closed
+        </button>
+        <button
+          onClick={() => setArchiveFilter('all')}
+          className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            archiveFilter === 'all' ? 'bg-surface shadow-xs text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          All Records
+        </button>
+      </div>
+
       {/* Grid of Patients */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filteredPatients.map(p => {
@@ -258,6 +298,7 @@ export default function PatientsView({
           if (p.status === 'Consultation') statusStyle = 'bg-surface-variant text-on-surface-variant';
           else if (p.status === 'Fabrication') statusStyle = 'bg-primary-container/10 text-primary';
           else if (p.status === 'New Referral') statusStyle = 'bg-secondary-container text-on-secondary-container';
+          else if (p.status === 'Archived') statusStyle = 'bg-primary/10 text-primary opacity-60';
 
           return (
             <div
@@ -266,7 +307,7 @@ export default function PatientsView({
                 setSelectedPatient(p);
                 setActiveProfileTab('documents');
               }}
-              className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-highest/50 cursor-pointer hover:border-primary/35 transition-all hover:shadow-sm group flex flex-col justify-between min-h-[170px]"
+              className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-highest/50 cursor-pointer hover:border-primary/35 transition-all hover:shadow-sm group flex flex-col justify-between min-h-[190px]"
             >
               <div className="flex justify-between items-start">
                 <div className="w-12 h-12 rounded-full bg-secondary-container/30 text-on-secondary-container flex items-center justify-center font-extrabold text-sm">
@@ -276,7 +317,7 @@ export default function PatientsView({
                   {p.status}
                 </span>
               </div>
-              <div className="mt-4">
+              <div className="mt-4 flex-1">
                 <h3 className="font-extrabold text-base text-on-surface group-hover:text-primary transition-colors truncate">
                   {p.name}
                 </h3>
@@ -287,6 +328,37 @@ export default function PatientsView({
                 <p className="text-[10px] font-bold text-on-surface-variant/70 uppercase tracking-wider mt-2">
                   MRN: {p.mrn}
                 </p>
+              </div>
+
+              {/* Admin quick actions */}
+              <div className="mt-4 pt-3 border-t border-surface-container-highest/30 flex items-center justify-end gap-1 shrink-0">
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const newStatus = p.status === 'Archived' ? 'In Progress' : 'Archived';
+                    await onUpdatePatient(p.id, { ...p, status: newStatus });
+                  }}
+                  title={p.status === 'Archived' ? 'Activate / Unarchive' : 'Archive'}
+                  className="p-1.5 rounded-full hover:bg-surface-container text-on-surface-variant hover:text-primary transition-all cursor-pointer flex items-center justify-center"
+                >
+                  <span className="material-symbols-outlined text-base">
+                    {p.status === 'Archived' ? 'unarchive' : 'archive'}
+                  </span>
+                </button>
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (confirm(`Are you absolutely sure you want to permanently delete patient ${p.name}? All medical records and uploaded files will be destroyed.`)) {
+                      await onDeletePatient(p.id);
+                    }
+                  }}
+                  title="Delete patient permanently"
+                  className="p-1.5 rounded-full hover:bg-primary-container/15 text-primary transition-all cursor-pointer flex items-center justify-center"
+                >
+                  <span className="material-symbols-outlined text-base">
+                    delete
+                  </span>
+                </button>
               </div>
             </div>
           );

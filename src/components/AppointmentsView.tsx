@@ -6,13 +6,15 @@ interface AppointmentsViewProps {
   appointments: Appointment[];
   onAddAppointment: (apptData: any) => Promise<void>;
   onUpdateAppointment: (apptId: string, updateData: any) => Promise<void>;
+  onDeleteAppointment: (apptId: string) => Promise<void>;
 }
 
 export default function AppointmentsView({
   patients,
   appointments,
   onAddAppointment,
-  onUpdateAppointment
+  onUpdateAppointment,
+  onDeleteAppointment
 }: AppointmentsViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Scheduled' | 'Checked In'>('All');
@@ -25,6 +27,46 @@ export default function AppointmentsView({
   const [formStatus, setFormStatus] = useState<'Scheduled' | 'Checked In'>('Scheduled');
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
   const [formIsSubmitting, setFormIsSubmitting] = useState(false);
+
+  // Edit Appointment Form State
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [editPatientName, setEditPatientName] = useState('');
+  const [editTime, setEditTime] = useState('');
+  const [editType, setEditType] = useState('');
+  const [editStatus, setEditStatus] = useState<'Scheduled' | 'Checked In'>('Scheduled');
+  const [editDate, setEditDate] = useState('');
+  const [editIsSubmitting, setEditIsSubmitting] = useState(false);
+
+  // Synchronize edit fields when selected appointment changes
+  React.useEffect(() => {
+    if (editingAppointment) {
+      setEditPatientName(editingAppointment.patientName);
+      setEditTime(editingAppointment.time);
+      setEditType(editingAppointment.type);
+      setEditStatus(editingAppointment.status);
+      setEditDate(editingAppointment.date || new Date().toISOString().split('T')[0]);
+    }
+  }, [editingAppointment]);
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAppointment) return;
+    try {
+      setEditIsSubmitting(true);
+      await onUpdateAppointment(editingAppointment.id, {
+        patientName: editPatientName,
+        time: editTime,
+        type: editType,
+        status: editStatus,
+        appt_date: editDate
+      });
+      setEditingAppointment(null);
+    } catch (err: any) {
+      alert(err.message || 'Error updating appointment');
+    } finally {
+      setEditIsSubmitting(false);
+    }
+  };
 
   // Email sending loading / feedback state
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
@@ -313,12 +355,23 @@ export default function AppointmentsView({
                     </div>
 
                     <h3 className="font-extrabold text-sm text-on-surface mb-0.5">{appt.patientName}</h3>
-                    <p className="text-[10px] font-bold text-on-surface-variant opacity-75 flex items-center gap-1 mb-2.5">
-                      <span className="material-symbols-outlined text-xs">id_card</span> MRN: {details.mrn}
-                    </p>
+                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                      <p className="text-[10px] font-bold text-on-surface-variant opacity-75 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">id_card</span> MRN: {details.mrn}
+                      </p>
+                      <span className="text-[9px] font-black uppercase bg-secondary-container/20 text-on-secondary-container px-2 py-0.5 rounded-sm border border-secondary-container/10">
+                        {details.status}
+                      </span>
+                    </div>
 
                     {/* Appt Detail details */}
                     <div className="space-y-2 bg-surface p-2.5 rounded-md border border-surface-container mb-3.5">
+                      {appt.date && (
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-on-surface-variant">
+                          <span className="material-symbols-outlined text-xs text-primary">calendar_today</span>
+                          <span>Date: {appt.date}</span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 text-[10px] font-bold text-on-surface-variant">
                         <span className="material-symbols-outlined text-xs text-primary">schedule</span>
                         <span>Time: {appt.time}</span>
@@ -340,9 +393,28 @@ export default function AppointmentsView({
 
                   {/* Actions footer: Send Notification / Email button */}
                   <div className="border-t border-surface-container/60 pt-3 flex justify-between items-center shrink-0">
-                    <span className="text-[9px] font-bold text-on-surface-variant/70 uppercase">
-                      Workflow: <span className="text-secondary">{details.status}</span>
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setEditingAppointment(appt)}
+                        title="Edit Appointment"
+                        className="p-1 rounded bg-surface hover:bg-surface-container-high text-on-surface-variant hover:text-primary transition-all cursor-pointer flex items-center justify-center border border-surface-container-highest"
+                      >
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (confirm(`Are you absolutely sure you want to cancel and delete the appointment for ${appt.patientName}?`)) {
+                            await onDeleteAppointment(appt.id);
+                          }
+                        }}
+                        title="Delete Appointment"
+                        className="p-1 rounded bg-surface hover:bg-primary-container/15 text-primary transition-all cursor-pointer flex items-center justify-center border border-surface-container-highest"
+                      >
+                        <span className="material-symbols-outlined text-sm">delete</span>
+                      </button>
+                    </div>
 
                     <button
                       type="button"
@@ -370,6 +442,127 @@ export default function AppointmentsView({
           </div>
         )}
       </div>
+
+      {/* MODAL: EDIT APPOINTMENT */}
+      {editingAppointment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-on-surface/40 modal-backdrop-blur">
+          <div className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-lg overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="px-6 py-5 flex justify-between items-center border-b border-surface-container-highest bg-surface-bright">
+              <div>
+                <h2 className="text-lg font-extrabold text-on-surface">Edit Appointment</h2>
+                <p className="text-xs text-on-surface-variant font-semibold mt-0.5">
+                  Update appointment date, time, clinical type or status.
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingAppointment(null)}
+                className="w-9 h-9 rounded-full bg-surface-container hover:bg-surface-variant text-on-surface-variant flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm font-bold">close</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleEditSubmit} className="p-6 overflow-y-auto space-y-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Patient Name</label>
+                <input
+                  type="text"
+                  required
+                  list="edit-patient-datalist"
+                  value={editPatientName}
+                  onChange={e => setEditPatientName(e.target.value)}
+                  className="w-full px-4 py-3 bg-surface rounded-full border-2 border-surface-container-highest text-sm focus:border-secondary outline-none transition-all placeholder:text-on-surface-variant/45"
+                  placeholder="e.g., Sarah Connor"
+                />
+                <datalist id="edit-patient-datalist">
+                  {patients.map(p => (
+                    <option key={p.id} value={p.name} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Appt Time</label>
+                  <select
+                    value={editTime}
+                    onChange={e => setEditTime(e.target.value)}
+                    className="w-full px-4 py-3 bg-surface rounded-full border-2 border-surface-container-highest text-sm text-on-surface focus:border-secondary outline-none transition-all"
+                  >
+                    <option value="08:00 AM">08:00 AM</option>
+                    <option value="09:00 AM">09:00 AM</option>
+                    <option value="10:00 AM">10:00 AM</option>
+                    <option value="11:30 AM">11:30 AM</option>
+                    <option value="01:00 PM">01:00 PM</option>
+                    <option value="02:00 PM">02:00 PM</option>
+                    <option value="03:30 PM">03:30 PM</option>
+                    <option value="04:30 PM">04:30 PM</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Appt Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={editDate}
+                    onChange={e => setEditDate(e.target.value)}
+                    className="w-full px-4 py-3 bg-surface rounded-full border-2 border-surface-container-highest text-sm text-on-surface focus:border-secondary outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Clinical Type</label>
+                <select
+                  value={editType}
+                  onChange={e => setEditType(e.target.value)}
+                  className="w-full px-4 py-3 bg-surface rounded-full border-2 border-surface-container-highest text-sm text-on-surface focus:border-secondary outline-none transition-all"
+                >
+                  <option value="Initial Evaluation - AFO">Initial Evaluation - AFO</option>
+                  <option value="Fitting & Delivery">Fitting & Delivery</option>
+                  <option value="Follow-up Alignment Check">Follow-up Alignment Check</option>
+                  <option value="AFO Adjustment">AFO Adjustment</option>
+                  <option value="KAFO Joint Tuning">KAFO Joint Tuning</option>
+                  <option value="Initial Consult">Initial Consult</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Appointment Status</label>
+                <select
+                  value={editStatus}
+                  onChange={e => setEditStatus(e.target.value as any)}
+                  className="w-full px-4 py-3 bg-surface rounded-full border-2 border-surface-container-highest text-sm text-on-surface focus:border-secondary outline-none transition-all"
+                >
+                  <option value="Scheduled">Scheduled</option>
+                  <option value="Checked In">Checked In</option>
+                </select>
+              </div>
+
+              {/* Footer */}
+              <div className="pt-4 border-t border-surface-container-highest flex justify-end gap-3 bg-surface-bright">
+                <button
+                  type="button"
+                  onClick={() => setEditingAppointment(null)}
+                  className="px-5 py-2.5 rounded-full border-2 border-surface-container-highest text-xs font-bold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editIsSubmitting}
+                  className="px-6 py-2.5 bg-primary text-white text-xs font-bold rounded-full hover:bg-primary-container transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-sm font-bold">check</span>
+                  {editIsSubmitting ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

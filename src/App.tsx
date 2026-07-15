@@ -376,6 +376,50 @@ export default function App() {
     }
   };
 
+  // API Call: Delete Patient (Admin)
+  const handleDeletePatient = async (patientId: string) => {
+    if (isOfflineMode || !db) {
+      const updatedPatients = db.patients.filter(p => p.id !== patientId);
+      saveStateLocally({
+        ...db,
+        patients: updatedPatients
+      });
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/patients/${patientId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Failed to delete patient');
+      await fetchState();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  // API Call: Delete Appointment (Admin)
+  const handleDeleteAppointment = async (apptId: string) => {
+    if (isOfflineMode || !db) {
+      const updatedAppointments = db.appointments.filter(a => a.id !== apptId);
+      saveStateLocally({
+        ...db,
+        appointments: updatedAppointments
+      });
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/appointments/${apptId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Failed to delete appointment');
+      await fetchState();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   // API Call: Update Authorization
   const handleUpdateAuth = async (authId: string, updateData: any) => {
     if (isOfflineMode || !db) {
@@ -730,6 +774,7 @@ export default function App() {
             onAddFile={handleAddFile}
             onDeleteFile={handleDeleteFile}
             onUpdatePatient={handleUpdatePatient}
+            onDeletePatient={handleDeletePatient}
             onAddAppointment={handleAddAppointment}
             onUpdateAppointment={handleUpdateAppointment}
             onAddAuth={handleAddAuth}
@@ -745,6 +790,7 @@ export default function App() {
             appointments={db.appointments}
             onAddAppointment={handleAddAppointment}
             onUpdateAppointment={handleUpdateAppointment}
+            onDeleteAppointment={handleDeleteAppointment}
           />
         );
       case 'tracker':
