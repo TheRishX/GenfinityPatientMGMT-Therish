@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Patient, PatientFile, Appointment, Authorization, Claim, ClinicalNote } from '../types';
+import { Patient, PatientFile, Appointment, Authorization, Claim, ClinicalNote, TimelineEvent, TimelineEventType } from '../types';
+import { PatientTimeline } from './PatientTimeline';
+import { compressImageFile } from '../utils/imageCompressor';
 
 interface PatientsViewProps {
   patients: Patient[];
@@ -48,10 +50,26 @@ export default function PatientsView({
   const setSelectedPatient = setSelectedPatientProp !== undefined ? setSelectedPatientProp : setLocalSelectedPatient;
 
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
-  const [activeProfileTab, setActiveProfileTab] = useState<string>('documents');
+  const [activeProfileTab, setActiveProfileTab] = useState<string>('timeline');
   const [viewingFile, setViewingFile] = useState<PatientFile | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Card Overflow Menu & Admin Security Delete Modal state
+  const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
+  const [deleteModalPatient, setDeleteModalPatient] = useState<Patient | null>(null);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const [timelineCategory, setTimelineCategory] = useState<'all' | 'visits' | 'notes' | 'orders' | 'auth' | 'fabrication' | 'documents'>('all');
+
+  // Quick Add Timeline Event States
+  const [showAddTimelineModal, setShowAddTimelineModal] = useState(false);
+  const [newTlEventType, setNewTlEventType] = useState<TimelineEventType>('visit');
+  const [newTlTitle, setNewTlTitle] = useState('');
+  const [newTlSummary, setNewTlSummary] = useState('');
+  const [newTlOutcome, setNewTlOutcome] = useState('');
+  const [newTlNextAction, setNewTlNextAction] = useState('');
+  const [newTlStatus, setNewTlStatus] = useState('Completed');
+  const [newTlAuthor, setNewTlAuthor] = useState('Dr. Sarah Jenkins');
 
   // Info Tab States
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -121,6 +139,8 @@ export default function PatientsView({
   const [newDob, setNewDob] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newReferral, setNewReferral] = useState('');
+  const [newInsuranceCompany, setNewInsuranceCompany] = useState('');
+  const [newPrimaryClinician, setNewPrimaryClinician] = useState('Dr. Sarah Jenkins');
 
   // Interactive Checklist states for Profile (Info / checklist on profile)
   const [checklist, setChecklist] = useState<Record<string, boolean>>({
@@ -137,7 +157,9 @@ export default function PatientsView({
       p.name.toLowerCase().includes(term) ||
       p.mrn.toLowerCase().includes(term) ||
       p.status.toLowerCase().includes(term) ||
-      (p.phone && p.phone.includes(term))
+      (p.phone && p.phone.includes(term)) ||
+      (p.insuranceCompany && p.insuranceCompany.toLowerCase().includes(term)) ||
+      (p.primaryClinician && p.primaryClinician.toLowerCase().includes(term))
     );
     if (!matchesSearch) return false;
 
@@ -152,14 +174,20 @@ export default function PatientsView({
   // Handle saving new patient
   const handleSavePatientSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim()) return;
+    const trimmedName = newName.trim();
+    if (!trimmedName || trimmedName.length < 2 || trimmedName.toLowerCase() === 'a') {
+      alert('A valid full patient name (minimum 2 characters) is required before saving a patient record.');
+      return;
+    }
 
     await onAddPatient({
-      name: newName,
+      name: trimmedName,
       phone: newPhone,
       dob: newDob,
       email: newEmail,
       referralSource: newReferral,
+      insuranceCompany: newInsuranceCompany || 'Medicare Blue Cross',
+      primaryClinician: newPrimaryClinician || 'Dr. Sarah Jenkins',
       status: 'In Progress'
     });
 
@@ -169,28 +197,84 @@ export default function PatientsView({
     setNewDob('');
     setNewEmail('');
     setNewReferral('');
+    setNewInsuranceCompany('');
+    setNewPrimaryClinician('Dr. Sarah Jenkins');
     setIsNewPatientModalOpen(false);
   };
 
-  // Real File Upload handlers (drag, drop, click)
-  const processUploadedFile = (file: File) => {
+  // Handler for logging a new timeline entry
+  const handleAddTimelineEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPatient || !newTlTitle.trim() || !newTlSummary.trim()) {
+      alert('Please provide a title and clinical summary for the timeline entry.');
+      return;
+    }
+
+    const now = new Date();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dateStr = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()} · ${now.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+
+    const newEntry: TimelineEvent = {
+      id: `tl_${Date.now()}`,
+      dateTime: dateStr,
+      author: newTlAuthor || 'Dr. Sarah Jenkins',
+      eventType: newTlEventType,
+      title: newTlTitle,
+      summary: newTlSummary,
+      outcome: newTlOutcome.trim() || undefined,
+      nextAction: newTlNextAction.trim() || undefined,
+      status: newTlStatus.trim() || 'Completed'
+    };
+
+    const currentTl = selectedPatient.timeline || [];
+    const updatedTl = [newEntry, ...currentTl];
+
+    await onUpdatePatient(selectedPatient.id, {
+      timeline: updatedTl
+    });
+
+    // Reset modal
+    setNewTlTitle('');
+    setNewTlSummary('');
+    setNewTlOutcome('');
+    setNewTlNextAction('');
+    setNewTlStatus('Completed');
+    setShowAddTimelineModal(false);
+  };
+
+  // Real File Upload handlers with Image Compression
+  const processUploadedFile = async (file: File) => {
     if (!selectedPatient) return;
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64String = reader.result as string;
+
+    try {
+      const isImg = file.type.startsWith('image/') || file.name.match(/\.(jpg|jpeg|png|webp)$/i);
+      let content = '';
+      let sizeStr = '';
+
+      if (isImg) {
+        const stats = await compressImageFile(file);
+        content = stats.compressedDataUrl;
+        sizeStr = `${stats.compressedSizeKB} KB (${stats.savingsPercentage}% saved)`;
+      } else {
+        content = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+        sizeStr = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+      }
+
       const extension = file.name.split('.').pop()?.toLowerCase() || '';
       let type: 'pdf' | 'jpg' | 'png' | 'doc' = 'pdf';
       if (['jpg', 'jpeg'].includes(extension)) type = 'jpg';
       else if (extension === 'png') type = 'png';
       else if (extension === 'doc' || extension === 'docx') type = 'doc';
 
-      const sizeStr = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
-
       await onAddFile(selectedPatient.id, {
         name: file.name,
         type: type,
         size: sizeStr,
-        content: base64String
+        content: content
       });
 
       // Update selectedPatient's file list locally for instant feedback
@@ -202,15 +286,16 @@ export default function PatientsView({
           type: type,
           date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
           size: sizeStr,
-          content: base64String
+          content: content
         };
         return {
           ...prev,
           files: [newFile, ...(prev.files || [])]
         };
       });
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error uploading file:', err);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -299,91 +384,213 @@ export default function PatientsView({
         </button>
       </div>
 
-      {/* Grid of Patients */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {/* Grid of Patients with Minimalist, High-Contrast Enhanced Patient Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredPatients.map(p => {
           // Determine status color theme
-          let statusStyle = 'bg-secondary/10 text-secondary';
-          if (p.status === 'Consultation') statusStyle = 'bg-surface-variant text-on-surface-variant';
-          else if (p.status === 'Fabrication') statusStyle = 'bg-primary-container/10 text-primary';
-          else if (p.status === 'New Referral') statusStyle = 'bg-secondary-container text-on-secondary-container';
-          else if (p.status === 'Archived') statusStyle = 'bg-primary/10 text-primary opacity-60';
+          let statusStyle = 'bg-secondary/10 text-secondary border-secondary/20';
+          if (p.status === 'Consultation') statusStyle = 'bg-surface-container text-on-surface-variant border-surface-container-highest';
+          else if (p.status === 'Fabrication') statusStyle = 'bg-primary/10 text-primary border-primary/20';
+          else if (p.status === 'New Referral') statusStyle = 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-300';
+          else if (p.status === 'Archived') statusStyle = 'bg-surface-container text-on-surface-variant/60 border-surface-container-highest';
+
+          // Contextual patient info lookups
+          const patientAppts = appointments.filter(a => a.patientName.toLowerCase() === p.name.toLowerCase());
+          const nextAppt = patientAppts[0];
+          const patientAuth = authorizations.find(a => a.patientName.toLowerCase() === p.name.toLowerCase());
+          
+          const activeDevice = patientAuth?.device || (
+            p.id === 'p1' ? 'Custom Bilateral AFO' :
+            p.id === 'p2' ? 'Transfemoral Prosthesis' :
+            p.id === 'p3' ? 'TLSO Spinal Orthosis' :
+            p.id === 'p4' ? 'Custom AFO Left' : 'Custom Orthosis / Device'
+          );
+
+          const isMenuOpen = openCardMenuId === p.id;
 
           return (
             <div
               key={p.id}
               onClick={() => {
                 setSelectedPatient(p);
-                setActiveProfileTab('documents');
+                setActiveProfileTab('timeline');
               }}
-              className="bg-surface-container-lowest rounded-2xl p-5 shadow-xs border border-surface-container-highest/50 cursor-pointer hover:border-primary/35 transition-all hover:shadow-sm group flex flex-col justify-between min-h-[190px]"
+              className="bg-surface-container-lowest rounded-3xl p-6 shadow-xs border border-surface-container-highest/60 cursor-pointer hover:border-secondary hover:shadow-md transition-all group flex flex-col justify-between relative min-h-[290px] space-y-4"
             >
-              <div className="flex justify-between items-start">
-                <div className="w-12 h-12 rounded-full bg-secondary-container/30 text-on-secondary-container flex items-center justify-center font-extrabold text-sm overflow-hidden">
-                  {p.avatarUrl ? (
-                    <img
-                      className="w-full h-full object-cover"
-                      alt={p.name}
-                      referrerPolicy="no-referrer"
-                      src={p.avatarUrl}
-                    />
-                  ) : p.id === 'p4' ? (
-                    <img
-                      className="w-full h-full object-cover"
-                      alt="Eleanor Vance"
-                      referrerPolicy="no-referrer"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrDX68ppEAqs_qFiQjVZ-pjvW7nzC-y8ew8jUnTQi7M9LMden4EQEWwD2_PRQqRVHVV3n7ttr8RpOpeaz60eJLFdqbjCSOnjD8r_W0OjndDWD52zlRvf8D_DEfPtq6gyyyu7r8kvL-YqlXnRZscJ8nufW2zl8p2wwoAcWoy8h0qLy227ryQ2OwvXAQsDdt9aZluBpQRPTd0bCQV8WFXtfOpEXnI3cOUsvRMaqWGuJVo9o1eJdyf4mpZg"
-                    />
-                  ) : (
-                    <span>{p.avatarInitials}</span>
-                  )}
+              {/* Card Header: Avatar, Name, MRN, Status */}
+              <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-14 h-14 rounded-full bg-secondary/10 text-secondary flex items-center justify-center font-black text-base overflow-hidden shrink-0 border border-secondary/20 shadow-2xs">
+                      {p.avatarUrl ? (
+                        <img
+                          className="w-full h-full object-cover"
+                          alt={p.name}
+                          referrerPolicy="no-referrer"
+                          src={p.avatarUrl}
+                        />
+                      ) : p.id === 'p4' ? (
+                        <img
+                          className="w-full h-full object-cover"
+                          alt="Eleanor Vance"
+                          referrerPolicy="no-referrer"
+                          src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrDX68ppEAqs_qFiQjVZ-pjvW7nzC-y8ew8jUnTQi7M9LMden4EQEWwD2_PRQqRVHVV3n7ttr8RpOpeaz60eJLFdqbjCSOnjD8r_W0OjndDWD52zlRvf8D_DEfPtq6gyyyu7r8kvL-YqlXnRZscJ8nufW2zl8p2wwoAcWoy8h0qLy227ryQ2OwvXAQsDdt9aZluBpQRPTd0bCQV8WFXtfOpEXnI3cOUsvRMaqWGuJVo9o1eJdyf4mpZg"
+                        />
+                      ) : (
+                        <span>{p.avatarInitials}</span>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-black text-base text-on-surface group-hover:text-secondary transition-colors line-clamp-1">
+                        {p.name}
+                      </h3>
+                        <p className="text-[10.5px] font-extrabold text-on-surface-variant font-mono mt-0.5">
+                        MRN: {p.mrn}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider shrink-0 ${statusStyle}`}>
+                    {p.status}
+                  </span>
                 </div>
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${statusStyle}`}>
-                  {p.status}
-                </span>
-              </div>
-              <div className="mt-4 flex-1">
-                <h3 className="font-extrabold text-base text-on-surface group-hover:text-primary transition-colors truncate">
-                  {p.name}
-                </h3>
-                <p className="font-semibold text-xs text-on-surface-variant flex items-center gap-1.5 mt-1 opacity-80">
-                  <span className="material-symbols-outlined text-sm">call</span>
-                  {p.phone || 'No phone'}
-                </p>
-                <p className="text-[10px] font-bold text-on-surface-variant/70 uppercase tracking-wider mt-2">
-                  MRN: {p.mrn}
-                </p>
+
+                {/* Minimalist Context Blocks */}
+                <div className="mt-5 space-y-2.5">
+                  {/* Active Device & Care Stage */}
+                  <div className="bg-surface p-3 rounded-2xl border border-surface-container flex items-center justify-between text-xs font-bold text-on-surface">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="material-symbols-outlined text-sm text-secondary shrink-0">precision_manufacturing</span>
+                      <span className="truncate">{p.deviceCategory || activeDevice}</span>
+                    </div>
+                    <span className="text-[9.5px] font-black uppercase text-primary shrink-0 bg-primary/10 px-2.5 py-0.5 rounded-lg border border-primary/20">
+                      {p.careStage || p.status}
+                    </span>
+                  </div>
+
+                  {/* Clinician & Payer */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-surface p-2.5 rounded-2xl border border-surface-container flex items-center gap-2 truncate">
+                      <span className="material-symbols-outlined text-xs text-secondary shrink-0">stethoscope</span>
+                      <div className="truncate">
+                        <span className="text-[8.5px] font-black uppercase text-on-surface-variant block">Clinician</span>
+                        <span className="font-bold text-on-surface text-[11px] truncate block">
+                          {p.primaryClinician || (p.id === 'p2' || p.id === 'p4' ? 'Dr. Aris Thorne' : 'Dr. Sarah Jenkins')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-surface p-2.5 rounded-2xl border border-surface-container flex items-center gap-2 truncate">
+                      <span className="material-symbols-outlined text-xs text-primary shrink-0">health_and_safety</span>
+                      <div className="truncate">
+                        <span className="text-[8.5px] font-black uppercase text-on-surface-variant block">Payer</span>
+                        <span className="font-bold text-on-surface text-[11px] truncate block">
+                          {p.insuranceCompany || 'Medicare Blue Cross'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Next Appointment & Workflow Status */}
+                  <div className="flex items-center justify-between text-[11px] font-extrabold pt-1">
+                    <div className="flex items-center gap-1.5 text-on-surface-variant">
+                      <span className="material-symbols-outlined text-xs text-secondary">calendar_today</span>
+                      <span>Next: {p.nextAppointment || (nextAppt ? nextAppt.time : 'Scheduled')}</span>
+                    </div>
+                    {p.blockerBadge ? (
+                      <span className="text-amber-700 dark:text-amber-400 font-black text-[10px] bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200">
+                        ⚠️ {p.blockerBadge}
+                      </span>
+                    ) : (
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold text-[10px]">
+                        ✓ Active Care
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Admin quick actions */}
-              <div className="mt-4 pt-3 border-t border-surface-container-highest/30 flex items-center justify-end gap-1 shrink-0">
-                <button
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    const newStatus = p.status === 'Archived' ? 'In Progress' : 'Archived';
-                    await onUpdatePatient(p.id, { ...p, status: newStatus });
-                  }}
-                  title={p.status === 'Archived' ? 'Activate / Unarchive' : 'Archive'}
-                  className="p-1.5 rounded-full hover:bg-surface-container text-on-surface-variant hover:text-primary transition-all cursor-pointer flex items-center justify-center"
-                >
-                  <span className="material-symbols-outlined text-base">
-                    {p.status === 'Archived' ? 'unarchive' : 'archive'}
-                  </span>
-                </button>
-                <button
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (confirm(`Are you absolutely sure you want to permanently delete patient ${p.name}? All medical records and uploaded files will be destroyed.`)) {
-                      await onDeletePatient(p.id);
-                    }
-                  }}
-                  title="Delete patient permanently"
-                  className="p-1.5 rounded-full hover:bg-primary-container/15 text-primary transition-all cursor-pointer flex items-center justify-center"
-                >
-                  <span className="material-symbols-outlined text-base">
-                    delete
-                  </span>
-                </button>
+              {/* Card Footer */}
+              <div className="pt-3 border-t border-surface-container/60 flex items-center justify-between shrink-0">
+                <span className="text-xs font-black text-secondary group-hover:text-primary flex items-center gap-1 transition-colors">
+                  Open Patient Chart
+                  <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                </span>
+
+                {/* Overflow Menu Button */}
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenCardMenuId(isMenuOpen ? null : p.id);
+                    }}
+                    title="Patient Record Actions"
+                    className="p-1.5 rounded-full hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-all cursor-pointer flex items-center justify-center"
+                  >
+                    <span className="material-symbols-outlined text-base font-bold">more_vert</span>
+                  </button>
+
+                  {/* Popover Dropdown */}
+                  {isMenuOpen && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute right-0 bottom-8 w-48 bg-surface-container-lowest border border-surface-container-highest rounded-2xl shadow-lg z-30 py-2 animate-fade-in text-xs font-semibold"
+                    >
+                      <button
+                        onClick={() => {
+                          setOpenCardMenuId(null);
+                          setSelectedPatient(p);
+                          setActiveProfileTab('story');
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-surface-container flex items-center gap-2 text-on-surface cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-sm text-secondary">history</span>
+                        Unified Story Chart
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setOpenCardMenuId(null);
+                          setSelectedPatient(p);
+                          setActiveProfileTab('info');
+                          setIsEditingInfo(true);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-surface-container flex items-center gap-2 text-on-surface cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-sm text-on-surface-variant">edit</span>
+                        Edit Demographics
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          setOpenCardMenuId(null);
+                          const newStatus = p.status === 'Archived' ? 'In Progress' : 'Archived';
+                          await onUpdatePatient(p.id, { ...p, status: newStatus });
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-surface-container flex items-center gap-2 text-on-surface cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-sm text-on-surface-variant">
+                          {p.status === 'Archived' ? 'unarchive' : 'archive'}
+                        </span>
+                        {p.status === 'Archived' ? 'Restore Patient' : 'Archive Patient'}
+                      </button>
+
+                      <div className="border-t border-surface-container-highest/40 my-1" />
+
+                      <button
+                        onClick={() => {
+                          setOpenCardMenuId(null);
+                          setDeleteModalPatient(p);
+                          setDeleteConfirmInput('');
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-primary-container/20 text-primary font-bold flex items-center gap-2 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-sm">delete_forever</span>
+                        Permanent Delete...
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -481,6 +688,31 @@ export default function PatientsView({
                 </select>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Insurance Provider</label>
+                  <input
+                    type="text"
+                    value={newInsuranceCompany}
+                    onChange={e => setNewInsuranceCompany(e.target.value)}
+                    className="w-full px-4 py-3 bg-surface rounded-full border-2 border-surface-container-highest text-sm focus:border-secondary outline-none transition-all placeholder:text-on-surface-variant/40"
+                    placeholder="e.g., Medicare Blue Cross"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Primary Clinician</label>
+                  <select
+                    value={newPrimaryClinician}
+                    onChange={e => setNewPrimaryClinician(e.target.value)}
+                    className="w-full px-4 py-3 bg-surface rounded-full border-2 border-surface-container-highest text-sm focus:border-secondary outline-none transition-all text-on-surface"
+                  >
+                    <option value="Dr. Sarah Jenkins">Dr. Sarah Jenkins</option>
+                    <option value="Dr. Aris Thorne">Dr. Aris Thorne</option>
+                    <option value="Dr. Michael Jenkins">Dr. Michael Jenkins</option>
+                  </select>
+                </div>
+              </div>
+
               {/* Footer */}
               <div className="pt-4 border-t border-surface-container-highest flex justify-end gap-3 bg-surface-bright">
                 <button
@@ -515,9 +747,9 @@ export default function PatientsView({
               <span className="material-symbols-outlined font-bold text-sm">close</span>
             </button>
 
-            {/* Profile header */}
-            <div className="px-6 pt-8 pb-5 border-b border-surface-container-highest">
-              <div className="flex items-center gap-5">
+            {/* Profile header with Compact O&P Clinical Snapshot */}
+            <div className="px-6 pt-6 pb-4 border-b border-surface-container-highest bg-surface-container-lowest space-y-4">
+              <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-surface shadow-xs shrink-0 bg-surface-container-highest flex items-center justify-center font-black">
                   {selectedPatient.avatarUrl ? (
                     <img
@@ -537,54 +769,189 @@ export default function PatientsView({
                     <span className="text-lg text-on-surface-variant">{selectedPatient.avatarInitials}</span>
                   )}
                 </div>
-                <div>
-                  <h1 className="text-xl font-black text-on-surface tracking-tight leading-none mb-1">
-                    {selectedPatient.name}
-                  </h1>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant font-semibold">
-                    <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm text-on-surface-variant/75">calendar_today</span>
-                      DOB: {selectedPatient.dob || '01/01/1980'}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm text-on-surface-variant/75">badge</span>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <h1 className="text-xl font-black text-on-surface tracking-tight leading-none">
+                      {selectedPatient.name}
+                    </h1>
+                    <span className="font-mono text-xs font-bold text-on-surface-variant bg-surface px-2 py-0.5 rounded-md border border-surface-container-highest">
                       MRN: {selectedPatient.mrn}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm text-on-surface-variant/75">phone_iphone</span>
-                      {selectedPatient.phone || 'No phone'}
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                      selectedPatient.status === 'Archived' 
+                        ? 'bg-surface-container text-on-surface-variant border-surface-container-highest' 
+                        : 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-300/40'
+                    }`}>
+                      {selectedPatient.status}
                     </span>
+                    {selectedPatient.blockerBadge && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/50 dark:text-amber-200">
+                        {selectedPatient.blockerBadge}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant font-medium">
+                    <span>DOB: <strong className="text-on-surface">{selectedPatient.dob || '01/01/1980'}</strong></span>
+                    <span>Phone: <strong className="text-on-surface">{selectedPatient.phone || 'No phone'}</strong></span>
+                    <span>Email: <strong className="text-on-surface">{selectedPatient.email || 'No email'}</strong></span>
+                    <span>Payer: <strong className="text-primary">{selectedPatient.insuranceCompany || 'Medicare Blue Cross'}</strong></span>
+                    <span>Clinician: <strong className="text-secondary">{selectedPatient.primaryClinician || 'Dr. Sarah Jenkins'}</strong></span>
                   </div>
                 </div>
-                <div className="ml-auto pr-10 hidden sm:block">
-                  <div className="px-3.5 py-1.5 rounded-full bg-secondary-container/20 text-on-secondary-container text-xs font-bold flex items-center gap-2 border border-secondary-container/10">
-                    <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-                    Active Patient
+              </div>
+
+              {/* O&P Compact Clinical Snapshot Grid */}
+              <div className="p-3.5 bg-surface-container-low/80 rounded-2xl border border-surface-container-highest/40 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                  {/* 1. Diagnosis & Affected Side */}
+                  <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-surface-container-highest/30 space-y-1">
+                    <span className="text-[9px] font-black uppercase text-secondary tracking-wider block">Diagnosis / Side</span>
+                    <p className="font-extrabold text-on-surface text-[11px] truncate" title={selectedPatient.diagnosis || 'Post-tibial tendon dysfunction / Pes Planus'}>
+                      {selectedPatient.diagnosis || 'Post-tibial tendon dysfunction / Pes Planus'}
+                    </p>
+                    <span className="inline-block px-2 py-0.5 rounded bg-primary/10 text-primary font-black text-[9.5px]">
+                      Side: {selectedPatient.affectedSide || 'Left'}
+                    </span>
+                  </div>
+
+                  {/* 2. Device Category & Tech Owner */}
+                  <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-surface-container-highest/30 space-y-1">
+                    <span className="text-[9px] font-black uppercase text-secondary tracking-wider block">Device &amp; Lab Owner</span>
+                    <p className="font-extrabold text-on-surface text-[11px] truncate">
+                      {selectedPatient.deviceCategory || 'Custom Foot Orthosis'}
+                    </p>
+                    <span className="inline-block text-[10px] font-semibold text-on-surface-variant">
+                      Lab Tech: <strong className="text-on-surface">{selectedPatient.fabricationOwner || 'Tech Mike'}</strong>
+                    </span>
+                  </div>
+
+                  {/* 3. Auth Status & Next Required Action */}
+                  <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-surface-container-highest/30 space-y-1">
+                    <span className="text-[9px] font-black uppercase text-secondary tracking-wider block">Auth Status &amp; Next Action</span>
+                    <p className="font-bold text-emerald-700 dark:text-emerald-300 text-[10.5px] truncate">
+                      {selectedPatient.authStatus || 'Approved (Exp: 12 Oct 2026)'}
+                    </p>
+                    <p className="text-[9.5px] font-bold text-amber-800 dark:text-amber-300 truncate" title={selectedPatient.nextRequiredAction || 'Capture 3D scan & submit l-code auth'}>
+                      Next: {selectedPatient.nextRequiredAction || 'Capture 3D scan & submit l-code auth'}
+                    </p>
+                  </div>
+
+                  {/* 4. Visits, Allergies & Safety */}
+                  <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-surface-container-highest/30 space-y-1">
+                    <span className="text-[9px] font-black uppercase text-secondary tracking-wider block">Visits &amp; Clinical Safety</span>
+                    <div className="flex justify-between items-center text-[10px] font-semibold text-on-surface-variant">
+                      <span>Last: {selectedPatient.lastVisit || '15 May 2026'}</span>
+                      <span>Next: {selectedPatient.nextAppointment || 'Today 2:00 PM'}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[9.5px]">
+                      <span className="text-red-600 dark:text-red-400 font-bold flex items-center gap-0.5">
+                        <span className="material-symbols-outlined text-[10px]">warning</span>
+                        {selectedPatient.allergies?.join(', ') || 'No Allergies'}
+                      </span>
+                      <span className="text-on-surface-variant/80 font-medium">
+                        {selectedPatient.communicationPreference || 'SMS Text'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* O&P Care Stage Pipeline Stepper */}
+                <div>
+                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-wider text-on-surface-variant mb-1.5 px-1">
+                    <span className="flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs text-primary">route</span>
+                      Clinic Floor Stage Pipeline
+                    </span>
+                    <span className="text-primary font-bold">Click stage button to advance workflow</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 sm:grid-cols-9 gap-1 text-[9.5px] font-bold text-center select-none">
+                    {[
+                      'Referral',
+                      'Evaluation',
+                      'Authorization',
+                      'Casting/scan',
+                      'Fabrication',
+                      'Fitting',
+                      'Delivery',
+                      'Follow-up',
+                      'Closed'
+                    ].map((stage, idx) => {
+                      const currentStageName = selectedPatient.careStage || selectedPatient.status;
+                      const isCurrent = currentStageName.toLowerCase().includes(stage.toLowerCase());
+                      
+                      return (
+                        <button
+                          key={stage}
+                          onClick={async () => {
+                            await onUpdatePatient(selectedPatient.id, {
+                              careStage: stage as any,
+                              status: stage === 'Referral' ? 'New Referral' : stage === 'Authorization' ? 'Auth Pending' : stage === 'Fabrication' ? 'Fabrication' : stage === 'Closed' ? 'Archived' : 'In Progress'
+                            });
+                          }}
+                          className={`py-1 px-1 rounded-lg border transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                            isCurrent
+                              ? 'bg-primary text-white border-primary shadow-xs font-black ring-2 ring-primary/30'
+                              : 'bg-surface-container-lowest text-on-surface-variant/70 border-surface-container-highest/30 hover:bg-surface-container hover:text-on-surface'
+                          }`}
+                        >
+                          <span className="truncate w-full">{idx + 1}. {stage}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Profile Tab List */}
+            {/* Profile Tab Navigation */}
             <nav className="px-6 flex gap-1 border-b border-surface-container-highest bg-surface-container-lowest shrink-0 overflow-x-auto select-none">
-              {['info', 'appointments', 'documents', 'authorization', 'billing', 'notes'].map(tab => (
+              {[
+                { id: 'timeline', label: 'Overview / Timeline' },
+                { id: 'info', label: 'Clinical & Info' },
+                { id: 'appointments', label: 'Appointments' },
+                { id: 'documents', label: 'Documents' },
+                { id: 'authorization', label: 'Prior Auth' },
+                { id: 'billing', label: 'Billing Claims' },
+                { id: 'notes', label: 'Clinical Notes' }
+              ].map(tab => (
                 <button
-                  key={tab}
-                  onClick={() => setActiveProfileTab(tab)}
-                  className={`px-5 py-3.5 font-bold text-xs uppercase tracking-wider hover:bg-surface-container-low transition-colors border-b-2 whitespace-nowrap cursor-pointer ${
-                    activeProfileTab === tab
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-on-surface-variant'
+                  key={tab.id}
+                  onClick={() => setActiveProfileTab(tab.id)}
+                  className={`px-4 py-3 font-extrabold text-xs tracking-wide transition-colors border-b-2 whitespace-nowrap cursor-pointer ${
+                    activeProfileTab === tab.id
+                      ? 'border-primary text-primary bg-primary/5'
+                      : 'border-transparent text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
                   }`}
                 >
-                  {tab}
+                  {tab.label}
                 </button>
               ))}
             </nav>
 
             {/* Tab Body */}
             <div className="flex-1 overflow-y-auto p-6 bg-surface">
-              {activeProfileTab === 'documents' ? (
+              {activeProfileTab === 'timeline' || activeProfileTab === 'story' ? (
+                <PatientTimeline
+                  patient={selectedPatient}
+                  appointments={appointments}
+                  authorizations={authorizations}
+                  claims={claims}
+                  onNavigateTab={(tabId) => setActiveProfileTab(tabId)}
+                  onAddTimelineEntry={async (entry) => {
+                    const currentTl = selectedPatient.timeline || [];
+                    const newEntry: TimelineEvent = {
+                      id: `tl_${Date.now()}`,
+                      ...entry
+                    };
+                    await onUpdatePatient(selectedPatient.id, {
+                      timeline: [newEntry, ...currentTl]
+                    });
+                  }}
+                />
+              ) : activeProfileTab === 'documents' ? (
                 <div className="space-y-6 max-w-4xl mx-auto">
                   {/* Checklist & Upload Card Grid */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1010,6 +1377,10 @@ export default function PatientsView({
                             <span className="font-mono bg-surface-container-low px-2 py-0.5 rounded-md font-bold text-on-surface">{selectedPatient.insuranceId || 'Pending'}</span>
                           </div>
                           <div className="flex justify-between items-center text-xs">
+                            <span className="text-on-surface-variant font-bold">Primary Clinician:</span>
+                            <span className="font-bold text-primary">{selectedPatient.primaryClinician || (selectedPatient.id === 'p2' || selectedPatient.id === 'p4' || selectedPatient.id === 'p6' || selectedPatient.id === 'p8' ? 'Dr. Aris Thorne' : 'Dr. Sarah Jenkins')}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
                             <span className="text-on-surface-variant font-bold">Workflow State:</span>
                             <span className="px-2.5 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-full">{selectedPatient.status}</span>
                           </div>
@@ -1417,9 +1788,9 @@ export default function PatientsView({
               ) : activeProfileTab === 'notes' ? (
                 <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Left Column: Write Clinical Note Form */}
-                    <div className="lg:col-span-1 bg-surface-container-lowest rounded-3xl p-5 border border-surface-container-highest/40">
-                      <h3 className="text-xs font-black text-on-surface flex items-center gap-1.5 border-b border-surface-container pb-2 mb-4">
+                    {/* Left Column: Write Quick Progress Note */}
+                    <div className="lg:col-span-1 bg-surface-container-lowest rounded-3xl p-5 border border-surface-container-highest/40 space-y-4">
+                      <h3 className="text-xs font-black text-on-surface flex items-center gap-1.5 border-b border-surface-container pb-2">
                         <span className="material-symbols-outlined text-primary text-sm">history_edu</span>
                         Add Progress Note
                       </h3>
@@ -1433,7 +1804,8 @@ export default function PatientsView({
                             id: `note_${Date.now()}`,
                             date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
                             author: newNoteAuthor || 'Dr. Aris Thorne',
-                            text: newNoteText
+                            text: newNoteText,
+                            isFinalized: true
                           };
 
                           const existingNotes = selectedPatient.clinicalNotes || [];
@@ -1449,14 +1821,14 @@ export default function PatientsView({
                         className="space-y-3"
                       >
                         <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Note Text</label>
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Note Content</label>
                           <textarea
                             rows={5}
                             required
-                            placeholder="Enter clinical assessment, physical findings, or prescription comments..."
+                            placeholder="Enter clinical assessment, physical findings, SOAP comments, or prescription details..."
                             value={newNoteText}
                             onChange={(e) => setNewNoteText(e.target.value)}
-                            className="w-full px-4 py-2 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none resize-none"
+                            className="w-full px-4 py-2.5 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none resize-none"
                           />
                         </div>
                         <div className="space-y-1">
@@ -1464,7 +1836,7 @@ export default function PatientsView({
                           <select
                             value={newNoteAuthor}
                             onChange={(e) => setNewNoteAuthor(e.target.value)}
-                            className="w-full px-4 py-2 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
+                            className="w-full px-4 py-2 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           >
                             <option value="Dr. Aris Thorne">Dr. Aris Thorne</option>
                             <option value="Dr. Sarah Jenkins">Dr. Sarah Jenkins</option>
@@ -1473,7 +1845,7 @@ export default function PatientsView({
                         </div>
                         <button
                           type="submit"
-                          className="w-full py-2.5 rounded-md bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary-container transition-all cursor-pointer mt-4"
+                          className="w-full py-2.5 rounded-xl bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary-container transition-all cursor-pointer mt-2"
                         >
                           <span className="material-symbols-outlined text-xs">save</span>
                           Save Progress Note
@@ -1497,20 +1869,87 @@ export default function PatientsView({
                                 <span className="material-symbols-outlined text-xs text-primary font-bold">medical_information</span>
                               </span>
 
-                              <div className="bg-surface-container-lowest rounded-2xl p-4 border border-surface-container-highest/60 shadow-xs hover:border-secondary transition-all">
-                                <div className="flex justify-between items-center border-b border-surface-container/50 pb-2 mb-2">
-                                  <span className="text-[10px] font-extrabold text-secondary">{note.author}</span>
-                                  <span className="text-[9px] font-bold text-on-surface-variant">{note.date}</span>
+                              <div className="bg-surface-container-lowest rounded-2xl p-4 border border-surface-container-highest/60 shadow-xs hover:border-secondary transition-all space-y-3">
+                                <div className="flex flex-wrap justify-between items-center border-b border-surface-container/50 pb-2 gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-extrabold text-secondary">{note.author}</span>
+                                    {note.visitType && (
+                                      <span className="px-2 py-0.5 bg-primary/10 text-primary text-[9px] font-extrabold rounded-md uppercase">
+                                        {note.visitType}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {note.isFinalized && (
+                                      <span className="text-[9px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-0.5">
+                                        <span className="material-symbols-outlined text-[10px]">verified</span> Finalized
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] font-bold text-on-surface-variant">{note.date}</span>
+                                  </div>
                                 </div>
-                                <p className="text-xs text-on-surface-variant font-semibold leading-relaxed whitespace-pre-wrap">
-                                  {note.text}
-                                </p>
+
+                                {/* Free Text or Structured SOAP view */}
+                                {note.subjective || note.objective || note.assessment || note.plan ? (
+                                  <div className="space-y-2 text-xs">
+                                    {note.subjective && (
+                                      <div className="bg-surface p-2.5 rounded-xl border border-surface-container">
+                                        <span className="text-[10px] font-extrabold uppercase text-secondary block mb-0.5">Subjective</span>
+                                        <p className="text-on-surface-variant font-medium leading-relaxed">{note.subjective}</p>
+                                      </div>
+                                    )}
+                                    {note.objective && (
+                                      <div className="bg-surface p-2.5 rounded-xl border border-surface-container">
+                                        <span className="text-[10px] font-extrabold uppercase text-secondary block mb-0.5">Objective / Findings</span>
+                                        <p className="text-on-surface-variant font-medium leading-relaxed">{note.objective}</p>
+                                      </div>
+                                    )}
+                                    {note.assessment && (
+                                      <div className="bg-surface p-2.5 rounded-xl border border-surface-container">
+                                        <span className="text-[10px] font-extrabold uppercase text-secondary block mb-0.5">Assessment</span>
+                                        <p className="text-on-surface-variant font-medium leading-relaxed">{note.assessment}</p>
+                                      </div>
+                                    )}
+                                    {note.plan && (
+                                      <div className="bg-surface p-2.5 rounded-xl border border-surface-container">
+                                        <span className="text-[10px] font-extrabold uppercase text-secondary block mb-0.5">Plan</span>
+                                        <p className="text-on-surface-variant font-medium leading-relaxed">{note.plan}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-on-surface-variant font-semibold leading-relaxed whitespace-pre-wrap">
+                                    {note.text}
+                                  </p>
+                                )}
+
+                                {/* Outcome & Device Footer */}
+                                {(note.outcome || note.deviceDetails?.lCodes?.length || note.nextTask?.description) && (
+                                  <div className="pt-2 border-t border-surface-container/60 flex flex-wrap gap-2 text-[10px]">
+                                    {note.outcome && (
+                                      <span className="bg-secondary/10 text-secondary font-bold px-2 py-0.5 rounded-md capitalize">
+                                        Outcome: {note.outcome.replace('_', ' ')}
+                                      </span>
+                                    )}
+                                    {note.deviceDetails?.lCodes && note.deviceDetails.lCodes.length > 0 && (
+                                      <span className="bg-surface-container-high text-on-surface font-mono font-bold px-2 py-0.5 rounded-md">
+                                        L-Codes: {note.deviceDetails.lCodes.join(', ')}
+                                      </span>
+                                    )}
+                                    {note.nextTask?.description && (
+                                      <span className="bg-amber-500/10 text-amber-700 font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[10px]">task</span>
+                                        Next: {note.nextTask.description} ({note.nextTask.dueDate})
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ))
                         ) : (
                           <div className="-ml-6 bg-surface-container-lowest border border-dashed border-surface-container-highest/60 rounded-2xl p-8 text-center text-on-surface-variant text-xs font-bold">
-                            No clinical notes recorded yet. Use the note writer to document treatments.
+                            No clinical notes recorded yet. Use the note writer or start a guided visit flow.
                           </div>
                         )}
                       </div>
@@ -1535,7 +1974,125 @@ export default function PatientsView({
         </div>
       )}
 
-      {/* MODAL 3: VIEW FILE / PREVIEW IMAGE */}
+      {/* MODAL 3: LOG NEW TIMELINE ACTIVITY ENTRY */}
+      {showAddTimelineModal && selectedPatient && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-on-surface/50 modal-backdrop-blur">
+          <div className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-xl overflow-hidden flex flex-col border border-surface-container-highest animate-fade-in">
+            <div className="px-6 py-4 flex justify-between items-center border-b border-surface-container-highest bg-surface-container-low">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-secondary">history_edu</span>
+                <h3 className="text-sm font-black text-on-surface">Log Timeline Activity Entry</h3>
+              </div>
+              <button
+                onClick={() => setShowAddTimelineModal(false)}
+                className="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-variant text-on-surface-variant flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xs font-bold">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleAddTimelineEntry} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-on-surface uppercase tracking-wider">Event Type</label>
+                  <select
+                    value={newTlEventType}
+                    onChange={(e) => setNewTlEventType(e.target.value as TimelineEventType)}
+                    className="w-full px-3 py-2 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-secondary outline-none"
+                  >
+                    <option value="visit">Visit / Consult</option>
+                    <option value="note">Clinical Assessment</option>
+                    <option value="order">Order / Rx Created</option>
+                    <option value="authorization">Prior Auth Update</option>
+                    <option value="fabrication">Lab Fabrication Update</option>
+                    <option value="document">Document / Attachment</option>
+                    <option value="payment">Billing / Claim</option>
+                    <option value="message">Patient Message</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-on-surface uppercase tracking-wider">Author / Clinician</label>
+                  <input
+                    type="text"
+                    value={newTlAuthor}
+                    onChange={(e) => setNewTlAuthor(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-secondary outline-none"
+                    placeholder="e.g. Dr. Sarah Jenkins"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-on-surface uppercase tracking-wider">Title / Headline</label>
+                <input
+                  type="text"
+                  required
+                  value={newTlTitle}
+                  onChange={(e) => setNewTlTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-secondary outline-none"
+                  placeholder="e.g. 22 Jul 2026 · Initial Evaluation & 3D Foot Scan"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-on-surface uppercase tracking-wider">Short Clinical Summary</label>
+                <textarea
+                  rows={3}
+                  required
+                  value={newTlSummary}
+                  onChange={(e) => setNewTlSummary(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-secondary outline-none resize-none"
+                  placeholder="e.g. Assessment recorded • Custom foot orthosis prescribed and 3D digital impression captured."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-on-surface uppercase tracking-wider">Outcome (Optional)</label>
+                  <input
+                    type="text"
+                    value={newTlOutcome}
+                    onChange={(e) => setNewTlOutcome(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-secondary outline-none"
+                    placeholder="e.g. Approved by insurer"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-on-surface uppercase tracking-wider">Next Action (Optional)</label>
+                  <input
+                    type="text"
+                    value={newTlNextAction}
+                    onChange={(e) => setNewTlNextAction(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-secondary outline-none"
+                    placeholder="e.g. Submit L-Code prior auth request"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-surface-container-highest">
+                <button
+                  type="button"
+                  onClick={() => setShowAddTimelineModal(false)}
+                  className="px-4 py-2 rounded-full border border-surface-container-highest text-xs font-bold text-on-surface hover:bg-surface-container cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-secondary text-white text-xs font-bold rounded-full hover:bg-secondary/90 transition-all cursor-pointer shadow-xs flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-sm">post_add</span>
+                  Save Entry
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: VIEW FILE / PREVIEW IMAGE */}
       {viewingFile && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-on-surface/50 modal-backdrop-blur">
           <div className="bg-surface-container-lowest w-full max-w-2xl rounded-3xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
@@ -1589,6 +2146,67 @@ export default function PatientsView({
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: ADMIN SECURITY CONFIRMATION FOR PERMANENT DELETE */}
+      {deleteModalPatient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-on-surface/50 modal-backdrop-blur">
+          <div className="bg-surface-container-lowest w-full max-w-md rounded-3xl shadow-2xl p-6 border border-primary/30 relative animate-fade-in">
+            <div className="w-12 h-12 rounded-full bg-primary-container/20 text-primary flex items-center justify-center mb-4 mx-auto">
+              <span className="material-symbols-outlined text-2xl font-bold">warning</span>
+            </div>
+            <h3 className="text-lg font-black text-on-surface text-center mb-1">
+              Admin Security Confirmation Required
+            </h3>
+            <p className="text-xs text-on-surface-variant font-semibold text-center mb-4">
+              Permanent destruction of record for <span className="font-bold text-on-surface">{deleteModalPatient.name}</span> (MRN: {deleteModalPatient.mrn}).
+            </p>
+
+            <div className="bg-surface-container-low p-3.5 rounded-2xl mb-4 border border-surface-container-highest/40 text-[11px] text-on-surface-variant space-y-1">
+              <p>• All clinical notes, appointments, and authorizations will be destroyed.</p>
+              <p>• All uploaded prescriptions and PDF documents will be removed.</p>
+              <p>• Action will be permanently logged in the HIPAA Security Audit Trail.</p>
+            </div>
+
+            <div className="space-y-2 mb-6">
+              <label className="text-[11px] font-bold text-on-surface uppercase tracking-wider block">
+                Type <span className="text-primary font-black">{deleteModalPatient.name}</span> to confirm:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmInput}
+                onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                placeholder={deleteModalPatient.name}
+                className="w-full px-4 py-2.5 bg-surface rounded-xl border border-primary/40 text-xs font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setDeleteModalPatient(null);
+                  setDeleteConfirmInput('');
+                }}
+                className="flex-1 py-2.5 rounded-full border border-surface-container-highest text-xs font-bold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={deleteConfirmInput.trim().toLowerCase() !== deleteModalPatient.name.trim().toLowerCase()}
+                onClick={async () => {
+                  const targetId = deleteModalPatient.id;
+                  setDeleteModalPatient(null);
+                  setDeleteConfirmInput('');
+                  await onDeletePatient(targetId);
+                }}
+                className="flex-1 py-2.5 rounded-full bg-primary text-white text-xs font-bold hover:bg-primary-container transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-1"
+              >
+                <span className="material-symbols-outlined text-xs">delete_forever</span>
+                Confirm Destruction
+              </button>
             </div>
           </div>
         </div>

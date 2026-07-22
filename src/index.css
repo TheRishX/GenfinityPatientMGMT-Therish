@@ -8,29 +8,39 @@
   --color-on-primary-container: #ffc4be;
   
   --color-secondary: #19619d;
-  --color-secondary-container: #82bdfe;
-  --color-on-secondary-container: #004c80;
+  --color-secondary-container: #e0f0ff;
+  --color-on-secondary-container: #003358;
   
-  --color-surface: #fbf9f8;
-  --color-surface-dim: #dbd9d9;
-  --color-surface-bright: #fbf9f8;
+  --color-surface: #faf8f7;
+  --color-surface-dim: #d8d6d5;
+  --color-surface-bright: #faf8f7;
   --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f5f3f3;
-  --color-surface-container: #efeded;
-  --color-surface-container-high: #eae8e7;
-  --color-surface-container-highest: #e4e2e2;
+  --color-surface-container-low: #f4f2f1;
+  --color-surface-container: #eeeae9;
+  --color-surface-container-high: #e8e4e3;
+  --color-surface-container-highest: #e0dcda;
   
-  --color-on-surface: #1b1c1c;
-  --color-on-surface-variant: #5a403e;
+  --color-on-surface: #1a1b1c;
+  --color-on-surface-variant: #524342;
   
-  --radius-default: 1rem;
-  --radius-lg: 2rem;
-  --radius-xl: 3rem;
+  --radius-default: 0.875rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.75rem;
+  --radius-2xl: 2.25rem;
 }
 
 @layer base {
   body {
     font-family: var(--font-sans);
+    background-color: var(--color-surface);
+    color: var(--color-on-surface);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
+  }
+
+  h1, h2, h3, h4 {
+    letter-spacing: -0.02em;
   }
 }
 
@@ -46,31 +56,37 @@
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-/* Scrollbars for Kanban Board columns */
-.kanban-scroll::-webkit-scrollbar {
-  height: 8px;
-  width: 8px;
-}
-.kanban-scroll::-webkit-scrollbar-track {
-  background: #f5f3f3;
-  border-radius: 9999px;
-}
-.kanban-scroll::-webkit-scrollbar-thumb {
-  background-color: #e4e2e2;
-  border-radius: 9999px;
-  border: 2px solid #f5f3f3;
+/* Minimalist border hairline utility */
+.border-subtle {
+  border-color: rgba(0, 0, 0, 0.06);
 }
 
-.modal-backdrop-blur {
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
+/* Minimalist card shadows */
 .ambient-shadow-card {
-  box-shadow: 0 4px 20px rgba(140, 0, 14, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 4px 12px rgba(0, 0, 0, 0.02);
 }
 
 .ambient-shadow-active {
-  box-shadow: 0 8px 40px rgba(140, 0, 14, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
 }
+
+/* Scrollbars for Kanban Board columns */
+.kanban-scroll::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.kanban-scroll::-webkit-scrollbar-track {
+  background: var(--color-surface-container-low);
+  border-radius: 9999px;
+}
+.kanban-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--color-surface-container-highest);
+  border-radius: 9999px;
+}
+
+.modal-backdrop-blur {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 

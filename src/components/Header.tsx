@@ -176,56 +176,30 @@ export default function Header({
   const unreadCount = notificationsList.length;
 
   return (
-    <header id="app-header" className="bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md flex justify-between items-center w-full h-20 px-6 z-10 sticky top-0 border-b border-surface-container-highest/20">
+    <header id="app-header" className="bg-surface/90 backdrop-blur-md flex justify-between items-center w-full h-20 px-8 z-10 sticky top-0 border-b border-surface-container-highest/30">
       {/* Dynamic Context Title or Search */}
-      <div className="flex-1 flex items-center gap-4">
-        <h2 className="hidden md:block text-lg font-extrabold text-on-surface mr-2 shrink-0 tracking-tight">
+      <div className="flex-1 flex items-center gap-6">
+        <h2 className="hidden md:block text-xl font-black text-on-surface mr-2 shrink-0 tracking-tight">
           {title}
         </h2>
 
-        {/* Real-Time Connection Pulse Indicator */}
-        <button
-          onClick={checkStatus}
-          disabled={isChecking}
-          title="Click to manually re-verify live Supabase connection"
-          className="flex items-center shrink-0 border-0 bg-transparent"
-        >
-          {supabaseConnected === null ? (
-            <span className="bg-amber-100/80 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider flex items-center gap-1.5 border border-amber-200/40 select-none cursor-pointer hover:bg-amber-200/50 transition-all">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-              Verifying Link...
-            </span>
-          ) : supabaseConnected ? (
-            <span className="bg-emerald-100/80 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider flex items-center gap-1.5 border border-emerald-200/40 select-none cursor-pointer hover:bg-emerald-200/50 transition-all shadow-[0_0_8px_rgba(16,185,129,0.1)]">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute" />
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 relative" />
-              Live Connected {latency !== null ? `(${latency}ms)` : ''}
-            </span>
-          ) : (
-            <span className="bg-primary/10 text-primary text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider flex items-center gap-1.5 border border-primary/20 select-none cursor-pointer hover:bg-primary/20 transition-all shadow-[0_0_8px_rgba(239,68,68,0.1)]">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              Local Sandbox / Offline
-            </span>
-          )}
-        </button>
-
         {/* Search input bar */}
         <div className="relative w-full max-w-md">
-          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">
+          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/70 text-sm">
             search
           </span>
           <input
             type="text"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 rounded-full border-2 border-surface-container-highest bg-surface-container-lowest focus:border-secondary focus:ring-2 focus:ring-secondary/10 text-sm outline-none transition-all placeholder:text-on-surface-variant/60"
+            className="w-full pl-11 pr-4 py-2 rounded-full border border-surface-container-highest/80 bg-surface-container-lowest focus:border-secondary focus:ring-2 focus:ring-secondary/10 text-xs font-semibold outline-none transition-all placeholder:text-on-surface-variant/50 shadow-2xs"
             placeholder="Search patients by name, MRN, status..."
           />
         </div>
       </div>
 
       {/* Utilities */}
-      <div className="flex items-center gap-4 ml-4 relative">
+      <div className="flex items-center gap-3 ml-4 relative">
         {/* Sync status */}
         <button
           onClick={onSyncClick}

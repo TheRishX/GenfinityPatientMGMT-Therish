@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
+import ClinicLogo from './components/ClinicLogo';
 import DashboardView from './components/DashboardView';
 import PatientsView from './components/PatientsView';
 import AppointmentsView from './components/AppointmentsView';
@@ -57,8 +58,7 @@ export default function App() {
         billing: true,
         documents: true,
         fabrication: true,
-        settings: true,
-        support: true
+        settings: true
       };
     } catch {
       return {
@@ -70,8 +70,7 @@ export default function App() {
         billing: true,
         documents: true,
         fabrication: true,
-        settings: true,
-        support: true
+        settings: true
       };
     }
   });
@@ -945,6 +944,49 @@ export default function App() {
     }
   };
 
+  // API Call: Add Fabrication Workshop item
+  const handleAddFabricationItem = async (itemData: any) => {
+    if (!db) return;
+    const newItem: FabricationItem = {
+      id: `fab_${Date.now()}`,
+      patientName: itemData.patientName,
+      device: itemData.device,
+      stage: itemData.stage || 'Layout',
+      priority: itemData.priority === 'High' || itemData.priority === 'Urgent' ? 'Urgent' : 'Standard',
+      techNotes: itemData.specifications || 'Created from guided visit flow.',
+      updatedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+    };
+
+    if (isOfflineMode) {
+      saveStateLocally({
+        ...db,
+        fabrication: [newItem, ...db.fabrication]
+      });
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/fabrication', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(itemData)
+      });
+      if (!res.ok) {
+        saveStateLocally({
+          ...db,
+          fabrication: [newItem, ...db.fabrication]
+        });
+      } else {
+        await fetchState();
+      }
+    } catch {
+      saveStateLocally({
+        ...db,
+        fabrication: [newItem, ...db.fabrication]
+      });
+    }
+  };
+
   // API Call: Update Fabrication Workshop item
   const handleUpdateFabrication = async (itemId: string, updateData: any) => {
     if (isOfflineMode || !db) {
@@ -1060,7 +1102,7 @@ export default function App() {
         <div className="w-full max-w-xs text-center space-y-6">
           {/* Lock Icon logo area */}
           <div className="flex flex-col items-center">
-            <span className="material-symbols-outlined text-5xl text-primary fill mb-3">lock</span>
+            <ClinicLogo size="lg" className="mb-3" />
             <h1 className="text-2xl font-black text-primary tracking-tight">{db.settings.clinicName}</h1>
             <p className="text-xs font-bold text-on-surface-variant tracking-wide mt-1 uppercase">
               HIPAA Compliant Session Lock
@@ -1160,6 +1202,8 @@ export default function App() {
           <DashboardView
             patients={db.patients}
             appointments={db.appointments}
+            authorizations={db.authorizations}
+            fabrication={db.fabrication}
             alerts={db.alerts}
             onNavigateToTab={(tab) => setActiveTab(tab)}
             onAlertAction={handleAlertActionRedirect}
@@ -1168,6 +1212,7 @@ export default function App() {
             isWorkspaceEditMode={isWorkspaceEditMode}
             customLabels={customLabels}
             onUpdateLabel={handleUpdateLabel}
+            onUpdateAppointment={handleUpdateAppointment}
           />
         );
       case 'patients':
@@ -1252,28 +1297,6 @@ export default function App() {
             onSaveSettings={handleSaveSettings}
           />
         );
-      case 'support':
-        return (
-          <div className="bg-surface-container-lowest rounded-3xl p-8 border border-surface-container-highest/40 shadow-xs max-w-2xl animate-fade-in">
-            <div className="flex items-center gap-3 text-secondary mb-6">
-              <span className="material-symbols-outlined text-3xl">support_agent</span>
-              <h2 className="text-2xl font-black text-on-surface">Genfinity Clinical Support</h2>
-            </div>
-            <p className="text-sm text-on-surface-variant leading-relaxed mb-6 font-semibold">
-              If you require immediate technical assistance with your clinical workspace synchronization, please reach out to our team.
-            </p>
-            <div className="space-y-4 font-bold text-xs text-on-surface">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary">mail</span>
-                <span>Email Support: <a href="mailto:support@genfinity.com" className="text-secondary underline">support@genfinity.com</a></span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary">phone</span>
-                <span>Clinical hotline: (555) 123-4567</span>
-              </div>
-            </div>
-          </div>
-        );
       default:
         return (
           <div className="p-8 text-center text-on-surface-variant font-bold text-sm">
@@ -1337,7 +1360,7 @@ export default function App() {
         />
 
         {/* Inner Content stage */}
-        <main className="flex-1 overflow-y-auto px-8 py-8">
+        <main className="flex-1 overflow-y-auto p-8 md:p-10 max-w-7xl mx-auto w-full">
           {renderTabContent()}
         </main>
       </div>

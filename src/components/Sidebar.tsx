@@ -1,4 +1,5 @@
 import React from 'react';
+import ClinicLogo from './ClinicLogo';
 
 interface SidebarProps {
   activeTab: string;
@@ -28,7 +29,7 @@ export default function Sidebar({
   onToggleModule
 }: SidebarProps) {
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+    { id: 'dashboard', label: 'Operations Today', icon: 'speed' },
     { id: 'patients', label: 'Patients', icon: 'groups' },
     { id: 'appointments', label: 'Appointments', icon: 'calendar_month' },
     { id: 'tracker', label: 'Tracker', icon: 'monitoring' },
@@ -46,8 +47,8 @@ export default function Sidebar({
   return (
     <nav id="app-sidebar" className="bg-surface-container-low dark:bg-surface-container-low shadow-sm h-screen w-72 flex-shrink-0 fixed left-0 top-0 h-full flex flex-col py-6 z-20 border-r border-surface-container-highest/30">
       {/* Brand area */}
-      <div className="px-6 mb-5 flex items-center gap-4">
-        <span className="material-symbols-outlined text-4xl text-primary fill">healing</span>
+      <div className="px-5 mb-5 flex items-center gap-3">
+        <ClinicLogo size="md" />
         <div>
           {isWorkspaceEditMode ? (
             <input
@@ -179,34 +180,6 @@ export default function Sidebar({
             </span>
             <span>{isWorkspaceEditMode ? 'Save Custom Layout' : 'Customize Workspace'}</span>
           </button>
-        )}
-
-        {(isWorkspaceEditMode || enabledModules['support'] !== false) && (
-          <div className="flex items-center justify-between rounded-full px-3 py-1 bg-transparent">
-            <button
-              onClick={() => setActiveTab('support')}
-              className={`flex-1 flex items-center gap-3.5 rounded-full px-3 py-2 text-sm font-semibold transition-colors cursor-pointer ${
-                activeTab === 'support'
-                  ? 'bg-secondary-container text-on-secondary-container'
-                  : 'text-on-surface-variant hover:bg-surface-container-high'
-              }`}
-            >
-              <span className="material-symbols-outlined shrink-0">help_outline</span>
-              <span>{customLabels['sidebar_support'] || 'Support'}</span>
-            </button>
-            {isWorkspaceEditMode && (
-              <button
-                onClick={() => onToggleModule?.('support')}
-                className={`p-1.5 rounded-full hover:bg-surface transition-all shrink-0 cursor-pointer ${
-                  enabledModules['support'] !== false ? 'text-primary' : 'text-on-surface-variant/40'
-                }`}
-              >
-                <span className="material-symbols-outlined text-sm font-bold">
-                  {enabledModules['support'] !== false ? 'visibility' : 'visibility_off'}
-                </span>
-              </button>
-            )}
-          </div>
         )}
 
         <button
