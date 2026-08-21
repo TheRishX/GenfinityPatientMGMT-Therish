@@ -9,6 +9,7 @@ import AuthView from './components/AuthView';
 import BillingView from './components/BillingView';
 import FabricationView from './components/FabricationView';
 import SettingsView from './components/SettingsView';
+import EmailView from './components/EmailView';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
 import { DEFAULT_DATABASE, getInitials, generateMRN } from './utils/defaultDb';
 
@@ -169,6 +170,7 @@ export default function App() {
       if (newPatient.status === 'Consultation') {
         const newAppt = {
           id: 'a_' + Date.now(),
+          patientId: newPatient.id,
           patientName: newPatient.name,
           time: '02:00 PM',
           type: 'Initial Consult',
@@ -290,6 +292,7 @@ export default function App() {
       if (status === 'Consultation' && targetPatient) {
         const newAppt = {
           id: 'a_' + Date.now(),
+          patientId: targetPatient.id,
           patientName: targetPatient.name,
           time: '02:00 PM',
           type: 'Initial Consult',
@@ -323,6 +326,11 @@ export default function App() {
   // API Call: Comprehensive Patient Update (Demographics, Insurance, Notes)
   const handleUpdatePatient = async (patientId: string, patientData: any) => {
     if (isOfflineMode || !db) {
+      const currentPatient = db.patients.find(p => p.id === patientId);
+      if (!currentPatient) return;
+      const nextName = patientData.name?.trim() || currentPatient.name;
+      const isSamePatient = (linkedId?: string, linkedName?: string) =>
+        linkedId === patientId || linkedName?.trim().toLowerCase() === currentPatient.name.trim().toLowerCase();
       const updatedPatients = db.patients.map(p => {
         if (p.id === patientId) {
           return {
@@ -335,7 +343,19 @@ export default function App() {
 
       saveStateLocally({
         ...db,
-        patients: updatedPatients
+        patients: updatedPatients,
+        appointments: db.appointments.map(item => isSamePatient(item.patientId, item.patientName)
+          ? { ...item, patientId, patientName: nextName, initials: getInitials(nextName) }
+          : item),
+        authorizations: db.authorizations.map(item => isSamePatient(item.patientId, item.patientName)
+          ? { ...item, patientId, patientName: nextName }
+          : item),
+        claims: db.claims.map(item => isSamePatient(item.patientId, item.patientName)
+          ? { ...item, patientId, patientName: nextName }
+          : item),
+        fabrication: db.fabrication.map(item => isSamePatient(item.patientId, item.patientName)
+          ? { ...item, patientId, patientName: nextName }
+          : item)
       });
       return;
     }
@@ -356,13 +376,19 @@ export default function App() {
   // API Call: Add Appointment
   const handleAddAppointment = async (apptData: any) => {
     if (isOfflineMode || !db) {
+      const patient = db.patients.find(p => p.name.trim().toLowerCase() === apptData.patientName.trim().toLowerCase());
+      if (!patient) {
+        alert('Select an existing patient.');
+        return;
+      }
       const newAppt = {
         id: 'a_' + Date.now(),
-        patientName: apptData.patientName,
+        patientId: patient.id,
+        patientName: patient.name,
         time: apptData.time || '09:00 AM',
         type: apptData.type || 'Consultation',
         status: apptData.status || 'Scheduled',
-        initials: getInitials(apptData.patientName)
+        initials: getInitials(patient.name)
       };
 
       saveStateLocally({
@@ -421,11 +447,22 @@ export default function App() {
   // API Call: Delete Patient (Admin)
   const handleDeletePatient = async (patientId: string) => {
     if (isOfflineMode || !db) {
+      const patient = db.patients.find(p => p.id === patientId);
+      if (!patient) return;
+      const patientName = patient.name.trim().toLowerCase();
+      const belongsToPatient = (name?: string) => name?.trim().toLowerCase() === patientName;
       const updatedPatients = db.patients.filter(p => p.id !== patientId);
       saveStateLocally({
         ...db,
-        patients: updatedPatients
+        patients: updatedPatients,
+        appointments: db.appointments.filter(item => item.patientId !== patientId && !belongsToPatient(item.patientName)),
+        authorizations: db.authorizations.filter(item => !belongsToPatient(item.patientName)),
+        claims: db.claims.filter(item => !belongsToPatient(item.patientName)),
+        fabrication: db.fabrication.filter(item => !belongsToPatient(item.patientName)),
+        emailLogs: (db.emailLogs || []).filter(item => !belongsToPatient(item.patientName)),
+        alerts: db.alerts.filter(item => !item.message.toLowerCase().includes(patientName))
       });
+      setSelectedPatient(current => current?.id === patientId ? null : current);
       return;
     }
 
@@ -773,6 +810,7 @@ export default function App() {
             onAlertAction={handleAlertActionRedirect}
             onDismissAlert={handleDismissAlert}
             onPatientClick={handleSelectPatientByName}
+            onUpdatePatient={handleUpdatePatient}
             isWorkspaceEditMode={isWorkspaceEditMode}
             customLabels={customLabels}
             onUpdateLabel={handleUpdateLabel}
@@ -861,6 +899,8 @@ export default function App() {
             onSaveSettings={handleSaveSettings}
           />
         );
+      case 'email':
+        return <EmailView patients={db.patients} />;
       default:
         return (
           <div className="p-8 text-center text-on-surface-variant font-bold text-sm">
@@ -909,7 +949,9 @@ export default function App() {
               : activeTab === 'fabrication'
               ? getSidebarLabel('fabrication', 'Active Workshop')
               : activeTab === 'settings'
-              ? getSidebarLabel('settings', 'Messages & Admin')
+              ? getSidebarLabel('settings', 'Admin Settings')
+              : activeTab === 'email'
+              ? getSidebarLabel('email', 'Email')
               : 'Genfinity Clinical Portal'
           }
           searchTerm={searchTerm}

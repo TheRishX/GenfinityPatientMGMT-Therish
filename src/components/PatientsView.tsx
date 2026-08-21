@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Patient, PatientFile, Appointment, Authorization, Claim, ClinicalNote, TimelineEvent, TimelineEventType } from '../types';
 import { PatientTimeline } from './PatientTimeline';
 import { compressImageFile } from '../utils/imageCompressor';
+import PatientEmailModal from './PatientEmailModal';
 
 interface PatientsViewProps {
   patients: Patient[];
@@ -59,6 +60,7 @@ export default function PatientsView({
   const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
   const [deleteModalPatient, setDeleteModalPatient] = useState<Patient | null>(null);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const [emailPatient, setEmailPatient] = useState<Patient | null>(null);
   const [timelineCategory, setTimelineCategory] = useState<'all' | 'visits' | 'notes' | 'orders' | 'auth' | 'fabrication' | 'documents'>('all');
 
   // Quick Add Timeline Event States
@@ -169,7 +171,7 @@ export default function PatientsView({
       return p.status === 'Archived';
     }
     return true;
-  });
+  }).sort((a, b) => Number(Boolean(b.important)) - Number(Boolean(a.important)));
 
   // Handle saving new patient
   const handleSavePatientSubmit = async (e: React.FormEvent) => {
@@ -450,9 +452,22 @@ export default function PatientsView({
                     </div>
                   </div>
 
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider shrink-0 ${statusStyle}`}>
-                    {p.status}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={async event => {
+                        event.stopPropagation();
+                        await onUpdatePatient(p.id, { important: !p.important });
+                      }}
+                      aria-label={p.important ? `Remove ${p.name} from important patients` : `Mark ${p.name} as important`}
+                      title={p.important ? 'Pinned to dashboard' : 'Pin to dashboard'}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors ${p.important ? 'bg-amber-500/15 text-amber-700' : 'bg-surface-container-low text-on-surface-variant hover:text-amber-700'}`}
+                    >
+                      <span className={`material-symbols-outlined text-lg ${p.important ? 'fill' : ''}`}>star</span>
+                    </button>
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${statusStyle}`}>
+                      {p.status}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Minimalist Context Blocks */}
@@ -512,10 +527,23 @@ export default function PatientsView({
 
               {/* Card Footer */}
               <div className="pt-3 border-t border-surface-container/60 flex items-center justify-between shrink-0">
-                <span className="text-xs font-black text-secondary group-hover:text-primary flex items-center gap-1 transition-colors">
-                  Open Patient Chart
-                  <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-secondary group-hover:text-primary flex items-center gap-1 transition-colors">
+                    Open chart
+                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                  </span>
+                  <button
+                    onClick={event => {
+                      event.stopPropagation();
+                      setEmailPatient(p);
+                    }}
+                    disabled={!p.email}
+                    className="px-2.5 py-1.5 rounded-lg bg-secondary/10 text-secondary text-[10px] font-bold cursor-pointer hover:bg-secondary/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-sm">mail</span>
+                    Email
+                  </button>
+                </div>
 
                 {/* Overflow Menu Button */}
                 <div className="relative">
@@ -2154,6 +2182,10 @@ export default function PatientsView({
             </div>
           </div>
         </div>
+      )}
+
+      {emailPatient && (
+        <PatientEmailModal patient={emailPatient} onClose={() => setEmailPatient(null)} />
       )}
     </div>
   );

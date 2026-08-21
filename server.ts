@@ -405,6 +405,7 @@ async function sendEmail(smtp: SmtpConfig, to: string, subject: string, body: st
 
     const info = await transporter.sendMail({
       from: `"${smtp.senderName}" <${smtp.fromEmail}>`,
+      replyTo: smtp.replyTo || smtp.fromEmail,
       to,
       subject,
       text: body,
@@ -415,94 +416,6 @@ async function sendEmail(smtp: SmtpConfig, to: string, subject: string, body: st
   } catch (error: any) {
     logs.push(`[${new Date().toLocaleTimeString()}] SMTP Connection or Authentication Error: ${error.message}`);
     return { success: false, message: `SMTP Error: ${error.message}`, logs };
-  }
-}
-
-// Internal Backend Event-Driven Email Notification Dispatcher
-async function internalTriggerEmail(triggerEvent: string, patientName: string, recipientEmail: string, payload?: any) {
-  try {
-    const db = await readDatabase();
-    const template = db.emailTemplates?.find(t => t.triggerEvent === triggerEvent);
-    if (!template) {
-      console.log(`[EMAIL ENGINE] Template for event "${triggerEvent}" not found. Skipped.`);
-      return;
-    }
-
-    let subject = template.subject;
-    let body = template.body;
-
-    const clinicName = db.settings?.clinicName || 'Genfinity O&P';
-    const clinicAddress = db.settings?.primaryAddress || '123 Prosthetics Way';
-    const clinicPhone = db.settings?.contactPhone || '(555) 123-4567';
-    const supportEmail = db.settings?.supportEmail || 'support@genfinity.com';
-
-    const variables: Record<string, string> = {
-      patientName: patientName || 'Patient',
-      clinicName,
-      clinicAddress,
-      clinicPhone,
-      supportEmail,
-      appointmentType: payload?.appointmentType || 'Fitting & Evaluation',
-      appointmentTime: payload?.appointmentTime || '09:00 AM',
-      deviceName: payload?.deviceName || 'Custom Device',
-      fabricationStage: payload?.fabricationStage || 'Initial Layout',
-      payerName: payload?.payerName || 'Insurance Provider',
-      authNumber: payload?.authNumber || 'AUTH-99121',
-      claimNumber: payload?.claimNumber || 'INV-2023-001',
-      claimAmount: payload?.claimAmount || '0.00'
-    };
-
-    Object.keys(variables).forEach(key => {
-      const regex = new RegExp(`{${key}}`, 'g');
-      subject = subject.replace(regex, variables[key]);
-      body = body.replace(regex, variables[key]);
-    });
-
-    const config = db.smtpConfig || {
-      host: 'smtp.mailtrap.io',
-      port: 587,
-      user: '',
-      pass: '',
-      secure: false,
-      fromEmail: 'notifications@genfinityortho.com',
-      senderName: 'Genfinity Orthotics & Prosthetics Clinic'
-    };
-
-    const result = await sendEmail(config, recipientEmail, subject, body);
-
-    const newLog: EmailLog = {
-      id: `log_${Date.now()}`,
-      recipientEmail,
-      patientName: patientName || 'Unassigned Patient',
-      subject,
-      body,
-      templateName: template.name,
-      sentAt: new Date().toLocaleString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }),
-      status: result.success ? 'Sent' : 'Failed',
-      errorMessage: result.success ? undefined : result.message
-    };
-
-    if (!db.emailLogs) db.emailLogs = [];
-    db.emailLogs.unshift(newLog);
-
-    // Also trigger a real clinic alert notification so the bell indicator in the header lights up!
-    const newAlert: AlertItem = {
-      id: `al_${Date.now()}`,
-      type: result.success ? 'info' : 'warning',
-      title: result.success ? 'Notification Sent' : 'Notification Failed',
-      message: result.success
-        ? `Patient notification "${template.name}" sent to ${patientName} (${recipientEmail}).`
-        : `Failed to dispatch notification: ${result.message}`,
-      actionText: 'Review Outbox',
-      actionTarget: 'settings'
-    };
-    if (!db.alerts) db.alerts = [];
-    db.alerts.unshift(newAlert);
-
-    await writeDatabase(db);
-    console.log(`[EMAIL ENGINE] Automatically dispatched notification for event: ${triggerEvent} to ${recipientEmail}`);
-  } catch (error) {
-    console.error(`[EMAIL ENGINE] Failed to trigger notification for event: ${triggerEvent}`, error);
   }
 }
 
@@ -664,6 +577,35 @@ Billing & Patient Accounts
     ];
   }
 
+  // Patient is the source of truth. Remove legacy orphan rows created before
+  // linked-record cascading was introduced.
+  const patientById = new Map(db.patients.map(patient => [patient.id, patient]));
+  const patientByName = new Map(db.patients.map(patient => [patient.name.trim().toLowerCase(), patient]));
+  const normalizeLinkedItems = <T extends { patientId?: string; patientName: string }>(items: T[]): T[] =>
+    items.flatMap(item => {
+      const patient = (item.patientId && patientById.get(item.patientId))
+        || patientByName.get(item.patientName.trim().toLowerCase());
+      return patient ? [{ ...item, patientId: patient.id, patientName: patient.name }] : [];
+    });
+  const previousLinkedState = JSON.stringify([db.appointments, db.authorizations, db.claims, db.fabrication]);
+  db.appointments = normalizeLinkedItems(db.appointments);
+  db.authorizations = normalizeLinkedItems(db.authorizations);
+  db.claims = normalizeLinkedItems(db.claims);
+  db.fabrication = normalizeLinkedItems(db.fabrication);
+  const nextLinkedState = JSON.stringify([db.appointments, db.authorizations, db.claims, db.fabrication]);
+
+  if (nextLinkedState !== previousLinkedState) {
+    if (pool) {
+      await pool.execute(
+        `INSERT INTO app_state (state_key, payload) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE payload = VALUES(payload)`,
+        ['clinic', JSON.stringify(db)]
+      );
+    } else {
+      await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
+      await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2));
+    }
+  }
 
   return db;
 }
@@ -796,7 +738,7 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
     try {
       const db = await readDatabase();
       res.json({
-        smtpConfig: db.smtpConfig,
+        smtpConfig: db.smtpConfig ? { ...db.smtpConfig, pass: db.smtpConfig.pass ? '********' : '' } : undefined,
         emailTemplates: db.emailTemplates,
         emailLogs: db.emailLogs
       });
@@ -809,10 +751,21 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
     try {
       const { smtpConfig, emailTemplates } = req.body;
       const db = await readDatabase();
-      if (smtpConfig) db.smtpConfig = smtpConfig;
+      if (smtpConfig) {
+        const existingPassword = db.smtpConfig?.pass || '';
+        db.smtpConfig = {
+          ...db.smtpConfig,
+          ...smtpConfig,
+          pass: !smtpConfig.pass || smtpConfig.pass === '********' ? existingPassword : smtpConfig.pass
+        };
+      }
       if (emailTemplates) db.emailTemplates = emailTemplates;
       await writeDatabase(db);
-      res.json({ success: true, smtpConfig: db.smtpConfig, emailTemplates: db.emailTemplates });
+      res.json({
+        success: true,
+        smtpConfig: db.smtpConfig ? { ...db.smtpConfig, pass: db.smtpConfig.pass ? '********' : '' } : undefined,
+        emailTemplates: db.emailTemplates
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -821,7 +774,10 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
   app.post('/api/email/test-connection', async (req, res) => {
     try {
       const { smtpConfig } = req.body;
-      const config = smtpConfig || (await readDatabase()).smtpConfig;
+      const savedConfig = (await readDatabase()).smtpConfig;
+      const config = smtpConfig
+        ? { ...savedConfig, ...smtpConfig, pass: !smtpConfig.pass || smtpConfig.pass === '********' ? savedConfig?.pass : smtpConfig.pass }
+        : savedConfig;
       if (!config) {
         return res.status(400).json({ success: false, message: 'SMTP configuration is missing.' });
       }
@@ -882,7 +838,9 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
     try {
       const { smtpConfig, testEmail } = req.body;
       const db = await readDatabase();
-      const config = smtpConfig || db.smtpConfig;
+      const config = smtpConfig
+        ? { ...db.smtpConfig, ...smtpConfig, pass: !smtpConfig.pass || smtpConfig.pass === '********' ? db.smtpConfig?.pass : smtpConfig.pass }
+        : db.smtpConfig;
       const targetEmail = testEmail || db.settings.supportEmail || 'test@example.com';
 
       if (!config) {
@@ -926,69 +884,40 @@ Clinical Portal Support Team`;
     }
   });
 
-  app.post('/api/email/send-trigger', async (req, res) => {
+  app.post('/api/email/send', async (req, res) => {
     try {
-      const { triggerEvent, recipientEmail, patientName, payload } = req.body;
-      if (!triggerEvent || !recipientEmail) {
-        return res.status(400).json({ error: 'triggerEvent and recipientEmail are required.' });
-      }
-
+      const { patientId, templateId, subject, body } = req.body;
       const db = await readDatabase();
-      const template = db.emailTemplates?.find(t => t.triggerEvent === triggerEvent);
-      if (!template) {
-        return res.status(404).json({ error: `Template for event ${triggerEvent} not found.` });
-      }
+      const patient = db.patients.find(item => item.id === patientId);
+      if (!patient) return res.status(404).json({ error: 'Patient not found.' });
+      if (!patient.email) return res.status(400).json({ error: 'This patient does not have an email address.' });
 
-      let subject = template.subject;
-      let body = template.body;
+      const template = db.emailTemplates?.find(item => item.id === templateId);
+      if (!template) return res.status(404).json({ error: 'Email template not found.' });
 
-      const clinicName = db.settings.clinicName || 'Genfinity O&P';
-      const clinicAddress = db.settings.primaryAddress || '123 Prosthetics Way';
-      const clinicPhone = db.settings.contactPhone || '(555) 123-4567';
-      const supportEmail = db.settings.supportEmail || 'support@genfinity.com';
+      const finalSubject = String(subject || template.subject).trim();
+      const finalBody = String(body || template.body).trim();
+      if (!finalSubject || !finalBody) return res.status(400).json({ error: 'Subject and message are required.' });
 
-      const variables: Record<string, string> = {
-        patientName: patientName || 'Patient',
-        clinicName,
-        clinicAddress,
-        clinicPhone,
-        supportEmail,
-        appointmentType: payload?.appointmentType || 'Fitting & Evaluation',
-        appointmentTime: payload?.appointmentTime || '09:00 AM',
-        deviceName: payload?.deviceName || 'Custom Device',
-        fabricationStage: payload?.fabricationStage || 'Initial Layout',
-        payerName: payload?.payerName || 'Insurance Provider',
-        authNumber: payload?.authNumber || 'AUTH-99121',
-        claimNumber: payload?.claimNumber || 'INV-2023-001',
-        claimAmount: payload?.claimAmount || '0.00'
-      };
+      const config = db.smtpConfig;
+      if (!config) return res.status(400).json({ error: 'Brevo SMTP is not configured.' });
 
-      Object.keys(variables).forEach(key => {
-        const regex = new RegExp(`{${key}}`, 'g');
-        subject = subject.replace(regex, variables[key]);
-        body = body.replace(regex, variables[key]);
-      });
-
-      const config = db.smtpConfig || {
-        host: 'smtp.mailtrap.io',
-        port: 587,
-        user: '',
-        pass: '',
-        secure: false,
-        fromEmail: 'notifications@genfinityortho.com',
-        senderName: 'Genfinity Orthotics & Prosthetics Clinic'
-      };
-
-      const result = await sendEmail(config, recipientEmail, subject, body);
-
+      const result = await sendEmail(config, patient.email, finalSubject, finalBody);
       const newLog: EmailLog = {
         id: `log_${Date.now()}`,
-        recipientEmail,
-        patientName: patientName || 'Unassigned Patient',
-        subject,
-        body,
+        recipientEmail: patient.email,
+        patientName: patient.name,
+        subject: finalSubject,
+        body: finalBody,
         templateName: template.name,
-        sentAt: new Date().toLocaleString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }),
+        sentAt: new Date().toLocaleString('en-US', {
+          month: 'short',
+          day: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        }),
         status: result.success ? 'Sent' : 'Failed',
         errorMessage: result.success ? undefined : result.message
       };
@@ -997,10 +926,9 @@ Clinical Portal Support Team`;
       db.emailLogs.unshift(newLog);
       await writeDatabase(db);
 
-      res.json({
+      res.status(result.success ? 200 : 502).json({
         success: result.success,
         message: result.message,
-        logs: result.logs,
         logEntry: newLog
       });
     } catch (err: any) {
@@ -1050,6 +978,7 @@ Clinical Portal Support Team`;
       if (status === 'Consultation') {
         db.appointments.unshift({
           id: `a_${Date.now()}`,
+          patientId: newPatient.id,
           patientName: name,
           time: '02:00 PM',
           type: 'Initial Consult',
@@ -1081,6 +1010,7 @@ Clinical Portal Support Team`;
       if (status === 'Consultation') {
         db.appointments.unshift({
           id: `a_${Date.now()}`,
+          patientId: updatedPatient.id,
           patientName: updatedPatient.name,
           time: '02:00 PM',
           type: 'Initial Consult',
@@ -1100,7 +1030,7 @@ Clinical Portal Support Team`;
   app.patch('/api/patients/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, phone, dob, email, referralSource, status, insuranceCompany, insuranceId, address, gender, clinicalNotes, avatarUrl } = req.body;
+      const { name, phone, dob, email, referralSource, status, insuranceCompany, insuranceId, address, gender, clinicalNotes, avatarUrl, important } = req.body;
 
       const db = await readDatabase();
       const patient = db.patients.find(p => p.id === id);
@@ -1108,7 +1038,36 @@ Clinical Portal Support Team`;
         return res.status(404).json({ error: 'Patient not found' });
       }
 
-      if (name !== undefined) patient.name = name;
+      if (name !== undefined && name.trim() && name.trim() !== patient.name) {
+        const previousName = patient.name.trim().toLowerCase();
+        const matchesPreviousName = (value?: string) => value?.trim().toLowerCase() === previousName;
+        db.appointments.forEach(item => {
+          if (item.patientId === id || matchesPreviousName(item.patientName)) {
+            item.patientId = id;
+            item.patientName = name.trim();
+            item.initials = getInitials(name.trim());
+          }
+        });
+        db.authorizations.forEach(item => {
+          if (item.patientId === id || matchesPreviousName(item.patientName)) {
+            item.patientId = id;
+            item.patientName = name.trim();
+          }
+        });
+        db.claims.forEach(item => {
+          if (item.patientId === id || matchesPreviousName(item.patientName)) {
+            item.patientId = id;
+            item.patientName = name.trim();
+          }
+        });
+        db.fabrication.forEach(item => {
+          if (item.patientId === id || matchesPreviousName(item.patientName)) {
+            item.patientId = id;
+            item.patientName = name.trim();
+          }
+        });
+        patient.name = name.trim();
+      }
       if (phone !== undefined) patient.phone = phone;
       if (dob !== undefined) patient.dob = dob;
       if (email !== undefined) patient.email = email;
@@ -1120,6 +1079,7 @@ Clinical Portal Support Team`;
       if (gender !== undefined) patient.gender = gender;
       if (clinicalNotes !== undefined) patient.clinicalNotes = clinicalNotes;
       if (avatarUrl !== undefined) patient.avatarUrl = avatarUrl;
+      if (important !== undefined) patient.important = Boolean(important);
       patient.avatarInitials = getInitials(patient.name);
 
       await writeDatabase(db);
@@ -1138,9 +1098,12 @@ Clinical Portal Support Team`;
       }
 
       const db = await readDatabase();
+      const matchedPatient = db.patients.find(p => p.name.trim().toLowerCase() === patientName.trim().toLowerCase());
+      if (!matchedPatient) return res.status(400).json({ error: 'Select an existing patient.' });
       const newAppointment: Appointment = {
         id: `a_${Date.now()}`,
-        patientName,
+        patientId: matchedPatient.id,
+        patientName: matchedPatient.name,
         time: time || '09:00 AM',
         type: type || 'Consultation',
         status: status || 'Scheduled',
@@ -1149,18 +1112,6 @@ Clinical Portal Support Team`;
       };
       db.appointments.unshift(newAppointment);
       await writeDatabase(db);
-
-      let recipientEmail = 'patient@example.com';
-      const localPatient = db.patients.find(p => p.name.toLowerCase() === patientName.toLowerCase());
-      if (localPatient?.email) {
-        recipientEmail = localPatient.email;
-      }
-
-      // Fire email trigger asynchronously
-      internalTriggerEmail('appointment_booked', patientName, recipientEmail, {
-        appointmentType: type || 'Consultation',
-        appointmentTime: `${appt_date || new Date().toLocaleDateString()} at ${time || '09:00 AM'}`
-      });
 
       res.status(201).json(newAppointment);
     } catch (err: any) {
@@ -1200,10 +1151,24 @@ Clinical Portal Support Team`;
       const { id } = req.params;
 
       const db = await readDatabase();
+      const patient = db.patients.find(p => p.id === id);
+      if (!patient) {
+        return res.status(404).json({ error: 'Patient not found' });
+      }
+
+      const patientName = patient.name.trim().toLowerCase();
+      const belongsToPatient = (name?: string) => name?.trim().toLowerCase() === patientName;
+
       db.patients = db.patients.filter(p => p.id !== id);
+      db.appointments = db.appointments.filter(item => item.patientId !== id && !belongsToPatient(item.patientName));
+      db.authorizations = db.authorizations.filter(item => item.patientId !== id && !belongsToPatient(item.patientName));
+      db.claims = db.claims.filter(item => item.patientId !== id && !belongsToPatient(item.patientName));
+      db.fabrication = db.fabrication.filter(item => item.patientId !== id && !belongsToPatient(item.patientName));
+      db.emailLogs = (db.emailLogs || []).filter(item => !belongsToPatient(item.patientName));
+      db.alerts = db.alerts.filter(item => !item.message.toLowerCase().includes(patientName));
       await writeDatabase(db);
 
-      res.json({ success: true, message: 'Patient record deleted successfully' });
+      res.json({ success: true, message: 'Patient and all linked workflow records deleted successfully' });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1291,28 +1256,12 @@ Clinical Portal Support Team`;
         return res.status(404).json({ error: 'Authorization not found' });
       }
 
-      const oldStatus = auth.status;
       if (status !== undefined) auth.status = status;
       if (payer !== undefined) auth.payer = payer;
       if (authNumber !== undefined) auth.authNumber = authNumber;
       if (notes !== undefined) auth.notes = notes;
 
       await writeDatabase(db);
-
-      // Trigger automatic insurance approval email when changed to Approved
-      if (status === 'Approved' && oldStatus !== 'Approved') {
-        let recipientEmail = 'patient@example.com';
-        const localPatient = db.patients.find(p => p.name.toLowerCase() === auth.patientName.toLowerCase());
-        if (localPatient?.email) {
-          recipientEmail = localPatient.email;
-        }
-
-        internalTriggerEmail('auth_status_approved', auth.patientName, recipientEmail, {
-          deviceName: auth.device || 'Clinical Prosthesis/Orthosis Device',
-          payerName: auth.payer || payer || 'Insurance Carrier',
-          authNumber: auth.authNumber || authNumber || 'AUTH-99121'
-        });
-      }
 
       res.json(auth);
     } catch (err: any) {
@@ -1329,9 +1278,12 @@ Clinical Portal Support Team`;
       }
 
       const db = await readDatabase();
+      const matchedPatient = db.patients.find(p => p.name.trim().toLowerCase() === patientName.trim().toLowerCase());
+      if (!matchedPatient) return res.status(400).json({ error: 'Select an existing patient.' });
       const newAuth: Authorization = {
         id: `au_${Date.now()}`,
-        patientName,
+        patientId: matchedPatient.id,
+        patientName: matchedPatient.name,
         device,
         status: status || 'Pending',
         submittedDate: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
@@ -1357,11 +1309,14 @@ Clinical Portal Support Team`;
       }
 
       const db = await readDatabase();
+      const matchedPatient = db.patients.find(p => p.name.trim().toLowerCase() === patientName.trim().toLowerCase());
+      if (!matchedPatient) return res.status(400).json({ error: 'Select an existing patient.' });
       const count = db.claims.length + 890;
       const newClaim: Claim = {
         id: `c_${Date.now()}`,
+        patientId: matchedPatient.id,
         claimNumber: `INV-2023-0${count}`,
-        patientName,
+        patientName: matchedPatient.name,
         payer: payer || 'Self',
         doctor: doctor || 'Dr. Sarah Jenkins',
         amount: parseFloat(amount),
@@ -1371,23 +1326,6 @@ Clinical Portal Support Team`;
 
       db.claims.unshift(newClaim);
       await writeDatabase(db);
-
-      // Trigger automatic invoice email asynchronously
-      let recipientEmail = 'patient@example.com';
-      try {
-        const localPatient = db.patients.find(p => p.name.toLowerCase() === patientName.toLowerCase());
-        if (localPatient?.email) {
-          recipientEmail = localPatient.email;
-        }
-      } catch (e) {
-        console.warn('Patient email lookup failed:', e);
-      }
-
-      internalTriggerEmail('invoice_billed', patientName, recipientEmail, {
-        claimNumber: newClaim.claimNumber,
-        payerName: newClaim.payer,
-        claimAmount: newClaim.amount.toFixed(2)
-      });
 
       res.status(201).json(newClaim);
     } catch (err: any) {
@@ -1449,27 +1387,12 @@ Clinical Portal Support Team`;
         return res.status(404).json({ error: 'Fabrication item not found' });
       }
 
-      const oldStage = item.stage;
       if (stage !== undefined) item.stage = stage;
       if (techNotes !== undefined) item.techNotes = techNotes;
       if (priority !== undefined) item.priority = priority;
       item.updatedAt = new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
 
       await writeDatabase(db);
-
-      // Trigger automatic progress update email if fabrication stage changed
-      if (stage !== undefined && stage !== oldStage) {
-        let recipientEmail = 'patient@example.com';
-        const localPatient = db.patients.find(p => p.name.toLowerCase() === item.patientName.toLowerCase());
-        if (localPatient?.email) {
-          recipientEmail = localPatient.email;
-        }
-
-        internalTriggerEmail('fabrication_status_changed', item.patientName, recipientEmail, {
-          deviceName: item.device || 'Prosthesis/Orthosis Device',
-          fabricationStage: stage
-        });
-      }
 
       res.json(item);
     } catch (err: any) {

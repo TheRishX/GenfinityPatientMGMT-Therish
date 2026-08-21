@@ -98,6 +98,7 @@ export interface Patient {
   consentStatus?: string;
   communicationPreference?: 'SMS Text' | 'Email' | 'Phone Call' | 'Patient Portal';
   blockerBadge?: string;
+  important?: boolean;
   timeline?: TimelineEvent[];
 }
 
@@ -114,6 +115,7 @@ export interface Appointment {
 
 export interface Authorization {
   id: string;
+  patientId?: string;
   patientName: string;
   device: string;
   status: 'Approved' | 'Pending' | 'Denied' | 'Needs More Info';
@@ -126,6 +128,7 @@ export interface Authorization {
 
 export interface Claim {
   id: string;
+  patientId?: string;
   claimNumber: string;
   patientName: string;
   payer: string;
@@ -147,6 +150,7 @@ export interface ClinicSettings {
 
 export interface FabricationItem {
   id: string;
+  patientId?: string;
   patientName: string;
   device: string;
   stage: 'Layout' | 'Thermoforming' | 'Grinding' | 'Assembly' | 'QA';
@@ -172,6 +176,7 @@ export interface SmtpConfig {
   secure: boolean;
   fromEmail: string;
   senderName: string;
+  replyTo?: string;
 }
 
 export interface EmailTemplate {

@@ -33,7 +33,8 @@ export default function Sidebar({
     { id: 'patients', label: 'Patients', icon: 'groups' },
     { id: 'appointments', label: 'Schedule', icon: 'calendar_month' },
     { id: 'tracker', label: 'Orders', icon: 'precision_manufacturing' },
-    { id: 'settings', label: 'Messages', icon: 'mail' }
+    { id: 'email', label: 'Email', icon: 'outgoing_mail' },
+    { id: 'settings', label: 'Admin', icon: 'settings' }
   ];
 
   const getLabel = (id: string, defaultLabel: string) => {
