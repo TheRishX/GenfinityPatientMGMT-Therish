@@ -737,20 +737,22 @@ export default function PatientsView({
 
       {/* MODAL 2: PATIENT PROFILE (Eleanor Vance Setup, Image 5) */}
       {selectedPatient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-on-surface/40 modal-backdrop-blur">
-          <div className="bg-surface-container-lowest w-full max-w-5xl rounded-3xl shadow-xl relative flex flex-col max-h-[95vh] overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-5 bg-on-surface/40 modal-backdrop-blur">
+          <div className="bg-surface-container-lowest w-full max-w-6xl rounded-2xl shadow-xl relative flex flex-col max-h-[94vh] overflow-hidden">
             {/* Close trigger */}
             <button
               onClick={() => setSelectedPatient(null)}
-              className="absolute top-5 right-5 w-10 h-10 bg-surface-container-high rounded-full flex items-center justify-center text-on-surface hover:bg-surface-dim transition-colors z-10 cursor-pointer"
+              aria-label="Close patient profile"
+              className="absolute top-4 right-4 w-9 h-9 bg-surface-container-low rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors z-10 cursor-pointer"
             >
               <span className="material-symbols-outlined font-bold text-sm">close</span>
             </button>
 
-            {/* Profile header with Compact O&P Clinical Snapshot */}
-            <div className="px-6 pt-6 pb-4 border-b border-surface-container-highest bg-surface-container-lowest space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-surface shadow-xs shrink-0 bg-surface-container-highest flex items-center justify-center font-black">
+            {/* Focused patient identity and clinical summary */}
+            <div className="px-5 pt-5 pb-4 pr-16 border-b border-surface-container-highest bg-surface-container-lowest space-y-4">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-12 h-12 rounded-full overflow-hidden border border-surface-container-highest shadow-2xs shrink-0 bg-surface-container-high flex items-center justify-center font-black">
                   {selectedPatient.avatarUrl ? (
                     <img
                       className="w-full h-full object-cover"
@@ -766,173 +768,115 @@ export default function PatientsView({
                       src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrDX68ppEAqs_qFiQjVZ-pjvW7nzC-y8ew8jUnTQi7M9LMden4EQEWwD2_PRQqRVHVV3n7ttr8RpOpeaz60eJLFdqbjCSOnjD8r_W0OjndDWD52zlRvf8D_DEfPtq6gyyyu7r8kvL-YqlXnRZscJ8nufW2zl8p2wwoAcWoy8h0qLy227ryQ2OwvXAQsDdt9aZluBpQRPTd0bCQV8WFXtfOpEXnI3cOUsvRMaqWGuJVo9o1eJdyf4mpZg"
                     />
                   ) : (
-                    <span className="text-lg text-on-surface-variant">{selectedPatient.avatarInitials}</span>
+                    <span className="text-sm text-on-surface-variant">{selectedPatient.avatarInitials}</span>
                   )}
-                </div>
+                  </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <h1 className="text-xl font-black text-on-surface tracking-tight leading-none">
-                      {selectedPatient.name}
-                    </h1>
-                    <span className="font-mono text-xs font-bold text-on-surface-variant bg-surface px-2 py-0.5 rounded-md border border-surface-container-highest">
-                      MRN: {selectedPatient.mrn}
-                    </span>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
-                      selectedPatient.status === 'Archived' 
-                        ? 'bg-surface-container text-on-surface-variant border-surface-container-highest' 
-                        : 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-300/40'
-                    }`}>
-                      {selectedPatient.status}
-                    </span>
-                    {selectedPatient.blockerBadge && (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/50 dark:text-amber-200">
-                        {selectedPatient.blockerBadge}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="text-lg font-black text-on-surface tracking-tight leading-tight truncate">
+                        {selectedPatient.name}
+                      </h1>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        selectedPatient.status === 'Archived'
+                          ? 'bg-surface-container text-on-surface-variant'
+                          : 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300'
+                      }`}>
+                        {selectedPatient.status}
                       </span>
-                    )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-on-surface-variant">
+                      <span className="font-mono">MRN {selectedPatient.mrn}</span>
+                      <span aria-hidden="true">•</span>
+                      <span>DOB {selectedPatient.dob || 'Not provided'}</span>
+                      <span aria-hidden="true">•</span>
+                      <span>{selectedPatient.phone || 'No phone'}</span>
+                      <span className="truncate max-w-[260px]">{selectedPatient.email || 'No email'}</span>
+                    </div>
                   </div>
-
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant font-medium">
-                    <span>DOB: <strong className="text-on-surface">{selectedPatient.dob || '01/01/1980'}</strong></span>
-                    <span>Phone: <strong className="text-on-surface">{selectedPatient.phone || 'No phone'}</strong></span>
-                    <span>Email: <strong className="text-on-surface">{selectedPatient.email || 'No email'}</strong></span>
-                    <span>Payer: <strong className="text-primary">{selectedPatient.insuranceCompany || 'Medicare Blue Cross'}</strong></span>
-                    <span>Clinician: <strong className="text-secondary">{selectedPatient.primaryClinician || 'Dr. Sarah Jenkins'}</strong></span>
-                  </div>
+                </div>
+                <div className="rounded-xl bg-primary/5 border border-primary/10 px-4 py-3 min-w-0">
+                  <span className="block text-[9px] font-black uppercase tracking-wider text-primary">Next action</span>
+                  <p className="mt-0.5 text-xs font-bold text-on-surface truncate" title={selectedPatient.nextRequiredAction || 'Capture 3D scan & submit l-code auth'}>
+                    {selectedPatient.nextRequiredAction || 'Capture 3D scan & submit l-code auth'}
+                  </p>
+                  <p className="mt-1 text-[10px] text-on-surface-variant">
+                    Next visit: <strong className="text-on-surface">{selectedPatient.nextAppointment || 'Today 2:00 PM'}</strong>
+                  </p>
                 </div>
               </div>
 
-              {/* O&P Compact Clinical Snapshot Grid */}
-              <div className="p-3.5 bg-surface-container-low/80 rounded-2xl border border-surface-container-highest/40 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                  {/* 1. Diagnosis & Affected Side */}
-                  <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-surface-container-highest/30 space-y-1">
-                    <span className="text-[9px] font-black uppercase text-secondary tracking-wider block">Diagnosis / Side</span>
-                    <p className="font-extrabold text-on-surface text-[11px] truncate" title={selectedPatient.diagnosis || 'Post-tibial tendon dysfunction / Pes Planus'}>
-                      {selectedPatient.diagnosis || 'Post-tibial tendon dysfunction / Pes Planus'}
-                    </p>
-                    <span className="inline-block px-2 py-0.5 rounded bg-primary/10 text-primary font-black text-[9.5px]">
-                      Side: {selectedPatient.affectedSide || 'Left'}
-                    </span>
-                  </div>
-
-                  {/* 2. Device Category & Tech Owner */}
-                  <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-surface-container-highest/30 space-y-1">
-                    <span className="text-[9px] font-black uppercase text-secondary tracking-wider block">Device &amp; Lab Owner</span>
-                    <p className="font-extrabold text-on-surface text-[11px] truncate">
-                      {selectedPatient.deviceCategory || 'Custom Foot Orthosis'}
-                    </p>
-                    <span className="inline-block text-[10px] font-semibold text-on-surface-variant">
-                      Lab Tech: <strong className="text-on-surface">{selectedPatient.fabricationOwner || 'Tech Mike'}</strong>
-                    </span>
-                  </div>
-
-                  {/* 3. Auth Status & Next Required Action */}
-                  <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-surface-container-highest/30 space-y-1">
-                    <span className="text-[9px] font-black uppercase text-secondary tracking-wider block">Auth Status &amp; Next Action</span>
-                    <p className="font-bold text-emerald-700 dark:text-emerald-300 text-[10.5px] truncate">
-                      {selectedPatient.authStatus || 'Approved (Exp: 12 Oct 2026)'}
-                    </p>
-                    <p className="text-[9.5px] font-bold text-amber-800 dark:text-amber-300 truncate" title={selectedPatient.nextRequiredAction || 'Capture 3D scan & submit l-code auth'}>
-                      Next: {selectedPatient.nextRequiredAction || 'Capture 3D scan & submit l-code auth'}
-                    </p>
-                  </div>
-
-                  {/* 4. Visits, Allergies & Safety */}
-                  <div className="bg-surface-container-lowest p-2.5 rounded-xl border border-surface-container-highest/30 space-y-1">
-                    <span className="text-[9px] font-black uppercase text-secondary tracking-wider block">Visits &amp; Clinical Safety</span>
-                    <div className="flex justify-between items-center text-[10px] font-semibold text-on-surface-variant">
-                      <span>Last: {selectedPatient.lastVisit || '15 May 2026'}</span>
-                      <span>Next: {selectedPatient.nextAppointment || 'Today 2:00 PM'}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[9.5px]">
-                      <span className="text-red-600 dark:text-red-400 font-bold flex items-center gap-0.5">
-                        <span className="material-symbols-outlined text-[10px]">warning</span>
-                        {selectedPatient.allergies?.join(', ') || 'No Allergies'}
-                      </span>
-                      <span className="text-on-surface-variant/80 font-medium">
-                        {selectedPatient.communicationPreference || 'SMS Text'}
-                      </span>
-                    </div>
-                  </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-surface-container-highest rounded-xl border border-surface-container-highest overflow-hidden bg-surface-container-low/35">
+                <div className="px-3 py-2.5 min-w-0">
+                  <span className="block text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Diagnosis</span>
+                  <p className="mt-0.5 text-[11px] font-bold text-on-surface truncate" title={selectedPatient.diagnosis || 'Post-tibial tendon dysfunction / Pes Planus'}>
+                    {selectedPatient.diagnosis || 'Post-tibial tendon dysfunction / Pes Planus'}
+                  </p>
+                  <span className="text-[10px] text-primary font-semibold">{selectedPatient.affectedSide || 'Left'} side</span>
                 </div>
-
-                {/* O&P Care Stage Pipeline Stepper */}
-                <div>
-                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-wider text-on-surface-variant mb-1.5 px-1">
-                    <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs text-primary">route</span>
-                      Clinic Floor Stage Pipeline
-                    </span>
-                    <span className="text-primary font-bold">Click stage button to advance workflow</span>
-                  </div>
-
-                  <div className="grid grid-cols-3 sm:grid-cols-9 gap-1 text-[9.5px] font-bold text-center select-none">
-                    {[
-                      'Referral',
-                      'Evaluation',
-                      'Authorization',
-                      'Casting/scan',
-                      'Fabrication',
-                      'Fitting',
-                      'Delivery',
-                      'Follow-up',
-                      'Closed'
-                    ].map((stage, idx) => {
-                      const currentStageName = selectedPatient.careStage || selectedPatient.status;
-                      const isCurrent = currentStageName.toLowerCase().includes(stage.toLowerCase());
-                      
-                      return (
-                        <button
-                          key={stage}
-                          onClick={async () => {
-                            await onUpdatePatient(selectedPatient.id, {
-                              careStage: stage as any,
-                              status: stage === 'Referral' ? 'New Referral' : stage === 'Authorization' ? 'Auth Pending' : stage === 'Fabrication' ? 'Fabrication' : stage === 'Closed' ? 'Archived' : 'In Progress'
-                            });
-                          }}
-                          className={`py-1 px-1 rounded-lg border transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
-                            isCurrent
-                              ? 'bg-primary text-white border-primary shadow-xs font-black ring-2 ring-primary/30'
-                              : 'bg-surface-container-lowest text-on-surface-variant/70 border-surface-container-highest/30 hover:bg-surface-container hover:text-on-surface'
-                          }`}
-                        >
-                          <span className="truncate w-full">{idx + 1}. {stage}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                <div className="px-3 py-2.5 min-w-0">
+                  <span className="block text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Device</span>
+                  <p className="mt-0.5 text-[11px] font-bold text-on-surface truncate">{selectedPatient.deviceCategory || 'Custom Foot Orthosis'}</p>
+                  <span className="text-[10px] text-on-surface-variant">{selectedPatient.fabricationOwner || 'Tech Mike'}</span>
+                </div>
+                <div className="px-3 py-2.5 min-w-0 border-t lg:border-t-0 border-surface-container-highest">
+                  <span className="block text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Coverage</span>
+                  <p className="mt-0.5 text-[11px] font-bold text-on-surface truncate">{selectedPatient.insuranceCompany || 'Medicare Blue Cross'}</p>
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold">{selectedPatient.authStatus || 'Approved'}</span>
+                </div>
+                <div className="px-3 py-2.5 min-w-0 border-t lg:border-t-0 border-surface-container-highest">
+                  <span className="block text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Care stage</span>
+                  <select
+                    aria-label="Care stage"
+                    value={selectedPatient.careStage || 'Evaluation'}
+                    onChange={async (event) => {
+                      const stage = event.target.value;
+                      await onUpdatePatient(selectedPatient.id, {
+                        careStage: stage as any,
+                        status: stage === 'Referral' ? 'New Referral' : stage === 'Authorization' ? 'Auth Pending' : stage === 'Fabrication' ? 'Fabrication' : stage === 'Closed' ? 'Archived' : 'In Progress'
+                      });
+                    }}
+                    className="mt-0.5 w-full bg-transparent text-[11px] font-bold text-on-surface outline-none cursor-pointer"
+                  >
+                    {['Referral', 'Evaluation', 'Authorization', 'Casting/scan', 'Fabrication', 'Fitting', 'Delivery', 'Follow-up', 'Closed'].map(stage => (
+                      <option key={stage} value={stage}>{stage}</option>
+                    ))}
+                  </select>
+                  <span className={`text-[10px] font-medium ${selectedPatient.allergies?.length ? 'text-red-600 dark:text-red-400' : 'text-on-surface-variant'}`}>
+                    {selectedPatient.allergies?.length ? selectedPatient.allergies.join(', ') : 'No known allergies'}
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* Profile Tab Navigation */}
-            <nav className="px-6 flex gap-1 border-b border-surface-container-highest bg-surface-container-lowest shrink-0 overflow-x-auto select-none">
+            <nav className="px-4 flex gap-1 border-b border-surface-container-highest bg-surface-container-lowest shrink-0 overflow-x-auto select-none" aria-label="Patient profile sections">
               {[
-                { id: 'timeline', label: 'Overview / Timeline' },
-                { id: 'info', label: 'Clinical & Info' },
-                { id: 'appointments', label: 'Appointments' },
-                { id: 'documents', label: 'Documents' },
-                { id: 'authorization', label: 'Prior Auth' },
-                { id: 'billing', label: 'Billing Claims' },
-                { id: 'notes', label: 'Clinical Notes' }
+                { id: 'timeline', label: 'Overview', icon: 'space_dashboard' },
+                { id: 'info', label: 'Clinical', icon: 'clinical_notes' },
+                { id: 'appointments', label: 'Visits', icon: 'calendar_month' },
+                { id: 'documents', label: 'Files', icon: 'folder_open' },
+                { id: 'authorization', label: 'Auth', icon: 'verified_user' },
+                { id: 'billing', label: 'Billing', icon: 'receipt_long' },
+                { id: 'notes', label: 'Notes', icon: 'edit_note' }
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveProfileTab(tab.id)}
-                  className={`px-4 py-3 font-extrabold text-xs tracking-wide transition-colors border-b-2 whitespace-nowrap cursor-pointer ${
+                  className={`px-3 py-2.5 font-bold text-[11px] transition-colors border-b-2 whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
                     activeProfileTab === tab.id
                       ? 'border-primary text-primary bg-primary/5'
                       : 'border-transparent text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
                   }`}
                 >
+                  <span className="material-symbols-outlined text-sm">{tab.icon}</span>
                   {tab.label}
                 </button>
               ))}
             </nav>
 
             {/* Tab Body */}
-            <div className="flex-1 overflow-y-auto p-6 bg-surface">
+            <div className="flex-1 overflow-y-auto p-4 md:p-5 bg-surface">
               {activeProfileTab === 'timeline' || activeProfileTab === 'story' ? (
                 <PatientTimeline
                   patient={selectedPatient}

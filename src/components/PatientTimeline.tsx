@@ -456,27 +456,18 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto animate-fade-in">
+    <div className="space-y-4 max-w-none animate-fade-in">
       {/* 1. TOP HIGH-PRIORITY ACTION ITEMS BANNER (Color-coded O&P Badges) */}
       {highPriorityItems.length > 0 && (
-        <div className="bg-surface-container-lowest border-2 border-amber-500/30 rounded-3xl p-5 shadow-xs space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-surface-container pb-3">
+        <div className="bg-amber-50/60 dark:bg-amber-950/15 border border-amber-500/25 rounded-2xl p-3.5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 flex items-center justify-center font-black">
-                <span className="material-symbols-outlined text-lg">priority_high</span>
+              <span className="w-7 h-7 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 flex items-center justify-center">
+                <span className="material-symbols-outlined text-base">priority_high</span>
               </span>
-              <div>
-                <h3 className="text-xs font-black text-on-surface uppercase tracking-wider">
-                  High-Priority Workflow Alerts ({highPriorityItems.length})
-                </h3>
-                <p className="text-[11px] text-on-surface-variant font-medium">
-                  Actions requiring clinical or administrative intervention for {patient.name}.
-                </p>
-              </div>
+              <h3 className="text-xs font-bold text-on-surface">Needs attention</h3>
             </div>
-            <span className="text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200 px-3 py-1 rounded-full border border-amber-300/40">
-              O&amp;P Action Required
-            </span>
+            <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300">{highPriorityItems.length} open</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -484,7 +475,7 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
               <div
                 key={item.id}
                 onClick={() => onNavigateTab(item.tabTarget)}
-                className="p-3 bg-surface rounded-2xl border border-surface-container hover:border-secondary transition-all cursor-pointer flex flex-col justify-between space-y-2 group"
+                className="p-3 bg-surface-container-lowest rounded-xl border border-amber-500/15 hover:border-amber-500/40 transition-all cursor-pointer flex flex-col justify-between space-y-2 group"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5">
@@ -512,8 +503,8 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between text-[10px] font-bold text-secondary pt-1 border-t border-surface-container/40">
-                  <span>Open Details</span>
+                <div className="flex items-center justify-between text-[10px] font-bold text-secondary pt-1">
+                  <span>Review</span>
                   <span className="material-symbols-outlined text-xs group-hover:translate-x-1 transition-transform">arrow_forward</span>
                 </div>
               </div>
@@ -523,59 +514,52 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
       )}
 
       {/* 2. MODE NAVIGATION & SEARCH BAR */}
-      <div className="bg-surface-container-low p-4 rounded-3xl border border-surface-container-highest/40 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-black text-on-surface">
-              Patient Care Feed &amp; Clinical Media
-            </h2>
+      <div className="bg-surface-container-lowest p-3 rounded-xl border border-surface-container-highest/50 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+            <h2 className="text-sm font-bold text-on-surface">Activity</h2>
             {uploadStats && (
-              <span className="text-[9.5px] font-extrabold px-2.5 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded-full border border-emerald-300">
-                ✨ Last Compression: -{uploadStats.savingsPercentage}%
+              <span className="text-[9.5px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded-full">
+                {uploadStats.savingsPercentage}% smaller
               </span>
             )}
-          </div>
-          <p className="text-[11px] text-on-surface-variant font-semibold mt-0.5">
-            Unified story feed and compressed casting photo &amp; 3D scan repository.
-          </p>
         </div>
 
         {/* View Switcher Tabs */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center bg-surface-container-lowest p-1 rounded-2xl border border-surface-container-highest/50 shadow-2xs">
+          <div className="flex items-center bg-surface-container-low p-1 rounded-xl">
             <button
               onClick={() => setActiveViewMode('stream')}
-              className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeViewMode === 'stream'
                   ? 'bg-secondary text-white shadow-xs'
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
               <span className="material-symbols-outlined text-sm">history_edu</span>
-              Timeline Feed
+              Timeline
             </button>
             <button
               onClick={() => setActiveViewMode('gallery')}
-              className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeViewMode === 'gallery'
                   ? 'bg-secondary text-white shadow-xs'
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
               <span className="material-symbols-outlined text-sm">photo_library</span>
-              Casting &amp; Scans Gallery
-              <span className="ml-1 px-1.5 py-0.2 bg-white/20 text-white text-[9px] rounded-full font-bold">
+              Media
+              <span className="ml-0.5 px-1.5 py-0.5 bg-black/10 dark:bg-white/15 text-current text-[9px] rounded-full font-bold">
                 {aggregatedMedia.length}
               </span>
             </button>
           </div>
 
           {/* Quick Upload Button */}
-          <label className="px-3.5 py-2 bg-primary/10 hover:bg-primary text-primary hover:text-white text-xs font-bold rounded-2xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs border border-primary/20">
+          <label className="px-3 py-2 bg-primary text-white text-[11px] font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer hover:bg-primary-container">
             <span className="material-symbols-outlined text-sm">
               {isUploadingImage ? 'sync' : 'add_a_photo'}
             </span>
-            <span>{isUploadingImage ? 'Compressing...' : 'Upload Media'}</span>
+            <span>{isUploadingImage ? 'Uploading…' : 'Add file'}</span>
             <input
               type="file"
               accept="image/*,.stl,.pdf"
@@ -589,28 +573,22 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
 
       {/* 3. VIEW MODE A: CASTING & SCANS GALLERY VIEW */}
       {activeViewMode === 'gallery' && (
-        <div className="space-y-5 animate-fade-in">
+        <div className="space-y-4 animate-fade-in">
           {/* Gallery Filter & Summary Header */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-surface-container-lowest p-4 rounded-2xl border border-surface-container-highest/40">
-            <div className="flex items-center gap-2 text-xs font-black text-on-surface">
-              <span className="material-symbols-outlined text-primary">filter_alt</span>
-              Filter Gallery Category:
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
               {(['all', 'casting', 'scan', 'document'] as const).map(cat => (
                 <button
                   key={cat}
                   onClick={() => setGalleryFilter(cat)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer capitalize ${
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer capitalize ${
                     galleryFilter === cat
                       ? 'bg-primary text-white shadow-2xs'
                       : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
                   }`}
                 >
-                  {cat === 'all' ? 'All Media & Attachments' : cat === 'casting' ? 'Casting Photos' : cat === 'scan' ? '3D Laser Scans' : 'Documents'}
+                  {cat === 'all' ? 'All' : cat === 'casting' ? 'Casting' : cat === 'scan' ? '3D scans' : 'Documents'}
                 </button>
               ))}
-            </div>
           </div>
 
           {/* Media Grid */}
@@ -625,7 +603,7 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
                 <div
                   key={media.id}
                   onClick={() => setLightboxIndex(idx)}
-                  className="bg-surface-container-lowest rounded-2xl border border-surface-container-highest/60 overflow-hidden shadow-xs hover:shadow-md hover:border-secondary transition-all cursor-pointer group flex flex-col justify-between"
+                  className="bg-surface-container-lowest rounded-xl border border-surface-container-highest/60 overflow-hidden hover:border-secondary transition-all cursor-pointer group flex flex-col justify-between"
                 >
                   {/* Image Preview Container */}
                   <div className="relative aspect-4/3 bg-surface-container-high overflow-hidden">
@@ -654,7 +632,7 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
                   </div>
 
                   {/* Metadata Breakdown */}
-                  <div className="p-3.5 space-y-2">
+                  <div className="p-3 space-y-1.5">
                     <h4 className="text-xs font-extrabold text-on-surface truncate group-hover:text-secondary transition-colors" title={media.name}>
                       {media.name}
                     </h4>
@@ -680,8 +658,8 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
       {activeViewMode === 'stream' && (
         <div className="space-y-6">
           {/* Category Filter & Log Action Header Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-surface-container-low p-4 rounded-2xl border border-surface-container-highest/40 shadow-2xs">
-            <div className="flex flex-wrap items-center gap-1 bg-surface-container-lowest p-1 rounded-2xl border border-surface-container-highest/40 text-[10.5px] font-bold overflow-x-auto">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1 text-[10.5px] font-bold overflow-x-auto">
               {(['all', 'visits', 'notes', 'orders', 'auth', 'fabrication', 'documents'] as const).map(cat => (
                 <button
                   key={cat}
@@ -692,17 +670,17 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
                       : 'text-on-surface-variant hover:text-on-surface'
                   }`}
                 >
-                  {cat === 'all' ? 'All Care Activity' : cat}
+                  {cat === 'all' ? 'All' : cat}
                 </button>
               ))}
             </div>
 
             <button
               onClick={() => setShowAddModal(true)}
-              className="px-4 py-2 bg-secondary text-white text-xs font-bold rounded-2xl hover:bg-secondary/90 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-3 py-2 bg-secondary text-white text-[11px] font-bold rounded-lg hover:bg-secondary/90 transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <span className="material-symbols-outlined text-sm">post_add</span>
-              Log Timeline Entry
+              Add note
             </button>
           </div>
 
