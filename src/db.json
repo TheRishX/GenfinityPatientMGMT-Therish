@@ -138,105 +138,9 @@
       "files": []
     }
   ],
-  "appointments": [
-    {
-      "id": "a1",
-      "patientName": "John Smith",
-      "time": "09:00 AM",
-      "type": "Initial Evaluation - AFO",
-      "status": "Checked In",
-      "initials": "JS"
-    },
-    {
-      "id": "a2",
-      "patientName": "Emma Watson",
-      "time": "11:30 AM",
-      "type": "Fitting & Delivery",
-      "status": "Scheduled",
-      "initials": "EW"
-    },
-    {
-      "id": "a3",
-      "patientName": "Marcus Thorne",
-      "time": "01:00 PM",
-      "type": "Follow-up Alignment Check",
-      "status": "Scheduled",
-      "initials": "MT"
-    },
-    {
-      "id": "a4",
-      "patientName": "Elena Rodriguez",
-      "time": "03:30 PM",
-      "type": "AFO Adjustment",
-      "status": "Scheduled",
-      "initials": "ER"
-    }
-  ],
-  "authorizations": [
-    {
-      "id": "au1",
-      "patientName": "Sarah Jenkins",
-      "device": "AFO - Right Ankle",
-      "status": "Pending",
-      "submittedDate": "Oct 12, 2023",
-      "daysWaiting": 14,
-      "payer": "BlueCross BlueShield",
-      "notes": "Initial claim submittal. Patient has prior auth history with BCBS."
-    },
-    {
-      "id": "au2",
-      "patientName": "Marcus Thorne",
-      "device": "Trans-tibial Prosthesis",
-      "status": "Approved",
-      "submittedDate": "Oct 20, 2023",
-      "daysWaiting": 6,
-      "payer": "Medicare",
-      "authNumber": "A-99231",
-      "notes": "LMN signed and loaded. Approved on first review."
-    },
-    {
-      "id": "au3",
-      "patientName": "Elena Rodriguez",
-      "device": "Custom KAFO",
-      "status": "Pending",
-      "submittedDate": "Oct 24, 2023",
-      "daysWaiting": 2,
-      "payer": "Aetna",
-      "notes": "Awaiting Response"
-    }
-  ],
-  "claims": [
-    {
-      "id": "c1",
-      "claimNumber": "INV-2023-0891",
-      "patientName": "Sarah Jenkins",
-      "payer": "Medicare",
-      "doctor": "Dr. Sarah Jenkins",
-      "amount": 2450,
-      "date": "Oct 25",
-      "status": "Billed"
-    },
-    {
-      "id": "c2",
-      "claimNumber": "INV-2023-0890",
-      "patientName": "David Chen",
-      "payer": "BlueCross",
-      "doctor": "Dr. David Chen",
-      "amount": 1120,
-      "date": "Oct 24",
-      "status": "Billed"
-    },
-    {
-      "id": "c3",
-      "claimNumber": "INV-2023-0889",
-      "patientName": "Robert Vance",
-      "payer": "Aetna",
-      "doctor": "Dr. Robert Vance",
-      "amount": 3800,
-      "date": "Oct 22",
-      "status": "Billed"
-    }
-  ],
+  "appointments": [],
+  "authorizations": [],
+  "claims": [],
   "settings": {
     "clinicName": "Genfinity O&P",
     "primaryAddress": "123 Prosthetics Way, Suite 400",
@@ -254,7 +158,8 @@
       "stage": "Thermoforming",
       "priority": "Standard",
       "techNotes": "Vacuum pressure looks stable. Cast corrected +1deg dorsiflexion.",
-      "updatedAt": "Oct 26"
+      "updatedAt": "Oct 26",
+      "patientId": "p4"
     },
     {
       "id": "fab2",
@@ -263,7 +168,8 @@
       "stage": "Layout",
       "priority": "Urgent",
       "techNotes": "Needs custom carbon fiber reinforcement layout.",
-      "updatedAt": "Oct 26"
+      "updatedAt": "Oct 26",
+      "patientId": "p3"
     },
     {
       "id": "fab3",
@@ -272,7 +178,8 @@
       "stage": "Assembly",
       "priority": "Standard",
       "techNotes": "Becker joints checked and lubricated. Ready for final straps.",
-      "updatedAt": "Oct 25"
+      "updatedAt": "Oct 25",
+      "patientId": "p1"
     }
   ],
   "alerts": [
