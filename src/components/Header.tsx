@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabaseClient } from '../utils/supabaseClient';
 import { Appointment, AlertItem } from '../types';
 
 interface HeaderProps {
@@ -29,7 +28,7 @@ export default function Header({
   onAlertAction,
   onDismissAlert
 }: HeaderProps) {
-  const [supabaseConnected, setSupabaseConnected] = useState<boolean | null>(null);
+  const [hostingerReady, setHostingerReady] = useState<boolean | null>(null);
   const [latency, setLatency] = useState<number | null>(null);
   const [isChecking, setIsChecking] = useState(false);
 
@@ -40,39 +39,19 @@ export default function Header({
   const checkStatus = async () => {
     setIsChecking(true);
     try {
-      const res = await fetch('/api/supabase-status');
+      const res = await fetch('/api/hostinger-status');
       const contentType = res.headers.get('content-type');
       if (res.ok && contentType && contentType.includes('application/json')) {
         const data = await res.json();
-        setSupabaseConnected(!!data.connected);
+        setHostingerReady(!!data.ready);
         if (data.latencyMs !== undefined) {
           setLatency(data.latencyMs);
         }
       } else {
-        const startTime = Date.now();
-        const { data, error } = await supabaseClient.from('clinic_settings').select('clinic_name').limit(1);
-        const latencyMs = Date.now() - startTime;
-        if (!error) {
-          setSupabaseConnected(true);
-          setLatency(latencyMs);
-        } else {
-          setSupabaseConnected(false);
-        }
+        setHostingerReady(false);
       }
     } catch (err) {
-      try {
-        const startTime = Date.now();
-        const { data, error } = await supabaseClient.from('clinic_settings').select('clinic_name').limit(1);
-        const latencyMs = Date.now() - startTime;
-        if (!error) {
-          setSupabaseConnected(true);
-          setLatency(latencyMs);
-        } else {
-          setSupabaseConnected(false);
-        }
-      } catch (clientErr) {
-        setSupabaseConnected(false);
-      }
+      setHostingerReady(false);
     } finally {
       setIsChecking(false);
     }
@@ -112,18 +91,18 @@ export default function Header({
     const list: { id: string; title: string; message: string; type: 'appointment' | 'alert' | 'system'; timeText?: string; rawAlert?: AlertItem }[] = [];
 
     // 1. Database Connection Notification
-    if (isOfflineMode || supabaseConnected === false) {
+    if (isOfflineMode || hostingerReady === false) {
       list.push({
         id: 'sys_offline',
-        title: 'Local Sandboxed Fallback Active',
-        message: 'Your system is operating securely in offline fallback mode with local storage synchronization.',
+        title: 'Local Fallback Active',
+        message: 'The portal is usable now. Hostinger API or private storage readiness still needs attention.',
         type: 'system'
       });
-    } else if (supabaseConnected) {
+    } else if (hostingerReady) {
       list.push({
         id: 'sys_online',
-        title: 'Cloud Synced Successfully',
-        message: `Connected securely to Supabase. Latency is ${latency || 12}ms.`,
+        title: 'Hostinger Backend Ready',
+        message: `Connected through the server API with private storage checks active. Latency is ${latency || 12}ms.`,
         type: 'system'
       });
     }

@@ -198,7 +198,7 @@ export default function DashboardView({
             <div className="space-y-2">
               <input
                 type="text"
-                value={getLabel('operations_header_title', 'Operations Today')}
+                value={getLabel('operations_header_title', 'Overview')}
                 onChange={(e) => onUpdateLabel?.('operations_header_title', e.target.value)}
                 className="bg-surface border border-primary text-3xl font-extrabold text-primary tracking-tight px-2 py-0.5 rounded outline-none"
               />
@@ -207,10 +207,10 @@ export default function DashboardView({
             <>
               <h2 className="text-3xl font-extrabold text-primary tracking-tight flex items-center gap-3">
                 <span className="material-symbols-outlined text-3xl text-secondary">speed</span>
-                {getLabel('operations_header_title', 'Operations Today')}
+                {getLabel('operations_header_title', 'Overview')}
               </h2>
               <p className="text-sm font-semibold text-on-surface-variant opacity-85 mt-1">
-                Real-time clinic floor, today's schedule, action queue, patient flow, and active cases
+                Urgent patients, today's schedule, overdue actions, deliveries due, and the prioritized work queue
               </p>
             </>
           )}
@@ -219,18 +219,11 @@ export default function DashboardView({
         {/* Quick Jump Controls */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => onNavigateToTab('reports')}
-            className="px-4 py-2 bg-surface-container-high hover:bg-surface-container text-on-surface font-bold text-xs rounded-full border border-surface-container-highest/60 flex items-center gap-2 transition-all cursor-pointer shadow-2xs"
-          >
-            <span className="material-symbols-outlined text-sm text-secondary">bar_chart</span>
-            View Reports Page
-          </button>
-          <button
             onClick={() => onNavigateToTab('appointments')}
             className="px-4 py-2 bg-primary text-white font-bold text-xs rounded-full flex items-center gap-2 hover:bg-primary-container transition-all cursor-pointer shadow-2xs"
           >
             <span className="material-symbols-outlined text-sm">calendar_month</span>
-            Full Schedule ({todayAppointmentsCount})
+            Schedule ({todayAppointmentsCount})
           </button>
         </div>
       </div>

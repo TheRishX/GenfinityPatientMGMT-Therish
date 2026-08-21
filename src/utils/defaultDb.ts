@@ -587,7 +587,7 @@ export const DEFAULT_DATABASE: DatabaseSchema = {
     primaryAddress: '123 Prosthetics Way, Suite 400',
     contactPhone: '(555) 123-4567',
     supportEmail: 'support@genfinity.com',
-    requirePin: true,
+    requirePin: false,
     pinCode: '1234',
     appearance: 'light'
   },

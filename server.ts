@@ -5,12 +5,12 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import nodemailer from 'nodemailer';
 import { DatabaseSchema, Patient, PatientFile, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem, SmtpConfig, EmailTemplate, EmailLog } from './src/types.js';
-import { supabase, reloadSupabaseConfig, getActiveConfig } from './src/utils/supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DB_PATH = path.join(__dirname, 'src', 'db.json');
+const PRIVATE_STORAGE_PATH = process.env.PRIVATE_STORAGE_PATH || path.resolve(__dirname, '..', 'private-clinic-storage');
 
 // Helper to generate initials
 const getInitials = (name: string): string => {
@@ -598,55 +598,6 @@ Billing & Patient Accounts
     ];
   }
 
-  try {
-    // A. Fetch Clinic Settings from Supabase
-    const { data: sData, error: sErr } = await supabase.from('clinic_settings').select('*').single();
-    if (sData && !sErr) {
-      db.settings.clinicName = sData.clinic_name || db.settings.clinicName;
-      db.settings.primaryAddress = sData.clinic_address || db.settings.primaryAddress;
-      db.settings.contactPhone = sData.clinic_phone || db.settings.contactPhone;
-      db.settings.supportEmail = sData.clinic_email || db.settings.supportEmail;
-    }
-
-    // B. Fetch Patients from Supabase
-    const { data: pData, error: pErr } = await supabase.from('patients').select('*').order('created_at', { ascending: false });
-    if (pData && !pErr) {
-      db.patients = pData.map((sp: any) => ({
-        id: sp.id,
-        name: sp.name || '',
-        phone: sp.phone || '',
-        dob: sp.dob || '',
-        email: sp.email || '',
-        referralSource: sp.referral_source || 'other',
-        status: sp.status || 'In Progress',
-        mrn: sp.notes || '#0000-XX',
-        avatarInitials: getInitials(sp.name || 'P'),
-        files: sp.documents?.files || [],
-        insuranceCompany: sp.auth_info?.insurance_company || '',
-        insuranceId: sp.auth_info?.insurance_id || '',
-        address: sp.auth_info?.address || '',
-        gender: sp.auth_info?.gender || 'Not specified',
-        clinicalNotes: sp.auth_info?.clinical_notes || [],
-        avatarUrl: sp.auth_info?.avatar_url || ''
-      }));
-    }
-
-    // C. Fetch Appointments from Supabase
-    const { data: aData, error: aErr } = await supabase.from('appointments').select('*').order('appt_date', { ascending: true });
-    if (aData && !aErr) {
-      db.appointments = aData.map((sa: any) => ({
-        id: sa.id,
-        patientName: sa.patient_name || '',
-        time: sa.appt_time || '09:00 AM',
-        type: sa.type || 'Consultation',
-        status: sa.status || 'Scheduled',
-        initials: getInitials(sa.patient_name || 'A'),
-        date: sa.appt_date || ''
-      }));
-    }
-  } catch (supErr) {
-    console.error('Supabase read synchronization failed:', supErr);
-  }
 
   return db;
 }
@@ -658,70 +609,35 @@ async function writeDatabase(db: DatabaseSchema): Promise<void> {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // API Routes
-  // Supabase Real-Time Status & Config Checkers
-  app.get('/api/supabase-status', async (req, res) => {
+  app.get('/api/hostinger-status', async (req, res) => {
     try {
       const startTime = Date.now();
-      const { data, error } = await supabase.from('clinic_settings').select('clinic_name').limit(1);
+      await fs.mkdir(PRIVATE_STORAGE_PATH, { recursive: true });
+      const probePath = path.join(PRIVATE_STORAGE_PATH, `.genfinity_probe_${process.pid}.txt`);
+      const probeValue = `ok:${Date.now()}`;
+      await fs.writeFile(probePath, probeValue, 'utf-8');
+      const readBack = await fs.readFile(probePath, 'utf-8');
+      await fs.unlink(probePath);
       const latencyMs = Date.now() - startTime;
-      
-      if (error) {
-        return res.json({
-          connected: false,
-          error: error.message,
-          latencyMs
-        });
-      }
-      
       res.json({
-        connected: true,
+        ready: readBack === probeValue,
         latencyMs,
-        details: data
+        runtime: process.version,
+        privateStoragePath: PRIVATE_STORAGE_PATH,
+        issues: readBack === probeValue ? [] : ['Private storage probe readback mismatch']
       });
     } catch (err: any) {
       res.json({
-        connected: false,
-        error: err.message
+        ready: false,
+        issues: [err.message],
+        privateStoragePath: PRIVATE_STORAGE_PATH
       });
-    }
-  });
-
-  app.get('/api/supabase-config', (req, res) => {
-    try {
-      const config = getActiveConfig();
-      res.json(config);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  app.post('/api/supabase-config', async (req, res) => {
-    try {
-      const { url, key } = req.body;
-      if (!url || !key) {
-        return res.status(400).json({ error: 'Both URL and Publishable Key are required' });
-      }
-      
-      // Update config
-      reloadSupabaseConfig(url, key);
-      
-      // Perform immediate validation test
-      const { error } = await supabase.from('clinic_settings').select('clinic_name').limit(1);
-      
-      res.json({
-        success: true,
-        message: 'Supabase configuration updated successfully',
-        connected: !error,
-        error: error ? error.message : null
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
     }
   });
 
@@ -961,49 +877,39 @@ Clinical Portal Support Team`;
       }
 
       const generatedMrn = generateMRN();
-
-      // Insert directly into live Supabase patients table!
-      const { data: newSupPatient, error } = await supabase.from('patients').insert({
+      const db = await readDatabase();
+      const newPatient: Patient = {
+        id: `p_${Date.now()}`,
         name,
         phone: phone || '',
         dob: dob || '',
         email: email || '',
-        referral_source: referralSource || 'other',
+        referralSource: referralSource || 'other',
         status: status || 'In Progress',
-        notes: generatedMrn, // Store MRN here
-        documents: { files: [] },
-        auth_info: { insurance_company: '' },
-        billing: { date: '', amount: 0, status: '' },
-        pinned_flag: false
-      }).select().single();
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      // Automatically schedule a consult appointment if patient is in Consultation stage
-      if (status === 'Consultation') {
-        const { error: apptErr } = await supabase.from('appointments').insert({
-          patient_name: name,
-          appt_time: '02:00 PM',
-          type: 'Initial Consult',
-          status: 'Scheduled'
-        });
-        if (apptErr) console.error('Auto appointment insert failed:', apptErr.message);
-      }
-
-      res.status(201).json({
-        id: newSupPatient.id,
-        name: newSupPatient.name,
-        phone: newSupPatient.phone,
-        dob: newSupPatient.dob,
-        email: newSupPatient.email,
-        referralSource: newSupPatient.referral_source,
-        status: newSupPatient.status,
         mrn: generatedMrn,
-        avatarInitials: getInitials(newSupPatient.name),
-        files: []
-      });
+        avatarInitials: getInitials(name),
+        files: [],
+        insuranceCompany: '',
+        insuranceId: '',
+        address: '',
+        gender: 'Not specified',
+        clinicalNotes: []
+      };
+      db.patients.unshift(newPatient);
+
+      if (status === 'Consultation') {
+        db.appointments.unshift({
+          id: `a_${Date.now()}`,
+          patientName: name,
+          time: '02:00 PM',
+          type: 'Initial Consult',
+          status: 'Scheduled',
+          initials: getInitials(name)
+        });
+      }
+
+      await writeDatabase(db);
+      res.status(201).json(newPatient);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1015,33 +921,26 @@ Clinical Portal Support Team`;
       const { id } = req.params;
       const { status } = req.body;
 
-      const { data: updatedPatient, error } = await supabase
-        .from('patients')
-        .update({ status })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(error.message);
+      const db = await readDatabase();
+      const updatedPatient = db.patients.find(p => p.id === id);
+      if (!updatedPatient) {
+        return res.status(404).json({ error: 'Patient not found' });
       }
+      updatedPatient.status = status;
 
-      // If transition to "Consultation", auto-schedule appointment in Supabase
       if (status === 'Consultation') {
-        const { error: apptErr } = await supabase.from('appointments').insert({
-          patient_name: updatedPatient.name,
-          appt_time: '02:00 PM',
+        db.appointments.unshift({
+          id: `a_${Date.now()}`,
+          patientName: updatedPatient.name,
+          time: '02:00 PM',
           type: 'Initial Consult',
-          status: 'Scheduled'
+          status: 'Scheduled',
+          initials: getInitials(updatedPatient.name)
         });
-        if (apptErr) console.error('Auto appointment transition insert failed:', apptErr.message);
       }
 
-      res.json({
-        id: updatedPatient.id,
-        name: updatedPatient.name,
-        status: updatedPatient.status
-      });
+      await writeDatabase(db);
+      res.json(updatedPatient);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1053,66 +952,34 @@ Clinical Portal Support Team`;
       const { id } = req.params;
       const { name, phone, dob, email, referralSource, status, insuranceCompany, insuranceId, address, gender, clinicalNotes, avatarUrl } = req.body;
 
-      // Fetch current row to merge auth_info properly
-      const { data: patient, error: fetchErr } = await supabase.from('patients').select('*').eq('id', id).single();
-      if (fetchErr || !patient) {
+      const db = await readDatabase();
+      const patient = db.patients.find(p => p.id === id);
+      if (!patient) {
         return res.status(404).json({ error: 'Patient not found' });
       }
 
-      const updatedAuthInfo = {
-        ...(patient.auth_info || {}),
-        ...(insuranceCompany !== undefined ? { insurance_company: insuranceCompany } : {}),
-        ...(insuranceId !== undefined ? { insurance_id: insuranceId } : {}),
-        ...(address !== undefined ? { address } : {}),
-        ...(gender !== undefined ? { gender } : {}),
-        ...(clinicalNotes !== undefined ? { clinical_notes: clinicalNotes } : {}),
-        ...(avatarUrl !== undefined ? { avatar_url: avatarUrl } : {})
-      };
+      if (name !== undefined) patient.name = name;
+      if (phone !== undefined) patient.phone = phone;
+      if (dob !== undefined) patient.dob = dob;
+      if (email !== undefined) patient.email = email;
+      if (referralSource !== undefined) patient.referralSource = referralSource;
+      if (status !== undefined) patient.status = status;
+      if (insuranceCompany !== undefined) patient.insuranceCompany = insuranceCompany;
+      if (insuranceId !== undefined) patient.insuranceId = insuranceId;
+      if (address !== undefined) patient.address = address;
+      if (gender !== undefined) patient.gender = gender;
+      if (clinicalNotes !== undefined) patient.clinicalNotes = clinicalNotes;
+      if (avatarUrl !== undefined) patient.avatarUrl = avatarUrl;
+      patient.avatarInitials = getInitials(patient.name);
 
-      const updatePayload: any = {};
-      if (name !== undefined) updatePayload.name = name;
-      if (phone !== undefined) updatePayload.phone = phone;
-      if (dob !== undefined) updatePayload.dob = dob;
-      if (email !== undefined) updatePayload.email = email;
-      if (referralSource !== undefined) updatePayload.referral_source = referralSource;
-      if (status !== undefined) updatePayload.status = status;
-      updatePayload.auth_info = updatedAuthInfo;
-
-      const { data: updatedPatient, error: updateErr } = await supabase
-        .from('patients')
-        .update(updatePayload)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (updateErr) {
-        throw new Error(updateErr.message);
-      }
-
-      res.json({
-        id: updatedPatient.id,
-        name: updatedPatient.name,
-        phone: updatedPatient.phone,
-        dob: updatedPatient.dob,
-        email: updatedPatient.email,
-        referralSource: updatedPatient.referral_source,
-        status: updatedPatient.status,
-        mrn: updatedPatient.notes || '#0000-XX',
-        avatarInitials: getInitials(updatedPatient.name),
-        files: updatedPatient.documents?.files || [],
-        insuranceCompany: updatedPatient.auth_info?.insurance_company || '',
-        insuranceId: updatedPatient.auth_info?.insurance_id || '',
-        address: updatedPatient.auth_info?.address || '',
-        gender: updatedPatient.auth_info?.gender || 'Not specified',
-        clinicalNotes: updatedPatient.auth_info?.clinical_notes || [],
-        avatarUrl: updatedPatient.auth_info?.avatar_url || ''
-      });
+      await writeDatabase(db);
+      res.json(patient);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // 3b. Add Appointment in Supabase
+  // 3b. Add Appointment
   app.post('/api/appointments', async (req, res) => {
     try {
       const { patientName, time, type, status, appt_date } = req.body;
@@ -1120,34 +987,23 @@ Clinical Portal Support Team`;
         return res.status(400).json({ error: 'Patient name is required' });
       }
 
-      const { data, error } = await supabase.from('appointments').insert({
-        patient_name: patientName,
-        appt_time: time || '09:00 AM',
+      const db = await readDatabase();
+      const newAppointment: Appointment = {
+        id: `a_${Date.now()}`,
+        patientName,
+        time: time || '09:00 AM',
         type: type || 'Consultation',
         status: status || 'Scheduled',
-        appt_date: appt_date || new Date().toISOString().split('T')[0]
-      }).select().single();
+        initials: getInitials(patientName),
+        date: appt_date || new Date().toISOString().split('T')[0]
+      };
+      db.appointments.unshift(newAppointment);
+      await writeDatabase(db);
 
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      // Try to find the patient to get their email address
       let recipientEmail = 'patient@example.com';
-      try {
-        const { data: patientRecord } = await supabase.from('patients').select('email').eq('name', patientName).limit(1);
-        if (patientRecord && patientRecord.length > 0 && patientRecord[0].email) {
-          recipientEmail = patientRecord[0].email;
-        } else {
-          // Fallback to local DB search
-          const localDb = await readDatabase();
-          const localPatient = localDb.patients.find(p => p.name.toLowerCase() === patientName.toLowerCase());
-          if (localPatient && localPatient.email) {
-            recipientEmail = localPatient.email;
-          }
-        }
-      } catch (e) {
-        console.warn('Patient email lookup failed:', e);
+      const localPatient = db.patients.find(p => p.name.toLowerCase() === patientName.toLowerCase());
+      if (localPatient?.email) {
+        recipientEmail = localPatient.email;
       }
 
       // Fire email trigger asynchronously
@@ -1156,7 +1012,7 @@ Clinical Portal Support Team`;
         appointmentTime: `${appt_date || new Date().toLocaleDateString()} at ${time || '09:00 AM'}`
       });
 
-      res.status(201).json(data);
+      res.status(201).json(newAppointment);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1168,30 +1024,21 @@ Clinical Portal Support Team`;
       const { id } = req.params;
       const { status, time, type, patientName, appt_date } = req.body;
 
-      const updateData: any = {};
-      if (status !== undefined) updateData.status = status;
-      if (time !== undefined) updateData.appt_time = time;
-      if (type !== undefined) updateData.type = type;
-      if (patientName !== undefined) updateData.patient_name = patientName;
-      if (appt_date !== undefined) updateData.appt_date = appt_date;
-
-      const { data, error } = await supabase.from('appointments').update(updateData).eq('id', id).select().single();
-      if (error) {
-        // Fallback for local sandbox mode
-        const db = await readDatabase();
-        const apptIndex = db.appointments.findIndex(a => a.id === id);
-        if (apptIndex !== -1) {
-          if (status !== undefined) db.appointments[apptIndex].status = status;
-          if (time !== undefined) db.appointments[apptIndex].time = time;
-          if (type !== undefined) db.appointments[apptIndex].type = type;
-          if (patientName !== undefined) db.appointments[apptIndex].patientName = patientName;
-          await writeDatabase(db);
-          return res.json(db.appointments[apptIndex]);
-        }
-        throw new Error(error.message);
+      const db = await readDatabase();
+      const appt = db.appointments.find(a => a.id === id);
+      if (!appt) {
+        return res.status(404).json({ error: 'Appointment not found' });
       }
-
-      res.json(data);
+      if (status !== undefined) appt.status = status;
+      if (time !== undefined) appt.time = time;
+      if (type !== undefined) appt.type = type;
+      if (patientName !== undefined) {
+        appt.patientName = patientName;
+        appt.initials = getInitials(patientName);
+      }
+      if (appt_date !== undefined) appt.date = appt_date;
+      await writeDatabase(db);
+      res.json(appt);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1202,13 +1049,6 @@ Clinical Portal Support Team`;
     try {
       const { id } = req.params;
 
-      // Delete from live Supabase
-      const { error: supErr } = await supabase.from('patients').delete().eq('id', id);
-      if (supErr) {
-        console.warn('Supabase delete warning:', supErr.message);
-      }
-
-      // Delete from local file
       const db = await readDatabase();
       db.patients = db.patients.filter(p => p.id !== id);
       await writeDatabase(db);
@@ -1224,13 +1064,6 @@ Clinical Portal Support Team`;
     try {
       const { id } = req.params;
 
-      // Delete from live Supabase
-      const { error: supErr } = await supabase.from('appointments').delete().eq('id', id);
-      if (supErr) {
-        console.warn('Supabase delete warning:', supErr.message);
-      }
-
-      // Delete from local file
       const db = await readDatabase();
       db.appointments = db.appointments.filter(a => a.id !== id);
       await writeDatabase(db);
@@ -1251,13 +1084,12 @@ Clinical Portal Support Team`;
         return res.status(400).json({ error: 'Filename is required' });
       }
 
-      // Get current files to append the new file
-      const { data: patient, error: fetchErr } = await supabase.from('patients').select('documents').eq('id', id).single();
-      if (fetchErr || !patient) {
+      const db = await readDatabase();
+      const patient = db.patients.find(p => p.id === id);
+      if (!patient) {
         return res.status(404).json({ error: 'Patient not found' });
       }
 
-      const existingFiles = patient.documents?.files || [];
       const newFile = {
         id: `f_${Date.now()}`,
         name,
@@ -1267,16 +1099,8 @@ Clinical Portal Support Team`;
         content: content || '' // Direct base64 content
       };
 
-      const updatedFiles = [newFile, ...existingFiles];
-
-      const { error: updateErr } = await supabase
-        .from('patients')
-        .update({ documents: { files: updatedFiles } })
-        .eq('id', id);
-
-      if (updateErr) {
-        throw new Error(updateErr.message);
-      }
+      patient.files = [newFile, ...(patient.files || [])] as PatientFile[];
+      await writeDatabase(db);
 
       res.status(201).json(newFile);
     } catch (err: any) {
@@ -1289,22 +1113,14 @@ Clinical Portal Support Team`;
     try {
       const { id, fileId } = req.params;
 
-      const { data: patient, error: fetchErr } = await supabase.from('patients').select('documents').eq('id', id).single();
-      if (fetchErr || !patient) {
+      const db = await readDatabase();
+      const patient = db.patients.find(p => p.id === id);
+      if (!patient) {
         return res.status(404).json({ error: 'Patient not found' });
       }
 
-      const existingFiles = patient.documents?.files || [];
-      const updatedFiles = existingFiles.filter((f: any) => f.id !== fileId);
-
-      const { error: updateErr } = await supabase
-        .from('patients')
-        .update({ documents: { files: updatedFiles } })
-        .eq('id', id);
-
-      if (updateErr) {
-        throw new Error(updateErr.message);
-      }
+      patient.files = (patient.files || []).filter((f: any) => f.id !== fileId);
+      await writeDatabase(db);
 
       res.json({ success: true, message: 'File deleted' });
     } catch (err: any) {
@@ -1336,18 +1152,9 @@ Clinical Portal Support Team`;
       // Trigger automatic insurance approval email when changed to Approved
       if (status === 'Approved' && oldStatus !== 'Approved') {
         let recipientEmail = 'patient@example.com';
-        try {
-          const { data: patientRecord } = await supabase.from('patients').select('email').eq('name', auth.patientName).limit(1);
-          if (patientRecord && patientRecord.length > 0 && patientRecord[0].email) {
-            recipientEmail = patientRecord[0].email;
-          } else {
-            const localPatient = db.patients.find(p => p.name.toLowerCase() === auth.patientName.toLowerCase());
-            if (localPatient && localPatient.email) {
-              recipientEmail = localPatient.email;
-            }
-          }
-        } catch (e) {
-          console.warn('Patient email lookup failed:', e);
+        const localPatient = db.patients.find(p => p.name.toLowerCase() === auth.patientName.toLowerCase());
+        if (localPatient?.email) {
+          recipientEmail = localPatient.email;
         }
 
         internalTriggerEmail('auth_status_approved', auth.patientName, recipientEmail, {
@@ -1418,14 +1225,9 @@ Clinical Portal Support Team`;
       // Trigger automatic invoice email asynchronously
       let recipientEmail = 'patient@example.com';
       try {
-        const { data: patientRecord } = await supabase.from('patients').select('email').eq('name', patientName).limit(1);
-        if (patientRecord && patientRecord.length > 0 && patientRecord[0].email) {
-          recipientEmail = patientRecord[0].email;
-        } else {
-          const localPatient = db.patients.find(p => p.name.toLowerCase() === patientName.toLowerCase());
-          if (localPatient && localPatient.email) {
-            recipientEmail = localPatient.email;
-          }
+        const localPatient = db.patients.find(p => p.name.toLowerCase() === patientName.toLowerCase());
+        if (localPatient?.email) {
+          recipientEmail = localPatient.email;
         }
       } catch (e) {
         console.warn('Patient email lookup failed:', e);
@@ -1465,18 +1267,6 @@ Clinical Portal Support Team`;
   app.put('/api/settings', async (req, res) => {
     try {
       const { clinicName, primaryAddress, contactPhone, supportEmail, requirePin, pinCode, appearance } = req.body;
-
-      try {
-        // Update live database row with id=1
-        await supabase.from('clinic_settings').update({
-          clinic_name: clinicName,
-          clinic_address: primaryAddress,
-          clinic_phone: contactPhone,
-          clinic_email: supportEmail
-        }).eq('id', 1);
-      } catch (err) {
-        console.error('Supabase settings update failed:', err);
-      }
 
       const db = await readDatabase();
       db.settings = {
@@ -1520,18 +1310,9 @@ Clinical Portal Support Team`;
       // Trigger automatic progress update email if fabrication stage changed
       if (stage !== undefined && stage !== oldStage) {
         let recipientEmail = 'patient@example.com';
-        try {
-          const { data: patientRecord } = await supabase.from('patients').select('email').eq('name', item.patientName).limit(1);
-          if (patientRecord && patientRecord.length > 0 && patientRecord[0].email) {
-            recipientEmail = patientRecord[0].email;
-          } else {
-            const localPatient = db.patients.find(p => p.name.toLowerCase() === item.patientName.toLowerCase());
-            if (localPatient && localPatient.email) {
-              recipientEmail = localPatient.email;
-            }
-          }
-        } catch (e) {
-          console.warn('Patient email lookup failed:', e);
+        const localPatient = db.patients.find(p => p.name.toLowerCase() === item.patientName.toLowerCase());
+        if (localPatient?.email) {
+          recipientEmail = localPatient.email;
         }
 
         internalTriggerEmail('fabrication_status_changed', item.patientName, recipientEmail, {
@@ -1590,7 +1371,12 @@ Clinical Portal Support Team`;
   // Vite Integration
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: {
+          port: Number(process.env.VITE_HMR_PORT || 24678)
+        }
+      },
       appType: 'spa'
     });
     app.use(vite.middlewares);

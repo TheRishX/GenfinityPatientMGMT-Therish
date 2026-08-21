@@ -29,15 +29,11 @@ export default function Sidebar({
   onToggleModule
 }: SidebarProps) {
   const navItems = [
-    { id: 'dashboard', label: 'Operations Today', icon: 'speed' },
+    { id: 'dashboard', label: 'Overview', icon: 'speed' },
     { id: 'patients', label: 'Patients', icon: 'groups' },
-    { id: 'appointments', label: 'Appointments', icon: 'calendar_month' },
-    { id: 'tracker', label: 'Tracker', icon: 'monitoring' },
-    { id: 'authorization', label: 'Authorization', icon: 'verified_user' },
-    { id: 'billing', label: 'Billing', icon: 'payments' },
-    { id: 'documents', label: 'Documents', icon: 'description' },
-    { id: 'fabrication', label: 'Fabrication', icon: 'precision_manufacturing' },
-    { id: 'settings', label: 'Settings', icon: 'settings' }
+    { id: 'appointments', label: 'Schedule', icon: 'calendar_month' },
+    { id: 'tracker', label: 'Orders', icon: 'precision_manufacturing' },
+    { id: 'settings', label: 'Messages', icon: 'mail' }
   ];
 
   const getLabel = (id: string, defaultLabel: string) => {

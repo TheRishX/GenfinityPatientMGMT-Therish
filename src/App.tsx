@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
-import ClinicLogo from './components/ClinicLogo';
 import DashboardView from './components/DashboardView';
 import PatientsView from './components/PatientsView';
 import AppointmentsView from './components/AppointmentsView';
@@ -12,22 +11,22 @@ import FabricationView from './components/FabricationView';
 import SettingsView from './components/SettingsView';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
 import { DEFAULT_DATABASE, getInitials, generateMRN } from './utils/defaultDb';
-import { supabaseClient } from './utils/supabaseClient';
 
 export default function App() {
-  const [db, setDb] = useState<DatabaseSchema | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [db, setDb] = useState<DatabaseSchema | null>(() => {
+    try {
+      const saved = localStorage.getItem('genfinity_db');
+      return saved ? JSON.parse(saved) : DEFAULT_DATABASE;
+    } catch {
+      return DEFAULT_DATABASE;
+    }
+  });
   const [error, setError] = useState<string | null>(null);
   const [isOfflineMode, setIsOfflineMode] = useState<boolean>(false);
 
   // Layout navigation & search
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [searchTerm, setSearchTerm] = useState<string>('');
-
-  // Security Lockscreen state (Launch Security)
-  const [isLocked, setIsLocked] = useState<boolean>(true);
-  const [pinInput, setPinInput] = useState<string>('');
-  const [pinError, setPinError] = useState<boolean>(false);
 
   // New patient modal trigger inside PatientsView
   const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState<boolean>(false);
@@ -54,10 +53,6 @@ export default function App() {
         patients: true,
         appointments: true,
         tracker: true,
-        authorization: true,
-        billing: true,
-        documents: true,
-        fabrication: true,
         settings: true
       };
     } catch {
@@ -66,10 +61,6 @@ export default function App() {
         patients: true,
         appointments: true,
         tracker: true,
-        authorization: true,
-        billing: true,
-        documents: true,
-        fabrication: true,
         settings: true
       };
     }
@@ -112,70 +103,9 @@ export default function App() {
     localStorage.setItem('genfinity_db', JSON.stringify(newDb));
   };
 
-  // Fetch from Supabase directly in Vercel/Client-only environments
-  const fetchStateDirectFromSupabase = async (baseDb: DatabaseSchema): Promise<DatabaseSchema> => {
-    const updatedDb = { ...baseDb };
-    try {
-      // 1. Fetch settings from clinic_settings
-      const { data: sData, error: sErr } = await supabaseClient.from('clinic_settings').select('*').limit(1);
-      if (sData && sData.length > 0 && !sErr) {
-        const row = sData[0];
-        updatedDb.settings = {
-          ...updatedDb.settings,
-          clinicName: row.clinic_name || updatedDb.settings.clinicName,
-          primaryAddress: row.clinic_address || updatedDb.settings.primaryAddress,
-          contactPhone: row.clinic_phone || updatedDb.settings.contactPhone,
-          supportEmail: row.clinic_email || updatedDb.settings.supportEmail,
-        };
-      }
-
-      // 2. Fetch patients
-      const { data: pData, error: pErr } = await supabaseClient.from('patients').select('*').order('created_at', { ascending: false });
-      if (pData && !pErr) {
-        updatedDb.patients = pData.map((sp: any) => ({
-          id: sp.id,
-          name: sp.name || '',
-          phone: sp.phone || '',
-          dob: sp.dob || '',
-          email: sp.email || '',
-          referralSource: sp.referral_source || 'other',
-          status: sp.status || 'In Progress',
-          mrn: sp.notes || '#0000-XX',
-          avatarInitials: getInitials(sp.name || 'P'),
-          files: sp.documents?.files || [],
-          insuranceCompany: sp.auth_info?.insurance_company || '',
-          insuranceId: sp.auth_info?.insurance_id || '',
-          address: sp.auth_info?.address || '',
-          gender: sp.auth_info?.gender || 'Not specified',
-          clinicalNotes: sp.auth_info?.clinical_notes || [],
-          avatarUrl: sp.auth_info?.avatar_url || '',
-          billing: sp.billing || { date: '', amount: 0, status: '' }
-        }));
-      }
-
-      // 3. Fetch appointments
-      const { data: aData, error: aErr } = await supabaseClient.from('appointments').select('*').order('created_at', { ascending: false });
-      if (aData && !aErr) {
-        updatedDb.appointments = aData.map((sa: any) => ({
-          id: sa.id,
-          patientName: sa.patient_name || '',
-          time: sa.appt_time || '09:00 AM',
-          type: sa.type || 'Consultation',
-          status: sa.status || 'Scheduled',
-          initials: getInitials(sa.patient_name || 'A'),
-          date: sa.appt_date || ''
-        }));
-      }
-    } catch (err) {
-      console.warn('Failed direct client-side Supabase query:', err);
-    }
-    return updatedDb;
-  };
-
   // Fetch complete dataset
   const fetchState = async () => {
     try {
-      setLoading(true);
       const res = await fetch('/api/data');
       const contentType = res.headers.get('content-type');
       if (res.ok && contentType && contentType.includes('application/json')) {
@@ -184,10 +114,10 @@ export default function App() {
         setIsOfflineMode(false);
         setError(null);
       } else {
-        throw new Error('Static/Vercel or non-JSON API response detected');
+        throw new Error('Hostinger API returned a non-JSON response');
       }
     } catch (err: any) {
-      console.warn('Backend server connection failed or static deployment. Switching to direct browser-to-Supabase client connection.', err);
+      console.warn('Backend server connection failed. Using local Hostinger-ready fallback state.', err);
       
       let baseDb = DEFAULT_DATABASE;
       const localData = localStorage.getItem('genfinity_db');
@@ -199,13 +129,10 @@ export default function App() {
         }
       }
 
-      const liveDb = await fetchStateDirectFromSupabase(baseDb);
-      setDb(liveDb);
-      localStorage.setItem('genfinity_db', JSON.stringify(liveDb));
+      setDb(baseDb);
+      localStorage.setItem('genfinity_db', JSON.stringify(baseDb));
       setIsOfflineMode(true);
       setError(null);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -213,80 +140,12 @@ export default function App() {
     fetchState();
   }, []);
 
-  // Sync state when lock screen requirement changes
-  useEffect(() => {
-    if (db && !db.settings.requirePin) {
-      setIsLocked(false);
-    }
-  }, [db]);
-
-  // Handle PIN input submission
-  const handlePinSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!db) return;
-
-    if (pinInput === db.settings.pinCode) {
-      setIsLocked(false);
-      setPinError(false);
-      setPinInput('');
-    } else {
-      setPinError(true);
-      setPinInput('');
-      setTimeout(() => setPinError(false), 1500);
-    }
-  };
-
-  const handleKeypadPress = (val: string) => {
-    if (pinInput.length < 4) {
-      setPinInput(prev => prev + val);
-    }
-  };
-
   // API Call: Add Patient
   const handleAddPatient = async (patientData: any) => {
     if (isOfflineMode || !db) {
       const generatedMrn = generateMRN();
       const initials = getInitials(patientData.name);
       
-      // Try direct client-side Supabase write if offline/Vercel
-      try {
-        const { data: newSupPatient, error } = await supabaseClient.from('patients').insert({
-          name: patientData.name,
-          phone: patientData.phone || '',
-          dob: patientData.dob || '',
-          email: patientData.email || '',
-          referral_source: patientData.referralSource || 'other',
-          status: patientData.status || 'In Progress',
-          notes: generatedMrn,
-          documents: { files: [] },
-          auth_info: {
-            insurance_company: '',
-            insurance_id: '',
-            address: '',
-            gender: 'Not specified',
-            clinical_notes: []
-          },
-          billing: { date: '', amount: 0, status: '' },
-          pinned_flag: false
-        }).select().single();
-
-        if (error) throw error;
-
-        if (patientData.status === 'Consultation') {
-          await supabaseClient.from('appointments').insert({
-            patient_name: patientData.name,
-            appt_time: '02:00 PM',
-            type: 'Initial Consult',
-            status: 'Scheduled'
-          });
-        }
-        
-        await fetchState();
-        return;
-      } catch (err) {
-        console.warn('Direct client-side Supabase write failed, falling back to local memory only', err);
-      }
-
       const newPatient: Patient = {
         id: 'p_' + Date.now(),
         name: patientData.name,
@@ -352,25 +211,6 @@ export default function App() {
         content: fileData.content || ''
       };
 
-      // Try direct client-side Supabase update
-      try {
-        const target = db.patients.find(p => p.id === patientId);
-        if (target) {
-          const currentFiles = target.files || [];
-          const updatedFiles = [newFile, ...currentFiles];
-          const { error } = await supabaseClient
-            .from('patients')
-            .update({ documents: { files: updatedFiles } })
-            .eq('id', patientId);
-          if (!error) {
-            await fetchState();
-            return;
-          }
-        }
-      } catch (directErr) {
-        console.warn('Direct client-side Supabase file upload failed, using offline fallback:', directErr);
-      }
-
       const updatedPatients = db.patients.map(p => {
         if (p.id === patientId) {
           return {
@@ -404,24 +244,6 @@ export default function App() {
   // API Call: Delete Document File
   const handleDeleteFile = async (patientId: string, fileId: string) => {
     if (isOfflineMode || !db) {
-      // Try direct client-side Supabase update
-      try {
-        const target = db.patients.find(p => p.id === patientId);
-        if (target) {
-          const updatedFiles = (target.files || []).filter(f => f.id !== fileId);
-          const { error } = await supabaseClient
-            .from('patients')
-            .update({ documents: { files: updatedFiles } })
-            .eq('id', patientId);
-          if (!error) {
-            await fetchState();
-            return;
-          }
-        }
-      } catch (directErr) {
-        console.warn('Direct client-side Supabase file delete failed, using offline fallback:', directErr);
-      }
-
       const updatedPatients = db.patients.map(p => {
         if (p.id === patientId) {
           return {
@@ -453,32 +275,6 @@ export default function App() {
   // API Call: Update Patient workflow column
   const handleUpdatePatientStatus = async (patientId: string, status: Patient['status']) => {
     if (isOfflineMode || !db) {
-      // Try direct client-side Supabase status update
-      try {
-        const { error } = await supabaseClient
-          .from('patients')
-          .update({ status })
-          .eq('id', patientId);
-        
-        if (!error) {
-          if (status === 'Consultation') {
-            const targetPatient = db.patients.find(p => p.id === patientId);
-            if (targetPatient) {
-              await supabaseClient.from('appointments').insert({
-                patient_name: targetPatient.name,
-                appt_time: '02:00 PM',
-                type: 'Initial Consult',
-                status: 'Scheduled'
-              });
-            }
-          }
-          await fetchState();
-          return;
-        }
-      } catch (directErr) {
-        console.warn('Direct client-side Supabase status update failed, using offline fallback:', directErr);
-      }
-
       const updatedPatients = db.patients.map(p => {
         if (p.id === patientId) {
           return {
@@ -527,39 +323,6 @@ export default function App() {
   // API Call: Comprehensive Patient Update (Demographics, Insurance, Notes)
   const handleUpdatePatient = async (patientId: string, patientData: any) => {
     if (isOfflineMode || !db) {
-      // Try direct client-side Supabase update
-      try {
-        const { error } = await supabaseClient
-          .from('patients')
-          .update({
-            name: patientData.name,
-            phone: patientData.phone,
-            dob: patientData.dob,
-            email: patientData.email,
-            referral_source: patientData.referralSource,
-            status: patientData.status,
-            notes: patientData.mrn,
-            pinned_flag: patientData.pinned_flag,
-            auth_info: {
-              insurance_company: patientData.insuranceCompany || '',
-              insurance_id: patientData.insuranceId || '',
-              address: patientData.address || '',
-              gender: patientData.gender || 'Not specified',
-              clinical_notes: patientData.clinicalNotes || [],
-              avatar_url: patientData.avatarUrl || ''
-            },
-            billing: patientData.billing || { date: '', amount: 0, status: '' }
-          })
-          .eq('id', patientId);
-        
-        if (!error) {
-          await fetchState();
-          return;
-        }
-      } catch (directErr) {
-        console.warn('Direct client-side Supabase patient update failed, using offline fallback:', directErr);
-      }
-
       const updatedPatients = db.patients.map(p => {
         if (p.id === patientId) {
           return {
@@ -590,26 +353,9 @@ export default function App() {
     }
   };
 
-  // API Call: Add Appointment in Supabase
+  // API Call: Add Appointment
   const handleAddAppointment = async (apptData: any) => {
     if (isOfflineMode || !db) {
-      // Try direct client-side Supabase insert
-      try {
-        const { error } = await supabaseClient.from('appointments').insert({
-          patient_name: apptData.patientName,
-          appt_time: apptData.time || '09:00 AM',
-          type: apptData.type || 'Consultation',
-          status: apptData.status || 'Scheduled',
-          appt_date: apptData.date || ''
-        });
-        if (!error) {
-          await fetchState();
-          return;
-        }
-      } catch (directErr) {
-        console.warn('Direct client-side Supabase appointment insert failed, using offline fallback:', directErr);
-      }
-
       const newAppt = {
         id: 'a_' + Date.now(),
         patientName: apptData.patientName,
@@ -642,26 +388,6 @@ export default function App() {
   // API Call: Update Appointment Status / Details
   const handleUpdateAppointment = async (apptId: string, updateData: any) => {
     if (isOfflineMode || !db) {
-      // Try direct client-side Supabase update
-      try {
-        const { error } = await supabaseClient
-          .from('appointments')
-          .update({
-            patient_name: updateData.patientName,
-            appt_time: updateData.time,
-            type: updateData.type,
-            status: updateData.status,
-            appt_date: updateData.date
-          })
-          .eq('id', apptId);
-        if (!error) {
-          await fetchState();
-          return;
-        }
-      } catch (directErr) {
-        console.warn('Direct client-side Supabase appointment update failed, using offline fallback:', directErr);
-      }
-
       const updatedAppointments = db.appointments.map(a => {
         if (a.id === apptId) {
           return {
@@ -695,20 +421,6 @@ export default function App() {
   // API Call: Delete Patient (Admin)
   const handleDeletePatient = async (patientId: string) => {
     if (isOfflineMode || !db) {
-      // Try direct client-side Supabase delete
-      try {
-        const { error } = await supabaseClient
-          .from('patients')
-          .delete()
-          .eq('id', patientId);
-        if (!error) {
-          await fetchState();
-          return;
-        }
-      } catch (directErr) {
-        console.warn('Direct client-side Supabase patient delete failed, using offline fallback:', directErr);
-      }
-
       const updatedPatients = db.patients.filter(p => p.id !== patientId);
       saveStateLocally({
         ...db,
@@ -731,20 +443,6 @@ export default function App() {
   // API Call: Delete Appointment (Admin)
   const handleDeleteAppointment = async (apptId: string) => {
     if (isOfflineMode || !db) {
-      // Try direct client-side Supabase delete
-      try {
-        const { error } = await supabaseClient
-          .from('appointments')
-          .delete()
-          .eq('id', apptId);
-        if (!error) {
-          await fetchState();
-          return;
-        }
-      } catch (directErr) {
-        console.warn('Direct client-side Supabase appointment delete failed, using offline fallback:', directErr);
-      }
-
       const updatedAppointments = db.appointments.filter(a => a.id !== apptId);
       saveStateLocally({
         ...db,
@@ -893,37 +591,6 @@ export default function App() {
   // API Call: Save settings config
   const handleSaveSettings = async (settingsData: ClinicSettings) => {
     if (isOfflineMode || !db) {
-      // Try direct client-side Supabase update for clinic_settings
-      try {
-        const { data: existing } = await supabaseClient.from('clinic_settings').select('id').limit(1);
-        if (existing && existing.length > 0) {
-          await supabaseClient
-            .from('clinic_settings')
-            .update({
-              clinic_name: settingsData.clinicName,
-              clinic_address: settingsData.primaryAddress,
-              clinic_phone: settingsData.contactPhone,
-              clinic_email: settingsData.supportEmail
-            })
-            .eq('id', existing[0].id);
-        } else {
-          await supabaseClient.from('clinic_settings').insert({
-            clinic_name: settingsData.clinicName,
-            clinic_address: settingsData.primaryAddress,
-            clinic_phone: settingsData.contactPhone,
-            clinic_email: settingsData.supportEmail
-          });
-        }
-        saveStateLocally({
-          ...db,
-          settings: settingsData
-        });
-        await fetchState();
-        return;
-      } catch (directErr) {
-        console.warn('Direct client-side Supabase settings update failed, using offline fallback:', directErr);
-      }
-
       saveStateLocally({
         ...db,
         settings: settingsData
@@ -1065,17 +732,6 @@ export default function App() {
     }
   };
 
-  // Return Loading skeleton
-  if (loading && !db) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-surface select-none">
-        <span className="material-symbols-outlined text-4xl text-primary animate-spin mb-4">sync</span>
-        <h2 className="text-sm font-bold text-on-surface uppercase tracking-widest">Initializing Genfinity Clinical Link</h2>
-        <p className="text-[10px] text-on-surface-variant font-bold mt-1">Checking HIPAA compliance protocols...</p>
-      </div>
-    );
-  }
-
   // Return server Error state
   if (error) {
     return (
@@ -1091,98 +747,6 @@ export default function App() {
         >
           <span className="material-symbols-outlined text-xs">sync</span> Retry Connection
         </button>
-      </div>
-    );
-  }
-
-  // HIPAA PIN GUARD LOCKSCREEN (Launch Security, Mockup #3)
-  if (isLocked && db?.settings.requirePin) {
-    return (
-      <div className="fixed inset-0 z-[100] bg-[#fbf9f8] flex flex-col items-center justify-center p-6 animate-fade-in">
-        <div className="w-full max-w-xs text-center space-y-6">
-          {/* Lock Icon logo area */}
-          <div className="flex flex-col items-center">
-            <ClinicLogo size="lg" className="mb-3" />
-            <h1 className="text-2xl font-black text-primary tracking-tight">{db.settings.clinicName}</h1>
-            <p className="text-xs font-bold text-on-surface-variant tracking-wide mt-1 uppercase">
-              HIPAA Compliant Session Lock
-            </p>
-          </div>
-
-          {/* Keypad PIN dots */}
-          <div className="flex justify-center gap-4 py-2">
-            {[0, 1, 2, 3].map(idx => (
-              <div
-                key={idx}
-                className={`w-4.5 h-4.5 rounded-full border-2 transition-all ${
-                  pinInput.length > idx
-                    ? 'bg-primary border-primary scale-110 shadow-xs'
-                    : 'bg-transparent border-surface-container-highest'
-                }`}
-              />
-            ))}
-          </div>
-
-          {/* Error / Instructions */}
-          <div className="h-6">
-            {pinError ? (
-              <p className="text-xs font-extrabold text-primary animate-bounce">
-                Incorrect clinical PIN. Access Denied.
-              </p>
-            ) : (
-              <p className="text-[11px] font-semibold text-on-surface-variant leading-relaxed">
-                Enter your 4-digit security code to resume session.
-              </p>
-            )}
-          </div>
-
-          {/* Keypad Grid (Touch targets & aesthetics matching Image 3) */}
-          <div className="grid grid-cols-3 gap-3.5 max-w-[240px] mx-auto select-none">
-            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
-              <button
-                key={num}
-                type="button"
-                onClick={() => handleKeypadPress(num)}
-                className="w-14 h-14 rounded-full bg-surface-container-low hover:bg-surface-container text-lg font-black text-on-surface flex items-center justify-center transition-all cursor-pointer active:scale-95 border border-surface-container-highest/20"
-              >
-                {num}
-              </button>
-            ))}
-            {/* Backspace */}
-            <button
-              type="button"
-              onClick={() => setPinInput(p => p.slice(0, -1))}
-              className="w-14 h-14 rounded-full hover:bg-surface-container text-on-surface-variant flex items-center justify-center transition-all cursor-pointer active:scale-95"
-            >
-              <span className="material-symbols-outlined">backspace</span>
-            </button>
-            {/* 0 */}
-            <button
-              type="button"
-              onClick={() => handleKeypadPress('0')}
-              className="w-14 h-14 rounded-full bg-surface-container-low hover:bg-surface-container text-lg font-black text-on-surface flex items-center justify-center transition-all cursor-pointer active:scale-95 border border-surface-container-highest/20"
-            >
-              0
-            </button>
-            {/* Submit */}
-            <button
-              type="button"
-              onClick={handlePinSubmit}
-              disabled={pinInput.length !== 4}
-              className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-95 ${
-                pinInput.length === 4
-                  ? 'bg-primary text-white hover:bg-primary-container shadow-xs cursor-pointer'
-                  : 'bg-surface-container-low text-on-surface-variant/40 border border-surface-container-highest/10 cursor-not-allowed'
-              }`}
-            >
-              <span className="material-symbols-outlined font-black">login</span>
-            </button>
-          </div>
-
-          <p className="text-[10px] text-on-surface-variant opacity-75 font-semibold">
-            Default sandbox credentials: <strong className="text-secondary select-all">1234</strong>
-          </p>
-        </div>
       </div>
     );
   }
@@ -1331,13 +895,13 @@ export default function App() {
         <Header
           title={
             activeTab === 'dashboard'
-              ? getSidebarLabel('dashboard', 'Dashboard Overview')
+              ? getSidebarLabel('dashboard', 'Overview')
               : activeTab === 'patients'
               ? getSidebarLabel('patients', 'Patient Database')
               : activeTab === 'appointments'
-              ? getSidebarLabel('appointments', 'Appointments Schedule')
+              ? getSidebarLabel('appointments', 'Schedule')
               : activeTab === 'tracker'
-              ? getSidebarLabel('tracker', 'Clinical Workflow Board')
+              ? getSidebarLabel('tracker', 'Orders')
               : activeTab === 'authorization'
               ? getSidebarLabel('authorization', 'Approval & Reimbursements')
               : activeTab === 'billing'
@@ -1345,7 +909,7 @@ export default function App() {
               : activeTab === 'fabrication'
               ? getSidebarLabel('fabrication', 'Active Workshop')
               : activeTab === 'settings'
-              ? getSidebarLabel('settings', 'System Settings')
+              ? getSidebarLabel('settings', 'Messages & Admin')
               : 'Genfinity Clinical Portal'
           }
           searchTerm={searchTerm}

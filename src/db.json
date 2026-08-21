@@ -1,0 +1,357 @@
+{
+  "patients": [
+    {
+      "id": "p1",
+      "name": "Jane Doe",
+      "phone": "(555) 123-4567",
+      "dob": "1988-05-14",
+      "email": "jane@example.com",
+      "referralSource": "physician",
+      "status": "In Progress",
+      "mrn": "#1293-JD",
+      "avatarInitials": "JD",
+      "files": []
+    },
+    {
+      "id": "p2",
+      "name": "Alex Smith",
+      "phone": "(555) 987-6543",
+      "dob": "1992-11-23",
+      "email": "alex@example.com",
+      "referralSource": "hospital",
+      "status": "Consultation",
+      "mrn": "#8832-AS",
+      "avatarInitials": "AS",
+      "files": []
+    },
+    {
+      "id": "p3",
+      "name": "Michael Johnson",
+      "phone": "(555) 456-7890",
+      "dob": "1975-02-18",
+      "email": "michael@example.com",
+      "referralSource": "specialist",
+      "status": "Fabrication",
+      "mrn": "#5521-MJ",
+      "avatarInitials": "MJ",
+      "files": []
+    },
+    {
+      "id": "p4",
+      "name": "Eleanor Vance",
+      "phone": "(555) 019-2834",
+      "dob": "1945-04-12",
+      "email": "eleanor@example.com",
+      "referralSource": "specialist",
+      "status": "Fabrication",
+      "mrn": "#8492-AX",
+      "avatarInitials": "EV",
+      "files": [
+        {
+          "id": "f1",
+          "name": "Prescription_DrThorne.pdf",
+          "type": "pdf",
+          "date": "Oct 12, 2023",
+          "size": "1.2 MB"
+        },
+        {
+          "id": "f2",
+          "name": "Scan_Insurance_Card_Front.jpg",
+          "type": "jpg",
+          "date": "Oct 10, 2023",
+          "size": "3.4 MB"
+        },
+        {
+          "id": "f3",
+          "name": "Scan_Insurance_Card_Back.jpg",
+          "type": "jpg",
+          "date": "Oct 10, 2023",
+          "size": "3.1 MB"
+        },
+        {
+          "id": "f4",
+          "name": "Clinical_Notes_Orthopedics.pdf",
+          "type": "pdf",
+          "date": "Oct 05, 2023",
+          "size": "5.8 MB"
+        }
+      ]
+    },
+    {
+      "id": "p5",
+      "name": "Robert Chen",
+      "phone": "(555) 888-2321",
+      "dob": "1994-08-12",
+      "email": "robert@example.com",
+      "referralSource": "physician",
+      "status": "New Referral",
+      "mrn": "#899-23A",
+      "avatarInitials": "RC",
+      "files": []
+    },
+    {
+      "id": "p6",
+      "name": "Maria Gonzalez",
+      "phone": "(555) 777-1111",
+      "dob": "1985-03-24",
+      "email": "maria@example.com",
+      "referralSource": "physician",
+      "status": "New Referral",
+      "mrn": "#442-90B",
+      "avatarInitials": "MG",
+      "files": []
+    },
+    {
+      "id": "p7",
+      "name": "James Wilson",
+      "phone": "(555) 222-3333",
+      "dob": "1962-09-15",
+      "email": "james@example.com",
+      "referralSource": "specialist",
+      "status": "Waiting for Rx",
+      "mrn": "#112-88C",
+      "avatarInitials": "JW",
+      "files": []
+    },
+    {
+      "id": "p8",
+      "name": "Elena Davis",
+      "phone": "(555) 345-6789",
+      "dob": "1978-01-22",
+      "email": "elena@example.com",
+      "referralSource": "physician",
+      "status": "Auth Pending",
+      "mrn": "#771-44D",
+      "avatarInitials": "ED",
+      "files": []
+    },
+    {
+      "id": "p9",
+      "name": "Thomas Wright",
+      "phone": "(555) 543-2109",
+      "dob": "1950-10-09",
+      "email": "thomas@example.com",
+      "referralSource": "hospital",
+      "status": "Auth Pending",
+      "mrn": "#220-91E",
+      "avatarInitials": "TW",
+      "files": []
+    }
+  ],
+  "appointments": [
+    {
+      "id": "a1",
+      "patientName": "John Smith",
+      "time": "09:00 AM",
+      "type": "Initial Evaluation - AFO",
+      "status": "Checked In",
+      "initials": "JS"
+    },
+    {
+      "id": "a2",
+      "patientName": "Emma Watson",
+      "time": "11:30 AM",
+      "type": "Fitting & Delivery",
+      "status": "Scheduled",
+      "initials": "EW"
+    },
+    {
+      "id": "a3",
+      "patientName": "Marcus Thorne",
+      "time": "01:00 PM",
+      "type": "Follow-up Alignment Check",
+      "status": "Scheduled",
+      "initials": "MT"
+    },
+    {
+      "id": "a4",
+      "patientName": "Elena Rodriguez",
+      "time": "03:30 PM",
+      "type": "AFO Adjustment",
+      "status": "Scheduled",
+      "initials": "ER"
+    }
+  ],
+  "authorizations": [
+    {
+      "id": "au1",
+      "patientName": "Sarah Jenkins",
+      "device": "AFO - Right Ankle",
+      "status": "Pending",
+      "submittedDate": "Oct 12, 2023",
+      "daysWaiting": 14,
+      "payer": "BlueCross BlueShield",
+      "notes": "Initial claim submittal. Patient has prior auth history with BCBS."
+    },
+    {
+      "id": "au2",
+      "patientName": "Marcus Thorne",
+      "device": "Trans-tibial Prosthesis",
+      "status": "Approved",
+      "submittedDate": "Oct 20, 2023",
+      "daysWaiting": 6,
+      "payer": "Medicare",
+      "authNumber": "A-99231",
+      "notes": "LMN signed and loaded. Approved on first review."
+    },
+    {
+      "id": "au3",
+      "patientName": "Elena Rodriguez",
+      "device": "Custom KAFO",
+      "status": "Pending",
+      "submittedDate": "Oct 24, 2023",
+      "daysWaiting": 2,
+      "payer": "Aetna",
+      "notes": "Awaiting Response"
+    }
+  ],
+  "claims": [
+    {
+      "id": "c1",
+      "claimNumber": "INV-2023-0891",
+      "patientName": "Sarah Jenkins",
+      "payer": "Medicare",
+      "doctor": "Dr. Sarah Jenkins",
+      "amount": 2450,
+      "date": "Oct 25",
+      "status": "Billed"
+    },
+    {
+      "id": "c2",
+      "claimNumber": "INV-2023-0890",
+      "patientName": "David Chen",
+      "payer": "BlueCross",
+      "doctor": "Dr. David Chen",
+      "amount": 1120,
+      "date": "Oct 24",
+      "status": "Billed"
+    },
+    {
+      "id": "c3",
+      "claimNumber": "INV-2023-0889",
+      "patientName": "Robert Vance",
+      "payer": "Aetna",
+      "doctor": "Dr. Robert Vance",
+      "amount": 3800,
+      "date": "Oct 22",
+      "status": "Billed"
+    }
+  ],
+  "settings": {
+    "clinicName": "Genfinity O&P",
+    "primaryAddress": "123 Prosthetics Way, Suite 400",
+    "contactPhone": "(555) 123-4567",
+    "supportEmail": "support@genfinity.com",
+    "requirePin": false,
+    "pinCode": "1234",
+    "appearance": "light"
+  },
+  "fabrication": [
+    {
+      "id": "fab1",
+      "patientName": "Eleanor Vance",
+      "device": "Custom AFO Brace - Thermoforming",
+      "stage": "Thermoforming",
+      "priority": "Standard",
+      "techNotes": "Vacuum pressure looks stable. Cast corrected +1deg dorsiflexion.",
+      "updatedAt": "Oct 26"
+    },
+    {
+      "id": "fab2",
+      "patientName": "Michael Johnson",
+      "device": "Trans-tibial Socket Layout",
+      "stage": "Layout",
+      "priority": "Urgent",
+      "techNotes": "Needs custom carbon fiber reinforcement layout.",
+      "updatedAt": "Oct 26"
+    },
+    {
+      "id": "fab3",
+      "patientName": "Jane Doe",
+      "device": "KAFO Joint Assembly",
+      "stage": "Assembly",
+      "priority": "Standard",
+      "techNotes": "Becker joints checked and lubricated. Ready for final straps.",
+      "updatedAt": "Oct 25"
+    }
+  ],
+  "alerts": [
+    {
+      "id": "al1",
+      "type": "warning",
+      "title": "Auth Expiring Soon",
+      "message": "Michael Brown's authorization expires in 3 days.",
+      "actionText": "Review Auth",
+      "actionTarget": "auth"
+    },
+    {
+      "id": "al2",
+      "type": "info",
+      "title": "Missing Documentation",
+      "message": "Sarah Davis needs LMN signed.",
+      "actionText": "Upload Doc",
+      "actionTarget": "documents"
+    }
+  ],
+  "smtpConfig": {
+    "host": "smtp.mailtrap.io",
+    "port": 587,
+    "user": "",
+    "pass": "",
+    "secure": false,
+    "fromEmail": "notifications@genfinityortho.com",
+    "senderName": "Genfinity Orthotics & Prosthetics Clinic"
+  },
+  "emailTemplates": [
+    {
+      "id": "temp_appt",
+      "name": "Appointment Confirmed & Instructions",
+      "subject": "Appointment Confirmed - {clinicName}",
+      "triggerEvent": "appointment_booked",
+      "body": "Dear {patientName},\n\nYour upcoming appointment for {appointmentType} at {clinicName} is confirmed!\n\n📅 Date/Time: {appointmentTime}\n📍 Location: {clinicAddress}\n\nO&P Clinical Guidance & Preparations:\n1. For lower-limb orthotic fittings (AFO, KAFO, foot orthoses): Please bring or wear stable, lace-up athletic shoes with clean socks.\n2. For prosthetic fittings (trans-tibial, trans-femoral evaluations): Please wear loose-fitting clothing or shorts to ensure our clinical specialists can perform precise alignment checks.\n3. Documentation: Remember to bring your active insurance card, valid photo ID, and the signed physician prescription if you have not already submitted it.\n\nIf you have any questions or need to reschedule, please contact our care team at {clinicPhone} or email us at {supportEmail}.\n\nWarm regards,\nClinical Patient Care\n{clinicName}"
+    },
+    {
+      "id": "temp_fab",
+      "name": "Custom Device Fabrication Progress",
+      "subject": "Custom Device Fabrication Update - {clinicName}",
+      "triggerEvent": "fabrication_status_changed",
+      "body": "Dear {patientName},\n\nWe are excited to share an update on your custom-fabricated clinical device ({deviceName})!\n\n🛠️ Progress Milestone: {fabricationStage}\n\nOur specialized clinical laboratory is hand-crafting your device with the highest standard of bio-mechanical alignment. Each modification, thermoforming, and grinding process is performed by our certified technicians to meet your precise anatomical prescription.\n\nWhat happens next?\nOnce the fabrication is fully completed and passes our multi-point Quality Assurance (QA) inspection, we will contact you immediately to schedule your custom fitting and delivery appointment!\n\nBest regards,\nLab Operations & Technical Staff\n{clinicName}"
+    },
+    {
+      "id": "temp_auth",
+      "name": "Insurance Authorization Approved",
+      "subject": "Good News! Insurance Authorization Approved - {clinicName}",
+      "triggerEvent": "auth_status_approved",
+      "body": "Dear {patientName},\n\nExcellent news! We have received formal insurance authorization approval from {payerName} for your custom device ({deviceName}).\n\n📝 Authorization Details:\n- Status: APPROVED & ACTIVE\n- Auth Reference: {authNumber}\n\nThis approval clears our team to proceed with hand-crafting your custom device. Our technical lab has been notified, and materials are being prepared to begin fabrication immediately.\n\nOur administrative team will keep you updated as the device proceeds through development. If you have any immediate questions, feel free to reach us at {clinicPhone}.\n\nWarm regards,\nClinical Care Coordination\n{clinicName}"
+    },
+    {
+      "id": "temp_bill",
+      "name": "Invoice Statement Alert",
+      "subject": "Statement of Account & Patient Co-Pay Statement - {clinicName}",
+      "triggerEvent": "invoice_billed",
+      "body": "Dear {patientName},\n\nPlease find summary details of the statement from your recent orthotic/prosthetic treatment.\n\n📄 Account Statement Summary:\n- Invoice Number: {claimNumber}\n- Insurer Group: {payerName}\n- Patient Co-Pay Balance: ${claimAmount}\n\nYou can pay this balance securely inside our clinical portal or at our reception desk during your next alignment fitting.\n\nIf you have questions about your billing, deductibles, or would like to coordinate a flexible payment schedule, please call our billing desk at {clinicPhone} or reply to {supportEmail}.\n\nSincerely,\nBilling & Patient Accounts\n{clinicName}"
+    }
+  ],
+  "emailLogs": [
+    {
+      "id": "log_1",
+      "recipientEmail": "eleanor@example.com",
+      "patientName": "Eleanor Vance",
+      "subject": "Custom Device Fabrication Update - Genfinity O&P",
+      "body": "Dear Eleanor Vance,\n\nWe are excited to share an update on your custom-fabricated clinical device (Custom AFO Brace)... Progress Milestone: Thermoforming...",
+      "templateName": "Custom Device Fabrication Progress",
+      "sentAt": "Jul 14, 2026, 02:45 PM",
+      "status": "Sent"
+    },
+    {
+      "id": "log_2",
+      "recipientEmail": "maria@example.com",
+      "patientName": "Maria Gonzalez",
+      "subject": "Appointment Confirmed - Genfinity O&P",
+      "body": "Dear Maria Gonzalez,\n\nYour upcoming appointment for Initial Evaluation - AFO at Genfinity O&P is confirmed!\n\nDate/Time: 09:00 AM...",
+      "templateName": "Appointment Confirmed & Instructions",
+      "sentAt": "Jul 14, 2026, 11:15 AM",
+      "status": "Sent"
+    }
+  ]
+}

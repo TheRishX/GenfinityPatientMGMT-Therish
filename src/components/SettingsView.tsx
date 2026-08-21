@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ClinicLogo from './ClinicLogo';
 import { ClinicSettings, SmtpConfig, EmailTemplate, EmailLog } from '../types';
-import { supabaseClient, getClientConfig, reloadClientSupabaseConfig } from '../utils/supabaseClient';
 
 interface SettingsViewProps {
   settings: ClinicSettings;
@@ -20,48 +19,21 @@ export default function SettingsView({
   const [primaryAddress, setPrimaryAddress] = useState(settings.primaryAddress);
   const [contactPhone, setContactPhone] = useState(settings.contactPhone);
   const [supportEmail, setSupportEmail] = useState(settings.supportEmail);
-  const [requirePin, setRequirePin] = useState(settings.requirePin);
-  const [pinCode, setPinCode] = useState(settings.pinCode);
   const [appearance, setAppearance] = useState<'light' | 'dark'>(settings.appearance || 'light');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Tab 2: Database Configuration State
-  const [supabaseUrl, setSupabaseUrl] = useState('');
-  const [supabaseKey, setSupabaseKey] = useState('');
+  // Tab 2: Hostinger deployment readiness
+  const [nodeRuntime, setNodeRuntime] = useState('Node.js 20+');
+  const [mysqlDatabase, setMysqlDatabase] = useState('genfinity_clinic_prod');
+  const [privateStoragePath, setPrivateStoragePath] = useState('../private-clinic-storage');
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{
     success: boolean;
     message: string;
-    connected?: boolean;
+    ready?: boolean;
     latencyMs?: number;
     error?: string;
   } | null>(null);
-
-  // Load current active Supabase config on mount
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const res = await fetch('/api/supabase-config');
-        const contentType = res.headers.get('content-type');
-        if (res.ok && contentType && contentType.includes('application/json')) {
-          const data = await res.json();
-          setSupabaseUrl(data.url || '');
-          setSupabaseKey(data.key || '');
-        } else {
-          // Fallback to client config from localStorage
-          const config = getClientConfig();
-          setSupabaseUrl(config.url || '');
-          setSupabaseKey(config.key || '');
-        }
-      } catch (err) {
-        // Fallback to client config from localStorage
-        const config = getClientConfig();
-        setSupabaseUrl(config.url || '');
-        setSupabaseKey(config.key || '');
-      }
-    };
-    fetchConfig();
-  }, []);
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,8 +42,8 @@ export default function SettingsView({
       primaryAddress,
       contactPhone,
       supportEmail,
-      requirePin,
-      pinCode,
+      requirePin: false,
+      pinCode: settings.pinCode,
       appearance
     });
     setSaveSuccess(true);
@@ -85,157 +57,106 @@ export default function SettingsView({
     setIsTesting(true);
     setTestResult(null);
 
-    const urlTrim = supabaseUrl.trim();
-    const keyTrim = supabaseKey.trim();
-
     try {
-      // 1. Always update local client configuration first (so testing directly works)
-      reloadClientSupabaseConfig(urlTrim, keyTrim);
-
-      // 2. Try posting to the backend (will work in AI Studio, fails safely on Vercel)
-      try {
-        const res = await fetch('/api/supabase-config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: urlTrim, key: keyTrim })
-        });
-        const contentType = res.headers.get('content-type');
-        if (res.ok && contentType && contentType.includes('application/json')) {
-          await res.json();
-        }
-      } catch (backendErr) {
-        console.warn('Backend server unavailable, updating client-side Supabase settings only.');
+      const startTime = Date.now();
+      const res = await fetch('/api/hostinger-status');
+      const contentType = res.headers.get('content-type');
+      if (!res.ok || !contentType || !contentType.includes('application/json')) {
+        throw new Error('The Hostinger readiness endpoint did not return JSON.');
       }
-
-      // 3. Perform verification query directly from client using supabaseClient with robust error parsing
-      try {
-        const startTime = Date.now();
-        const { data, error } = await supabaseClient.from('clinic_settings').select('clinic_name').limit(1);
-        const latencyMs = Date.now() - startTime;
-
-        if (!error) {
-          setTestResult({
-            success: true,
-            message: 'Supabase configuration applied and validated successfully! Direct connection was established.',
-            connected: true,
-            latencyMs
-          });
-        } else {
-          setTestResult({
-            success: false,
-            message: 'Supabase configuration saved, but direct connection verification failed. Please check your URL and Key, or ensure the tables and RLS are created.',
-            connected: false,
-            error: error.message
-          });
-        }
-      } catch (queryErr: any) {
-        const errorMsg = queryErr?.message || String(queryErr);
-        if (errorMsg.includes('Unexpected token') || errorMsg.includes('is not valid JSON') || errorMsg.includes('JSON')) {
-          setTestResult({
-            success: false,
-            message: 'The connection returned an HTML response instead of JSON. This usually indicates that the Supabase project is currently paused/inactive, or the URL is incorrect. Please log into your Supabase Dashboard to restore or verify your project.',
-            connected: false,
-            error: `JSON Parse Exception: ${errorMsg}`
-          });
-        } else {
-          setTestResult({
-            success: false,
-            message: 'An exception occurred while executing the verification query on the Supabase client.',
-            connected: false,
-            error: errorMsg
-          });
-        }
-      }
+      const data = await res.json();
+      const latencyMs = Date.now() - startTime;
+      setTestResult({
+        success: !!data.ready,
+        ready: !!data.ready,
+        latencyMs,
+        message: data.ready
+          ? 'Hostinger-style backend is reachable and the private storage directory passed the read/write check.'
+          : 'The backend is reachable, but one or more Hostinger readiness checks still need attention.',
+        error: data.issues?.join(' | ')
+      });
     } catch (err: any) {
       const errorMsg = err?.message || String(err);
-      if (errorMsg.includes('Unexpected token') || errorMsg.includes('is not valid JSON') || errorMsg.includes('JSON')) {
-        setTestResult({
-          success: false,
-          message: 'The connection returned an HTML response instead of JSON. This usually indicates that your Supabase project is paused, inactive, or the credentials/URL are incorrect.',
-          connected: false,
-          error: errorMsg
-        });
-      } else {
-        setTestResult({
-          success: false,
-          message: 'Error occurred while saving or testing connection.',
-          connected: false,
-          error: errorMsg
-        });
-      }
+      setTestResult({
+        success: false,
+        ready: false,
+        message: 'Unable to run the Hostinger readiness check from this browser session.',
+        error: errorMsg
+      });
     } finally {
       setIsTesting(false);
     }
   };
 
-  // Static complete Supabase database creation SQL
-  const supabaseSQL = `-- ==========================================
--- GENFINITY CLINICAL DATABASE SETUP SCHEMA
--- ==========================================
+  const mysqlSQL = `-- GENFINITY CLINICAL MYSQL STARTER SCHEMA
+-- Hostinger Business / MySQL 8+ / InnoDB
 
--- 1. Create Clinic Settings Table
 CREATE TABLE IF NOT EXISTS clinic_settings (
-  id bigint primary key generated always as identity,
-  clinic_name text default 'Genfinity O&P',
-  clinic_address text default '123 Prosthetics Way, Suite 400',
-  clinic_phone text default '(555) 123-4567',
-  clinic_email text default 'support@genfinity.com',
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  clinic_name VARCHAR(160) NOT NULL DEFAULT 'Genfinity O&P',
+  clinic_address VARCHAR(255) NOT NULL DEFAULT '',
+  clinic_phone VARCHAR(40) NOT NULL DEFAULT '',
+  clinic_email VARCHAR(160) NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Insert default setting row if table is blank
-INSERT INTO clinic_settings (clinic_name, clinic_address, clinic_phone, clinic_email)
-SELECT 'Genfinity O&P', '123 Prosthetics Way, Suite 400', '(555) 123-4567', 'support@genfinity.com'
-WHERE NOT EXISTS (SELECT 1 FROM clinic_settings);
+CREATE TABLE IF NOT EXISTS staff_users (
+  id CHAR(36) PRIMARY KEY,
+  email VARCHAR(190) NOT NULL UNIQUE,
+  display_name VARCHAR(160) NOT NULL,
+  role_admin BOOLEAN NOT NULL DEFAULT FALSE,
+  role_clinical BOOLEAN NOT NULL DEFAULT FALSE,
+  role_office BOOLEAN NOT NULL DEFAULT TRUE,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 2. Create Patients Table
 CREATE TABLE IF NOT EXISTS patients (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  phone text default '',
-  dob text default '',
-  email text default '',
-  referral_source text default 'other',
-  status text default 'In Progress',
-  notes text default '', -- Stores patient HIPAA MRN
-  documents jsonb default '{"files": []}'::jsonb,
-  auth_info jsonb default '{"insurance_company": "", "insurance_id": "", "address": "", "gender": "Not specified", "clinical_notes": []}'::jsonb,
-  billing jsonb default '{"date": "", "amount": 0, "status": ""}'::jsonb,
-  pinned_flag boolean default false,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
+  id CHAR(36) PRIMARY KEY,
+  patient_number VARCHAR(40) NOT NULL UNIQUE,
+  full_name VARCHAR(190) NOT NULL,
+  phone VARCHAR(40) NOT NULL DEFAULT '',
+  email VARCHAR(190) NOT NULL DEFAULT '',
+  date_of_birth DATE NULL,
+  priority ENUM('Routine','High','Urgent') NOT NULL DEFAULT 'Routine',
+  most_urgent_case_id CHAR(36) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_patient_search (full_name, patient_number, phone, email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 3. Create Appointments Table
-CREATE TABLE IF NOT EXISTS appointments (
-  id uuid primary key default gen_random_uuid(),
-  patient_name text not null,
-  appt_time text default '09:00 AM',
-  type text default 'Consultation',
-  status text default 'Scheduled',
-  appt_date text default '',
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
+CREATE TABLE IF NOT EXISTS care_cases (
+  id CHAR(36) PRIMARY KEY,
+  patient_id CHAR(36) NOT NULL,
+  stage ENUM('New inquiry','Registration','Evaluation','Documentation','Self-pay or insurance','Insurance verification','Prior authorization','Measurement or casting','Device/component ordering','Fabrication','Quality check','Fitting','Delivery','Follow-up','Adjustment, repair, or replacement','Closed','Archived') NOT NULL DEFAULT 'New inquiry',
+  priority ENUM('Routine','High','Urgent') NOT NULL DEFAULT 'Routine',
+  owner_staff_id CHAR(36) NULL,
+  next_action VARCHAR(255) NOT NULL DEFAULT 'Register patient',
+  next_action_due_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_cases_patient FOREIGN KEY (patient_id) REFERENCES patients(id),
+  CONSTRAINT fk_cases_owner FOREIGN KEY (owner_staff_id) REFERENCES staff_users(id),
+  INDEX idx_cases_work_queue (stage, priority, next_action_due_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ==========================================
--- ROW LEVEL SECURITY (RLS) POLICIES
--- ==========================================
-
-ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow public reads" ON patients FOR SELECT USING (true);
-CREATE POLICY "Allow public inserts" ON patients FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public updates" ON patients FOR UPDATE USING (true);
-CREATE POLICY "Allow public deletes" ON patients FOR DELETE USING (true);
-
-ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow public reads" ON appointments FOR SELECT USING (true);
-CREATE POLICY "Allow public inserts" ON appointments FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public updates" ON appointments FOR UPDATE USING (true);
-CREATE POLICY "Allow public deletes" ON appointments FOR DELETE USING (true);
-
-ALTER TABLE clinic_settings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow public reads" ON clinic_settings FOR SELECT USING (true);
-CREATE POLICY "Allow public inserts" ON clinic_settings FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public updates" ON clinic_settings FOR UPDATE USING (true);`;
+CREATE TABLE IF NOT EXISTS document_metadata (
+  id CHAR(36) PRIMARY KEY,
+  patient_id CHAR(36) NOT NULL,
+  care_case_id CHAR(36) NULL,
+  original_name VARCHAR(255) NOT NULL,
+  mime_type VARCHAR(80) NOT NULL,
+  byte_size BIGINT UNSIGNED NOT NULL,
+  storage_path VARCHAR(512) NOT NULL,
+  sha256_checksum CHAR(64) NOT NULL,
+  encryption_version VARCHAR(40) NOT NULL,
+  nonce VARBINARY(32) NOT NULL,
+  auth_tag VARBINARY(32) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_docs_patient FOREIGN KEY (patient_id) REFERENCES patients(id),
+  CONSTRAINT fk_docs_case FOREIGN KEY (care_case_id) REFERENCES care_cases(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`;
 
   // Tab 3: Email Notification Suite State
   const [emailSmtpHost, setEmailSmtpHost] = useState('');
@@ -476,7 +397,7 @@ CREATE POLICY "Allow public updates" ON clinic_settings FOR UPDATE USING (true);
 
   const [copiedSQL, setCopiedSQL] = useState(false);
   const handleCopySQL = () => {
-    navigator.clipboard.writeText(supabaseSQL);
+    navigator.clipboard.writeText(mysqlSQL);
     setCopiedSQL(true);
     setTimeout(() => setCopiedSQL(false), 2000);
   };
@@ -487,7 +408,7 @@ CREATE POLICY "Allow public updates" ON clinic_settings FOR UPDATE USING (true);
       <div className="border-b border-surface-container-highest/20 pb-4">
         <h2 className="text-3xl font-extrabold text-on-surface tracking-tight">System &amp; Database Settings</h2>
         <p className="text-sm font-semibold text-on-surface-variant opacity-85 mt-1">
-          Manage clinical profiles, system parameters, real-time database credentials and storage integrations.
+          Manage clinical profiles, Hostinger backend readiness, private storage, and email automation.
         </p>
       </div>
 
@@ -513,7 +434,7 @@ CREATE POLICY "Allow public updates" ON clinic_settings FOR UPDATE USING (true);
           }`}
         >
           <span className="material-symbols-outlined text-sm">database</span>
-          Supabase Connection Link
+          Hostinger Setup
         </button>
         <button
           onClick={() => setActiveTab('email')}
@@ -591,45 +512,6 @@ CREATE POLICY "Allow public updates" ON clinic_settings FOR UPDATE USING (true);
             </div>
           </div>
 
-          {/* Security / PIN Card */}
-          <div className="bg-surface-container-lowest rounded-3xl p-6 border border-surface-container-highest/50 shadow-xs space-y-4">
-            <h3 className="font-extrabold text-sm text-on-surface flex items-center gap-2 mb-2">
-              <span className="material-symbols-outlined text-primary text-base">security</span>
-              Launch Security &amp; Access Controls
-            </h3>
-
-            <div className="flex items-center justify-between p-3.5 bg-surface rounded-2xl border border-surface-container/60">
-              <div className="flex-1 pr-4">
-                <span className="block text-xs font-extrabold text-on-surface">Require Practitioner PIN</span>
-                <span className="block text-[10px] text-on-surface-variant font-medium mt-0.5 leading-relaxed">
-                  Requires a 4-digit numeric code on launch to prevent unauthorized HIPAA views.
-                </span>
-              </div>
-              <input
-                type="checkbox"
-                checked={requirePin}
-                onChange={() => setRequirePin(p => !p)}
-                className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-0 cursor-pointer"
-              />
-            </div>
-
-            {requirePin && (
-              <div className="flex flex-col gap-1.5 max-w-xs animate-fade-in animate-duration-150">
-                <label className="text-xs font-bold text-on-surface uppercase tracking-wide">Set 4-Digit Security PIN</label>
-                <input
-                  type="text"
-                  pattern="[0-9]{4}"
-                  maxLength={4}
-                  value={pinCode}
-                  onChange={e => setPinCode(e.target.value.replace(/[^0-9]/g, ''))}
-                  className="px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs text-on-surface focus:border-secondary outline-none tracking-widest font-black"
-                  placeholder="1234"
-                  required
-                />
-              </div>
-            )}
-          </div>
-
           {/* UI Appearance Preference */}
           <div className="bg-surface-container-lowest rounded-3xl p-6 border border-surface-container-highest/50 shadow-xs space-y-4">
             <h3 className="font-extrabold text-sm text-on-surface flex items-center gap-2 mb-2">
@@ -686,38 +568,50 @@ CREATE POLICY "Allow public updates" ON clinic_settings FOR UPDATE USING (true);
       {/* Tab 2: Database Connection Checker & Setup Panel */}
       {activeTab === 'database' && (
         <div className="space-y-6 animate-fade-in">
-          {/* Main Credentials Editor */}
+          {/* Main Hostinger Readiness Editor */}
           <div className="bg-surface-container-lowest rounded-3xl p-6 border border-surface-container-highest/50 shadow-xs space-y-4">
             <div>
               <h3 className="font-extrabold text-sm text-on-surface flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-base">settings_ethernet</span>
-                Active Supabase Connection Parameters
+                Hostinger Business Runtime Mapping
               </h3>
               <p className="text-[11px] text-on-surface-variant font-medium mt-1 leading-relaxed">
-                Connect your workspace to any live Supabase cloud database. All queries will update instantly.
+                The browser only talks to this Node API. MySQL credentials, storage paths, and secrets stay on the Hostinger server.
               </p>
             </div>
 
             <form onSubmit={handleConfigSubmit} className="space-y-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-on-surface uppercase tracking-wide">Supabase Project URL</label>
+                <label className="text-xs font-bold text-on-surface uppercase tracking-wide">Node Runtime</label>
                 <input
-                  type="url"
-                  value={supabaseUrl}
-                  onChange={e => setSupabaseUrl(e.target.value)}
-                  placeholder="https://your-project.supabase.co"
+                  type="text"
+                  value={nodeRuntime}
+                  onChange={e => setNodeRuntime(e.target.value)}
+                  placeholder="Node.js 20+"
                   className="px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs text-on-surface focus:border-secondary outline-none transition-all w-full font-mono"
                   required
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-on-surface uppercase tracking-wide">Supabase Anon / Publishable Key</label>
+                <label className="text-xs font-bold text-on-surface uppercase tracking-wide">MySQL Database</label>
                 <input
                   type="text"
-                  value={supabaseKey}
-                  onChange={e => setSupabaseKey(e.target.value)}
-                  placeholder="eyJhbGciOiJIUzI1NiIsIn..."
+                  value={mysqlDatabase}
+                  onChange={e => setMysqlDatabase(e.target.value)}
+                  placeholder="genfinity_clinic_prod"
+                  className="px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs text-on-surface focus:border-secondary outline-none transition-all w-full font-mono"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-on-surface uppercase tracking-wide">Private Storage Directory</label>
+                <input
+                  type="text"
+                  value={privateStoragePath}
+                  onChange={e => setPrivateStoragePath(e.target.value)}
+                  placeholder="../private-clinic-storage"
                   className="px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs text-on-surface focus:border-secondary outline-none transition-all w-full font-mono"
                   required
                 />
@@ -732,7 +626,7 @@ CREATE POLICY "Allow public updates" ON clinic_settings FOR UPDATE USING (true);
                   <span className="material-symbols-outlined text-sm font-bold">
                     {isTesting ? 'sync' : 'network_check'}
                   </span>
-                  {isTesting ? 'Verifying...' : 'Verify & Apply Connection'}
+                  {isTesting ? 'Checking...' : 'Run Readiness Check'}
                 </button>
               </div>
             </form>
@@ -740,17 +634,17 @@ CREATE POLICY "Allow public updates" ON clinic_settings FOR UPDATE USING (true);
             {/* Test Results Banner */}
             {testResult && (
               <div className={`p-4 rounded-2xl border animate-fade-in ${
-                testResult.success && testResult.connected
+                testResult.success && testResult.ready
                   ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 text-emerald-800 dark:text-emerald-300'
                   : 'bg-primary/5 border-primary/20 text-primary'
               }`}>
                 <div className="flex items-start gap-3">
                   <span className="material-symbols-outlined text-lg">
-                    {testResult.success && testResult.connected ? 'check_circle' : 'warning'}
+                    {testResult.success && testResult.ready ? 'check_circle' : 'warning'}
                   </span>
                   <div className="space-y-1">
                     <span className="block text-xs font-black">
-                      {testResult.success && testResult.connected ? 'Connection Success!' : 'Connection Validation Warning'}
+                      {testResult.success && testResult.ready ? 'Hostinger Ready' : 'Readiness Attention Needed'}
                     </span>
                     <span className="block text-[11px] leading-relaxed opacity-90">
                       {testResult.message}
@@ -760,9 +654,9 @@ CREATE POLICY "Allow public updates" ON clinic_settings FOR UPDATE USING (true);
                         Diagnosis: {testResult.error}
                       </span>
                     )}
-                    {testResult.success && testResult.connected && (
+                    {testResult.success && testResult.ready && (
                       <span className="block text-[10px] opacity-80 mt-1 font-bold">
-                        Database tables were checked and are functioning correctly!
+                        Private storage can be written and read through the server process.
                       </span>
                     )}
                   </div>
@@ -777,10 +671,10 @@ CREATE POLICY "Allow public updates" ON clinic_settings FOR UPDATE USING (true);
               <div>
                 <h3 className="font-extrabold text-sm text-on-surface flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary text-base">code</span>
-                  Supabase Initialization SQL Query
+                  MySQL Starter Schema
                 </h3>
                 <p className="text-[11px] text-on-surface-variant font-medium mt-1 leading-relaxed">
-                  Run this SQL script inside your Supabase **SQL Editor** to instantly initialize the clinic configuration, patient registries, and appointment tables with Row-Level Security (RLS) configured properly.
+                  Run this in Hostinger's MySQL database after creating the database and user. It sets the launch foundation for patients, cases, staff, and encrypted document metadata.
                 </p>
               </div>
               <button
@@ -796,11 +690,11 @@ CREATE POLICY "Allow public updates" ON clinic_settings FOR UPDATE USING (true);
 
             <div className="relative bg-[#1e1e1e] rounded-2xl overflow-hidden border border-zinc-800 text-xs font-mono">
               <div className="bg-[#2d2d2d] px-4 py-2 text-zinc-400 text-[10px] flex justify-between items-center select-none">
-                <span>supabase_schema.sql</span>
-                <span className="uppercase text-emerald-400 font-bold">PostgreSQL</span>
+                <span>hostinger_mysql_schema.sql</span>
+                <span className="uppercase text-emerald-400 font-bold">MySQL / InnoDB</span>
               </div>
               <pre className="p-4 overflow-x-auto text-zinc-300 whitespace-pre max-h-[300px] leading-relaxed select-all">
-                {supabaseSQL}
+                {mysqlSQL}
               </pre>
             </div>
           </div>
@@ -809,31 +703,31 @@ CREATE POLICY "Allow public updates" ON clinic_settings FOR UPDATE USING (true);
           <div className="bg-surface-container-lowest rounded-3xl p-6 border border-surface-container-highest/50 shadow-xs space-y-4">
             <h3 className="font-extrabold text-sm text-on-surface flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-base">cloud_upload</span>
-              Clinical File Upload &amp; Storage Setup Guide
+              Private Document Storage Setup
             </h3>
             
             <p className="text-xs text-on-surface-variant leading-relaxed font-medium">
-              The clinical portal is optimized with double-redundancy for file uploading and attachments (LMNs, insurance card scans, clinical letters). Follow these simple steps to configure Supabase Storage:
+              Uploads must live in a private Hostinger directory outside public_html and outside the deployed app target. The API encrypts file contents before writing them.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 bg-surface rounded-2xl border border-surface-container-highest/50 space-y-2">
                 <div className="flex items-center gap-1.5 text-primary text-xs font-black uppercase">
                   <span className="material-symbols-outlined text-sm font-bold">folder_shared</span>
-                  1. Automatic Redundancy
+                  1. Private Disk
                 </div>
                 <p className="text-[10px] text-on-surface-variant leading-relaxed">
-                  Documents are automatically encoded as fast, lightweight binary streams directly inside the <strong>patients.documents</strong> jsonb column. This ensures instant offline sandbox mode saving and requires zero extra cloud resources.
+                  Store encrypted files under <strong>private-clinic-storage</strong>. MySQL stores metadata, checksum, nonce, and authentication tag only.
                 </p>
               </div>
 
               <div className="p-4 bg-surface rounded-2xl border border-surface-container-highest/50 space-y-2">
                 <div className="flex items-center gap-1.5 text-primary text-xs font-black uppercase">
                   <span className="material-symbols-outlined text-sm font-bold">cloud</span>
-                  2. Optional Cloud Bucket
+                  2. Backup Gate
                 </div>
                 <p className="text-[10px] text-on-surface-variant leading-relaxed">
-                  If you want to move to public CDN downloads: open the Supabase dashboard, click <strong>Storage</strong>, create a public bucket named <strong>patient-documents</strong>, and permit select uploads.
+                  Confirm Hostinger backups include this directory, then mirror encrypted backups to Google Drive for independent recovery.
                 </p>
               </div>
             </div>
