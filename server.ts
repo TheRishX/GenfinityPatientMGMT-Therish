@@ -4,13 +4,60 @@ import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+import mysql, { Pool } from 'mysql2/promise';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { DatabaseSchema, Patient, PatientFile, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem, SmtpConfig, EmailTemplate, EmailLog } from './src/types.js';
+
+// Hostinger deployments can provide a private runtime file alongside standard
+// environment variables. Local development continues to use `.env`.
+dotenv.config({ path: process.env.RUNTIME_ENV_PATH || 'hostinger.runtime' });
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DB_PATH = path.join(__dirname, 'src', 'db.json');
 const PRIVATE_STORAGE_PATH = process.env.PRIVATE_STORAGE_PATH || path.resolve(__dirname, '..', 'private-clinic-storage');
+
+const mysqlConfigured = Boolean(
+  process.env.MYSQL_HOST &&
+  process.env.MYSQL_DATABASE &&
+  process.env.MYSQL_USER &&
+  process.env.MYSQL_PASSWORD
+);
+
+let mysqlPool: Pool | null = null;
+
+function getMysqlPool(): Pool | null {
+  if (!mysqlConfigured) return null;
+  if (!mysqlPool) {
+    mysqlPool = mysql.createPool({
+      host: process.env.MYSQL_HOST,
+      port: Number(process.env.MYSQL_PORT || 3306),
+      database: process.env.MYSQL_DATABASE,
+      user: process.env.MYSQL_USER,
+      password: process.env.MYSQL_PASSWORD,
+      connectionLimit: Number(process.env.MYSQL_CONNECTION_LIMIT || 8),
+      waitForConnections: true,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 0,
+      charset: 'utf8mb4'
+    });
+  }
+  return mysqlPool;
+}
+
+async function ensureMysqlSchema(pool: Pool): Promise<void> {
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS app_state (
+      state_key VARCHAR(64) NOT NULL PRIMARY KEY,
+      payload LONGTEXT NOT NULL,
+      updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+        ON UPDATE CURRENT_TIMESTAMP(3)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+}
 
 // Helper to generate initials
 const getInitials = (name: string): string => {
@@ -462,11 +509,30 @@ async function internalTriggerEmail(triggerEvent: string, patientName: string, r
 // Database Accessor Helpers
 async function readDatabase(): Promise<DatabaseSchema> {
   let db: DatabaseSchema;
-  try {
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    db = JSON.parse(data);
-  } catch (e) {
-    db = JSON.parse(JSON.stringify(DEFAULT_DATABASE));
+  const pool = getMysqlPool();
+
+  if (pool) {
+    await ensureMysqlSchema(pool);
+    const [rows] = await pool.execute<any[]>(
+      'SELECT payload FROM app_state WHERE state_key = ? LIMIT 1',
+      ['clinic']
+    );
+    if (rows.length) {
+      db = JSON.parse(rows[0].payload);
+    } else {
+      db = JSON.parse(JSON.stringify(DEFAULT_DATABASE));
+      await pool.execute(
+        'INSERT INTO app_state (state_key, payload) VALUES (?, ?)',
+        ['clinic', JSON.stringify(db)]
+      );
+    }
+  } else {
+    try {
+      const data = await fs.readFile(DB_PATH, 'utf-8');
+      db = JSON.parse(data);
+    } catch (e) {
+      db = JSON.parse(JSON.stringify(DEFAULT_DATABASE));
+    }
   }
 
   // Ensure default Email structures exist
@@ -603,6 +669,16 @@ Billing & Patient Accounts
 }
 
 async function writeDatabase(db: DatabaseSchema): Promise<void> {
+  const pool = getMysqlPool();
+  if (pool) {
+    await ensureMysqlSchema(pool);
+    await pool.execute(
+      `INSERT INTO app_state (state_key, payload) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE payload = VALUES(payload)`,
+      ['clinic', JSON.stringify(db)]
+    );
+    return;
+  }
   await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
   await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2));
 }
@@ -611,8 +687,75 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
 
+  app.disable('x-powered-by');
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+  // A temporary deployment may contain clinical data, so protect the entire
+  // site at the server boundary until a full identity provider is connected.
+  if (process.env.ACCESS_PASSWORD) {
+    const expectedUser = process.env.ACCESS_USERNAME || 'genfinity';
+    const expectedPassword = process.env.ACCESS_PASSWORD;
+    const sessionToken = createHmac('sha256', expectedPassword).update('genfinity-session').digest('hex');
+    const accessPage = (invalid = false) => `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Genfinity Portal Access</title><style>
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f7fb;font:16px system-ui;color:#172033}
+form{width:min(360px,calc(100% - 48px));background:#fff;padding:32px;border-radius:18px;box-shadow:0 16px 50px #1720331a}
+h1{font-size:22px;margin:0 0 8px}p{color:#5d6778;font-size:14px}input,button{box-sizing:border-box;width:100%;padding:12px 14px;border-radius:10px;font:inherit}
+input{border:1px solid #ccd3df;margin:12px 0}button{border:0;background:#075e54;color:#fff;font-weight:700;cursor:pointer}.error{color:#b42318}
+</style></head><body><form method="post" action="/_access"><h1>Genfinity Portal</h1><p>Enter the temporary deployment password to continue.</p>
+${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<input type="password" name="password" autocomplete="current-password" required autofocus>
+<button type="submit">Open portal</button></form></body></html>`;
+
+    app.get('/_access', (_req, res) => res.type('html').send(accessPage()));
+    app.post('/_access', (req, res) => {
+      const supplied = Buffer.from(String(req.body.password || ''));
+      const expected = Buffer.from(expectedPassword);
+      if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
+        return res.status(403).type('html').send(accessPage(true));
+      }
+      res.setHeader('Set-Cookie', `genfinity_access=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=28800`);
+      return res.type('html').send('<!doctype html><meta charset="utf-8"><title>Opening portal</title><script>location.replace("/")</script><p>Access granted. <a href="/">Open the portal</a>.</p>');
+    });
+    app.get('/_logout', (_req, res) => {
+      res.setHeader('Set-Cookie', 'genfinity_access=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0');
+      res.type('html').send(accessPage());
+    });
+
+    app.use((req, res, next) => {
+      const cookieAuthenticated = (req.headers.cookie || '')
+        .split(';')
+        .map(value => value.trim())
+        .includes(`genfinity_access=${sessionToken}`);
+      const authorization = req.headers.authorization || '';
+      const encoded = authorization.startsWith('Basic ') ? authorization.slice(6) : '';
+      let suppliedUser = '';
+      let suppliedPassword = '';
+      try {
+        [suppliedUser, suppliedPassword] = Buffer.from(encoded, 'base64').toString('utf8').split(':', 2);
+      } catch {
+        // Treat malformed authorization as unauthenticated.
+      }
+      suppliedUser = suppliedUser || '';
+      suppliedPassword = suppliedPassword || '';
+
+      const userMatches = suppliedUser === expectedUser;
+      const supplied = Buffer.from(suppliedPassword);
+      const expected = Buffer.from(expectedPassword);
+      const passwordMatches = supplied.length === expected.length && timingSafeEqual(supplied, expected);
+      if (!cookieAuthenticated && (!userMatches || !passwordMatches)) {
+        if (req.method === 'GET') return res.status(200).type('html').send(accessPage());
+        return res.status(403).json({ error: 'Authentication required' });
+      }
+      next();
+    });
+  }
+
+  app.use('/api', (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
 
   // API Routes
   app.get('/api/hostinger-status', async (req, res) => {
@@ -624,11 +767,18 @@ async function startServer() {
       await fs.writeFile(probePath, probeValue, 'utf-8');
       const readBack = await fs.readFile(probePath, 'utf-8');
       await fs.unlink(probePath);
+      const pool = getMysqlPool();
+      if (pool) {
+        await ensureMysqlSchema(pool);
+        await pool.query('SELECT 1');
+      }
       const latencyMs = Date.now() - startTime;
       res.json({
         ready: readBack === probeValue,
         latencyMs,
         runtime: process.version,
+        persistence: pool ? 'mysql' : 'json-fallback',
+        database: pool ? process.env.MYSQL_DATABASE : null,
         privateStoragePath: PRIVATE_STORAGE_PATH,
         issues: readBack === probeValue ? [] : ['Private storage probe readback mismatch']
       });
