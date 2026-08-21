@@ -13,18 +13,6 @@
       "files": []
     },
     {
-      "id": "p2",
-      "name": "Alex Smith",
-      "phone": "(555) 987-6543",
-      "dob": "1992-11-23",
-      "email": "alex@example.com",
-      "referralSource": "hospital",
-      "status": "Consultation",
-      "mrn": "#8832-AS",
-      "avatarInitials": "AS",
-      "files": []
-    },
-    {
       "id": "p3",
       "name": "Michael Johnson",
       "phone": "(555) 456-7890",
@@ -35,47 +23,6 @@
       "mrn": "#5521-MJ",
       "avatarInitials": "MJ",
       "files": []
-    },
-    {
-      "id": "p4",
-      "name": "Eleanor Vance",
-      "phone": "(555) 019-2834",
-      "dob": "1945-04-12",
-      "email": "eleanor@example.com",
-      "referralSource": "specialist",
-      "status": "Fabrication",
-      "mrn": "#8492-AX",
-      "avatarInitials": "EV",
-      "files": [
-        {
-          "id": "f1",
-          "name": "Prescription_DrThorne.pdf",
-          "type": "pdf",
-          "date": "Oct 12, 2023",
-          "size": "1.2 MB"
-        },
-        {
-          "id": "f2",
-          "name": "Scan_Insurance_Card_Front.jpg",
-          "type": "jpg",
-          "date": "Oct 10, 2023",
-          "size": "3.4 MB"
-        },
-        {
-          "id": "f3",
-          "name": "Scan_Insurance_Card_Back.jpg",
-          "type": "jpg",
-          "date": "Oct 10, 2023",
-          "size": "3.1 MB"
-        },
-        {
-          "id": "f4",
-          "name": "Clinical_Notes_Orthopedics.pdf",
-          "type": "pdf",
-          "date": "Oct 05, 2023",
-          "size": "5.8 MB"
-        }
-      ]
     },
     {
       "id": "p5",
@@ -151,16 +98,6 @@
     "appearance": "light"
   },
   "fabrication": [
-    {
-      "id": "fab1",
-      "patientName": "Eleanor Vance",
-      "device": "Custom AFO Brace - Thermoforming",
-      "stage": "Thermoforming",
-      "priority": "Standard",
-      "techNotes": "Vacuum pressure looks stable. Cast corrected +1deg dorsiflexion.",
-      "updatedAt": "Oct 26",
-      "patientId": "p4"
-    },
     {
       "id": "fab2",
       "patientName": "Michael Johnson",
@@ -240,16 +177,6 @@
     }
   ],
   "emailLogs": [
-    {
-      "id": "log_1",
-      "recipientEmail": "eleanor@example.com",
-      "patientName": "Eleanor Vance",
-      "subject": "Custom Device Fabrication Update - Genfinity O&P",
-      "body": "Dear Eleanor Vance,\n\nWe are excited to share an update on your custom-fabricated clinical device (Custom AFO Brace)... Progress Milestone: Thermoforming...",
-      "templateName": "Custom Device Fabrication Progress",
-      "sentAt": "Jul 14, 2026, 02:45 PM",
-      "status": "Sent"
-    },
     {
       "id": "log_2",
       "recipientEmail": "maria@example.com",

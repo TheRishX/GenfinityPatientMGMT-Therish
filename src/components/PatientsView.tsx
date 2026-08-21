@@ -51,6 +51,8 @@ export default function PatientsView({
   const setSelectedPatient = setSelectedPatientProp !== undefined ? setSelectedPatientProp : setLocalSelectedPatient;
 
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
+  const [patientView, setPatientView] = useState<'grid' | 'list' | 'compact'>('grid');
+  const [sortBy, setSortBy] = useState<'priority' | 'name' | 'status'>('priority');
   const [activeProfileTab, setActiveProfileTab] = useState<string>('timeline');
   const [viewingFile, setViewingFile] = useState<PatientFile | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -171,7 +173,11 @@ export default function PatientsView({
       return p.status === 'Archived';
     }
     return true;
-  }).sort((a, b) => Number(Boolean(b.important)) - Number(Boolean(a.important)));
+  }).sort((a, b) => {
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    if (sortBy === 'status') return a.status.localeCompare(b.status) || a.name.localeCompare(b.name);
+    return Number(Boolean(b.important)) - Number(Boolean(a.important)) || a.name.localeCompare(b.name);
+  });
 
   // Handle saving new patient
   const handleSavePatientSubmit = async (e: React.FormEvent) => {
@@ -358,36 +364,58 @@ export default function PatientsView({
         </button>
       </div>
 
-      {/* Patient archive filter tabs */}
-      <div className="flex bg-surface-container-high rounded-full p-0.5 border border-surface-container-highest/60 w-fit select-none">
-        <button
-          onClick={() => setArchiveFilter('active')}
-          className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-            archiveFilter === 'active' ? 'bg-surface shadow-xs text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
-          }`}
-        >
-          Active Records
-        </button>
-        <button
-          onClick={() => setArchiveFilter('archived')}
-          className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-            archiveFilter === 'archived' ? 'bg-surface shadow-xs text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
-          }`}
-        >
-          Archived / Closed
-        </button>
-        <button
-          onClick={() => setArchiveFilter('all')}
-          className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-            archiveFilter === 'all' ? 'bg-surface shadow-xs text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
-          }`}
-        >
-          All Records
-        </button>
+      {/* Focused workspace controls */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-surface-container-highest/70 bg-surface-container-lowest px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-full overflow-x-auto rounded-xl bg-surface-container-low p-1 sm:w-auto">
+          {[
+            { id: 'active', label: 'Active' },
+            { id: 'archived', label: 'Archived' },
+            { id: 'all', label: 'All records' }
+          ].map(filter => (
+            <button
+              key={filter.id}
+              onClick={() => setArchiveFilter(filter.id as typeof archiveFilter)}
+              className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-bold transition-all cursor-pointer ${
+                archiveFilter === filter.id ? 'bg-surface text-on-surface shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between gap-2 sm:justify-end">
+          <span className="hidden text-xs font-semibold text-on-surface-variant md:block">{filteredPatients.length} patients</span>
+          <label className="flex items-center gap-1.5 rounded-lg border border-surface-container-highest px-2.5 py-2 text-xs text-on-surface-variant">
+            <span className="material-symbols-outlined text-sm">sort</span>
+            <select aria-label="Sort patients" value={sortBy} onChange={event => setSortBy(event.target.value as typeof sortBy)} className="bg-transparent font-bold text-on-surface outline-none cursor-pointer">
+              <option value="priority">Priority</option>
+              <option value="name">Name</option>
+              <option value="status">Care status</option>
+            </select>
+          </label>
+          <div className="flex rounded-lg border border-surface-container-highest bg-surface-container-low p-0.5" aria-label="Patient view">
+            {[
+              { id: 'grid', icon: 'grid_view', label: 'Grid view' },
+              { id: 'list', icon: 'view_list', label: 'List view' },
+              { id: 'compact', icon: 'view_compact', label: 'Compact view' }
+            ].map(view => (
+              <button
+                key={view.id}
+                onClick={() => setPatientView(view.id as typeof patientView)}
+                title={view.label}
+                aria-label={view.label}
+                className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors cursor-pointer ${patientView === view.id ? 'bg-surface text-primary shadow-xs' : 'text-on-surface-variant hover:text-on-surface'}`}
+              >
+                <span className="material-symbols-outlined text-base">{view.icon}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Grid of Patients with Minimalist, High-Contrast Enhanced Patient Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Scan-friendly patient records */}
+      <div className={patientView === 'list' ? 'space-y-2' : patientView === 'compact' ? 'grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3' : 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3'}>
         {filteredPatients.map(p => {
           // Determine status color theme
           let statusStyle = 'bg-secondary/10 text-secondary border-secondary/20';
@@ -410,6 +438,30 @@ export default function PatientsView({
 
           const isMenuOpen = openCardMenuId === p.id;
 
+          if (patientView === 'list') {
+            return (
+              <div key={p.id} onClick={() => { setSelectedPatient(p); setActiveProfileTab('timeline'); }} className="group grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-surface-container-highest/70 bg-surface-container-lowest px-3 py-3 transition-all hover:border-secondary/50 hover:shadow-sm sm:grid-cols-[auto_minmax(180px,1.2fr)_minmax(160px,1fr)_minmax(140px,1fr)_auto]">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary/10 text-xs font-black text-secondary">
+                  {p.avatarUrl ? <img className="h-full w-full object-cover" alt={p.name} src={p.avatarUrl} referrerPolicy="no-referrer" /> : <span>{p.avatarInitials}</span>}
+                </div>
+                <div className="min-w-0"><div className="flex items-center gap-2"><h3 className="truncate text-sm font-black text-on-surface">{p.name}</h3>{p.important && <span className="material-symbols-outlined fill text-sm text-amber-600">star</span>}</div><p className="mt-0.5 font-mono text-[10px] font-semibold text-on-surface-variant">{p.mrn}</p></div>
+                <div className="hidden min-w-0 sm:block"><p className="truncate text-xs font-bold text-on-surface">{p.deviceCategory || activeDevice}</p><p className="mt-0.5 text-[10px] text-on-surface-variant">{p.primaryClinician || 'Dr. Sarah Jenkins'}</p></div>
+                <div className="hidden min-w-0 sm:block"><p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Next step</p><p className="truncate text-xs font-semibold text-on-surface">{p.nextAppointment || (nextAppt ? nextAppt.time : 'No visit scheduled')}</p></div>
+                <div className="flex items-center gap-2"><span className={`hidden rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-wide sm:block ${statusStyle}`}>{p.status}</span><span className="material-symbols-outlined text-base text-on-surface-variant transition-transform group-hover:translate-x-0.5">arrow_forward</span></div>
+              </div>
+            );
+          }
+
+          if (patientView === 'compact') {
+            return (
+              <div key={p.id} onClick={() => { setSelectedPatient(p); setActiveProfileTab('timeline'); }} className="group flex cursor-pointer items-center gap-3 rounded-xl border border-surface-container-highest/70 bg-surface-container-lowest px-3 py-2.5 transition-all hover:border-secondary/50 hover:shadow-sm">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary/10 text-[11px] font-black text-secondary">{p.avatarUrl ? <img className="h-full w-full object-cover" alt={p.name} src={p.avatarUrl} referrerPolicy="no-referrer" /> : p.avatarInitials}</div>
+                <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><h3 className="truncate text-xs font-black text-on-surface">{p.name}</h3>{p.important && <span className="material-symbols-outlined fill text-xs text-amber-600">star</span>}</div><p className="mt-0.5 truncate text-[10px] text-on-surface-variant">{p.careStage || p.status} · {p.nextAppointment || (nextAppt ? nextAppt.time : 'No visit')}</p></div>
+                <span className={`h-2 w-2 shrink-0 rounded-full ${p.blockerBadge ? 'bg-amber-500' : p.status === 'Archived' ? 'bg-surface-container-highest' : 'bg-emerald-500'}`} title={p.blockerBadge || p.status} />
+              </div>
+            );
+          }
+
           return (
             <div
               key={p.id}
@@ -417,13 +469,13 @@ export default function PatientsView({
                 setSelectedPatient(p);
                 setActiveProfileTab('timeline');
               }}
-              className="bg-surface-container-lowest rounded-3xl p-6 shadow-xs border border-surface-container-highest/60 cursor-pointer hover:border-secondary hover:shadow-md transition-all group flex flex-col justify-between relative min-h-[290px] space-y-4"
+              className="bg-surface-container-lowest rounded-2xl p-4 shadow-xs border border-surface-container-highest/70 cursor-pointer hover:border-secondary/60 hover:shadow-md transition-all group flex flex-col justify-between relative min-h-[218px] space-y-4"
             >
               {/* Card Header: Avatar, Name, MRN, Status */}
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3.5">
-                    <div className="w-14 h-14 rounded-full bg-secondary/10 text-secondary flex items-center justify-center font-black text-base overflow-hidden shrink-0 border border-secondary/20 shadow-2xs">
+                    <div className="w-11 h-11 rounded-full bg-secondary/10 text-secondary flex items-center justify-center font-black text-sm overflow-hidden shrink-0 border border-secondary/20">
                       {p.avatarUrl ? (
                         <img
                           className="w-full h-full object-cover"
@@ -470,58 +522,10 @@ export default function PatientsView({
                   </div>
                 </div>
 
-                {/* Minimalist Context Blocks */}
-                <div className="mt-5 space-y-2.5">
-                  {/* Active Device & Care Stage */}
-                  <div className="bg-surface p-3 rounded-2xl border border-surface-container flex items-center justify-between text-xs font-bold text-on-surface">
-                    <div className="flex items-center gap-2 truncate">
-                      <span className="material-symbols-outlined text-sm text-secondary shrink-0">precision_manufacturing</span>
-                      <span className="truncate">{p.deviceCategory || activeDevice}</span>
-                    </div>
-                    <span className="text-[9.5px] font-black uppercase text-primary shrink-0 bg-primary/10 px-2.5 py-0.5 rounded-lg border border-primary/20">
-                      {p.careStage || p.status}
-                    </span>
-                  </div>
-
-                  {/* Clinician & Payer */}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-surface p-2.5 rounded-2xl border border-surface-container flex items-center gap-2 truncate">
-                      <span className="material-symbols-outlined text-xs text-secondary shrink-0">stethoscope</span>
-                      <div className="truncate">
-                        <span className="text-[8.5px] font-black uppercase text-on-surface-variant block">Clinician</span>
-                        <span className="font-bold text-on-surface text-[11px] truncate block">
-                          {p.primaryClinician || (p.id === 'p2' || p.id === 'p4' ? 'Dr. Aris Thorne' : 'Dr. Sarah Jenkins')}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="bg-surface p-2.5 rounded-2xl border border-surface-container flex items-center gap-2 truncate">
-                      <span className="material-symbols-outlined text-xs text-primary shrink-0">health_and_safety</span>
-                      <div className="truncate">
-                        <span className="text-[8.5px] font-black uppercase text-on-surface-variant block">Payer</span>
-                        <span className="font-bold text-on-surface text-[11px] truncate block">
-                          {p.insuranceCompany || 'Medicare Blue Cross'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Next Appointment & Workflow Status */}
-                  <div className="flex items-center justify-between text-[11px] font-extrabold pt-1">
-                    <div className="flex items-center gap-1.5 text-on-surface-variant">
-                      <span className="material-symbols-outlined text-xs text-secondary">calendar_today</span>
-                      <span>Next: {p.nextAppointment || (nextAppt ? nextAppt.time : 'Scheduled')}</span>
-                    </div>
-                    {p.blockerBadge ? (
-                      <span className="text-amber-700 dark:text-amber-400 font-black text-[10px] bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200">
-                        ⚠️ {p.blockerBadge}
-                      </span>
-                    ) : (
-                      <span className="text-emerald-700 dark:text-emerald-400 font-bold text-[10px]">
-                        ✓ Active Care
-                      </span>
-                    )}
-                  </div>
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Device</p><p className="mt-0.5 truncate text-xs font-bold text-on-surface">{p.deviceCategory || activeDevice}</p></div><span className="shrink-0 rounded-md bg-primary/8 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-primary">{p.careStage || p.status}</span></div>
+                  <div className="border-t border-surface-container pt-3"><p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Next action</p><p className="mt-0.5 truncate text-xs font-semibold text-on-surface">{p.nextRequiredAction || (nextAppt ? `${nextAppt.type} · ${nextAppt.time}` : 'Review patient chart')}</p></div>
+                  {p.blockerBadge && <p className="truncate text-[10px] font-bold text-amber-700 dark:text-amber-400">Attention: {p.blockerBadge}</p>}
                 </div>
               </div>
 
@@ -529,7 +533,7 @@ export default function PatientsView({
               <div className="pt-3 border-t border-surface-container/60 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black text-secondary group-hover:text-primary flex items-center gap-1 transition-colors">
-                    Open chart
+                    View chart
                     <span className="material-symbols-outlined text-sm">arrow_forward</span>
                   </span>
                   <button
