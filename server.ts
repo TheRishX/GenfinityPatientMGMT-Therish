@@ -17,7 +17,6 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DB_PATH = path.join(__dirname, 'src', 'db.json');
 const PRIVATE_STORAGE_PATH = process.env.PRIVATE_STORAGE_PATH || path.resolve(__dirname, '..', 'private-clinic-storage');
 
 const mysqlConfigured = Boolean(
@@ -424,28 +423,23 @@ async function readDatabase(): Promise<DatabaseSchema> {
   let db: DatabaseSchema;
   const pool = getMysqlPool();
 
-  if (pool) {
-    await ensureMysqlSchema(pool);
-    const [rows] = await pool.execute<any[]>(
-      'SELECT payload FROM app_state WHERE state_key = ? LIMIT 1',
-      ['clinic']
-    );
-    if (rows.length) {
-      db = JSON.parse(rows[0].payload);
-    } else {
-      db = JSON.parse(JSON.stringify(DEFAULT_DATABASE));
-      await pool.execute(
-        'INSERT INTO app_state (state_key, payload) VALUES (?, ?)',
-        ['clinic', JSON.stringify(db)]
-      );
-    }
+  if (!pool) {
+    throw new Error('Hostinger MySQL is not configured. Clinical data access is disabled.');
+  }
+
+  await ensureMysqlSchema(pool);
+  const [rows] = await pool.execute<any[]>(
+    'SELECT payload FROM app_state WHERE state_key = ? LIMIT 1',
+    ['clinic']
+  );
+  if (rows.length) {
+    db = JSON.parse(rows[0].payload);
   } else {
-    try {
-      const data = await fs.readFile(DB_PATH, 'utf-8');
-      db = JSON.parse(data);
-    } catch (e) {
-      db = JSON.parse(JSON.stringify(DEFAULT_DATABASE));
-    }
+    db = JSON.parse(JSON.stringify(DEFAULT_DATABASE));
+    await pool.execute(
+      'INSERT INTO app_state (state_key, payload) VALUES (?, ?)',
+      ['clinic', JSON.stringify(db)]
+    );
   }
 
   // Ensure default Email structures exist
@@ -595,16 +589,11 @@ Billing & Patient Accounts
   const nextLinkedState = JSON.stringify([db.appointments, db.authorizations, db.claims, db.fabrication]);
 
   if (nextLinkedState !== previousLinkedState) {
-    if (pool) {
-      await pool.execute(
-        `INSERT INTO app_state (state_key, payload) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE payload = VALUES(payload)`,
-        ['clinic', JSON.stringify(db)]
-      );
-    } else {
-      await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
-      await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2));
-    }
+    await pool.execute(
+      `INSERT INTO app_state (state_key, payload) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE payload = VALUES(payload)`,
+      ['clinic', JSON.stringify(db)]
+    );
   }
 
   return db;
@@ -612,17 +601,15 @@ Billing & Patient Accounts
 
 async function writeDatabase(db: DatabaseSchema): Promise<void> {
   const pool = getMysqlPool();
-  if (pool) {
-    await ensureMysqlSchema(pool);
-    await pool.execute(
-      `INSERT INTO app_state (state_key, payload) VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE payload = VALUES(payload)`,
-      ['clinic', JSON.stringify(db)]
-    );
-    return;
+  if (!pool) {
+    throw new Error('Hostinger MySQL is not configured. Clinical data writes are disabled.');
   }
-  await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
-  await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2));
+  await ensureMysqlSchema(pool);
+  await pool.execute(
+    `INSERT INTO app_state (state_key, payload) VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE payload = VALUES(payload)`,
+    ['clinic', JSON.stringify(db)]
+  );
 }
 
 async function startServer() {
@@ -715,14 +702,18 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
         await pool.query('SELECT 1');
       }
       const latencyMs = Date.now() - startTime;
+      const mysqlReady = Boolean(pool);
       res.json({
-        ready: readBack === probeValue,
+        ready: readBack === probeValue && mysqlReady,
         latencyMs,
         runtime: process.version,
-        persistence: pool ? 'mysql' : 'json-fallback',
+        persistence: pool ? 'mysql' : 'unavailable',
         database: pool ? process.env.MYSQL_DATABASE : null,
         privateStoragePath: PRIVATE_STORAGE_PATH,
-        issues: readBack === probeValue ? [] : ['Private storage probe readback mismatch']
+        issues: [
+          ...(readBack === probeValue ? [] : ['Private storage probe readback mismatch']),
+          ...(mysqlReady ? [] : ['Hostinger MySQL environment variables are missing'])
+        ]
       });
     } catch (err: any) {
       res.json({

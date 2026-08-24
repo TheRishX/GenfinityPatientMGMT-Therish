@@ -11,19 +11,17 @@ import FabricationView from './components/FabricationView';
 import SettingsView from './components/SettingsView';
 import EmailView from './components/EmailView';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
-import { DEFAULT_DATABASE, getInitials, generateMRN } from './utils/defaultDb';
+import { getInitials, generateMRN } from './utils/defaultDb';
 
 export default function App() {
-  const [db, setDb] = useState<DatabaseSchema | null>(() => {
-    try {
-      const saved = localStorage.getItem('genfinity_db');
-      return saved ? JSON.parse(saved) : DEFAULT_DATABASE;
-    } catch {
-      return DEFAULT_DATABASE;
-    }
-  });
+  // Clinical data must always come from the server-backed Hostinger database.
+  // Do not initialize this state from browser storage: another browser/device
+  // would otherwise see a different database.
+  const [db, setDb] = useState<DatabaseSchema | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isOfflineMode, setIsOfflineMode] = useState<boolean>(false);
+  // Kept as an explicit false value for child component compatibility. There
+  // is intentionally no offline clinical-data mode.
+  const isOfflineMode = false;
 
   // Layout navigation & search
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -99,41 +97,28 @@ export default function App() {
     }
   };
 
-  const saveStateLocally = (newDb: DatabaseSchema) => {
-    setDb(newDb);
-    localStorage.setItem('genfinity_db', JSON.stringify(newDb));
+  // Guard legacy call sites while ensuring no clinical data can ever be
+  // persisted in browser storage.
+  const saveStateLocally = (_newDb: DatabaseSchema): never => {
+    throw new Error('Local clinical-data persistence is disabled.');
   };
 
   // Fetch complete dataset
   const fetchState = async () => {
     try {
-      const res = await fetch('/api/data');
+      const res = await fetch('/api/data', { cache: 'no-store' });
       const contentType = res.headers.get('content-type');
       if (res.ok && contentType && contentType.includes('application/json')) {
         const data: DatabaseSchema = await res.json();
         setDb(data);
-        setIsOfflineMode(false);
         setError(null);
       } else {
         throw new Error('Hostinger API returned a non-JSON response');
       }
     } catch (err: any) {
-      console.warn('Backend server connection failed. Using local Hostinger-ready fallback state.', err);
-      
-      let baseDb = DEFAULT_DATABASE;
-      const localData = localStorage.getItem('genfinity_db');
-      if (localData) {
-        try {
-          baseDb = JSON.parse(localData);
-        } catch (e) {
-          baseDb = DEFAULT_DATABASE;
-        }
-      }
-
-      setDb(baseDb);
-      localStorage.setItem('genfinity_db', JSON.stringify(baseDb));
-      setIsOfflineMode(true);
-      setError(null);
+      console.error('Hostinger database connection failed.', err);
+      setDb(null);
+      setError('The Hostinger database could not be reached. No local data is being used.');
     }
   };
 
@@ -958,7 +943,6 @@ export default function App() {
           setSearchTerm={setSearchTerm}
           onSyncClick={fetchState}
           clinicName={db?.settings.clinicName}
-          isOfflineMode={isOfflineMode}
           appointments={db.appointments}
           alerts={db.alerts}
           onAlertAction={handleAlertActionRedirect}
