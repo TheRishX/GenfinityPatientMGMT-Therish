@@ -933,7 +933,10 @@ Clinical Portal Support Team`;
       const db = await readDatabase();
       res.json(db);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(503).json({
+        error: `Hostinger MySQL is unavailable: ${err.message}`,
+        persistence: 'mysql'
+      });
     }
   });
 
@@ -1433,7 +1436,10 @@ Clinical Portal Support Team`;
   });
 
   // Vite Integration
-  if (process.env.NODE_ENV !== 'production') {
+  // Hostinger Passenger may not provide NODE_ENV. Only opt into Vite when
+  // development is explicitly requested; deployed Node apps must serve the
+  // already-built dist/ bundle.
+  if (process.env.NODE_ENV === 'development') {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,

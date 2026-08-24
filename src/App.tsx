@@ -108,12 +108,16 @@ export default function App() {
     try {
       const res = await fetch('/api/data', { cache: 'no-store' });
       const contentType = res.headers.get('content-type');
-      if (res.ok && contentType && contentType.includes('application/json')) {
-        const data: DatabaseSchema = await res.json();
+      if (contentType && contentType.includes('application/json')) {
+        const payload = await res.json();
+        if (!res.ok) {
+          throw new Error(payload.error || `Hostinger API request failed (${res.status})`);
+        }
+        const data: DatabaseSchema = payload;
         setDb(data);
         setError(null);
       } else {
-        throw new Error('Hostinger API returned a non-JSON response');
+        throw new Error(`Hostinger API returned a non-JSON response (${res.status})`);
       }
     } catch (err: any) {
       console.error('Hostinger database connection failed.', err);
@@ -754,20 +758,22 @@ export default function App() {
     }
   };
 
-  // Return server Error state
-  if (error) {
+  // Do not render the application shell until the authoritative database has
+  // loaded. This also prevents dereferencing db while the initial request is
+  // still pending or after a failed Hostinger connection.
+  if (!db || error) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-surface px-6 text-center select-none">
-        <span className="material-symbols-outlined text-5xl text-primary mb-4">cloud_off</span>
-        <h2 className="text-xl font-extrabold text-on-surface">Connection Timeout</h2>
+        <span className="material-symbols-outlined text-5xl text-primary mb-4">{error ? 'cloud_off' : 'sync'}</span>
+        <h2 className="text-xl font-extrabold text-on-surface">{error ? 'Database Connection Error' : 'Loading clinical data…'}</h2>
         <p className="text-xs text-on-surface-variant max-w-sm mt-2 leading-relaxed">
-          The Genfinity Clinical local server couldn't be reached. Ensure terminal task is running or restart the dev sandbox.
+          {error || 'Connecting to the Hostinger MySQL database. No browser-stored clinical data is being used.'}
         </p>
         <button
           onClick={fetchState}
           className="mt-6 px-6 py-2.5 bg-primary text-white text-xs font-bold rounded-full cursor-pointer flex items-center gap-1.5 shadow-xs"
         >
-          <span className="material-symbols-outlined text-xs">sync</span> Retry Connection
+          <span className="material-symbols-outlined text-xs">sync</span> {error ? 'Retry Connection' : 'Refresh'}
         </button>
       </div>
     );
