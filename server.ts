@@ -20,11 +20,19 @@ const __dirname = path.dirname(__filename);
 
 const PRIVATE_STORAGE_PATH = process.env.PRIVATE_STORAGE_PATH || path.resolve(__dirname, '..', 'private-clinic-storage');
 
+// Hostinger's environment editor can normalize these identifiers to uppercase,
+// while MySQL account names on the server are lowercase and case-sensitive.
+// Normalize identifiers only; passwords must remain byte-for-byte unchanged.
+const MYSQL_HOST = process.env.MYSQL_HOST?.trim();
+const MYSQL_DATABASE = process.env.MYSQL_DATABASE?.trim().toLowerCase();
+const MYSQL_USER = process.env.MYSQL_USER?.trim().toLowerCase();
+const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD;
+
 const mysqlConfigured = Boolean(
-  process.env.MYSQL_HOST &&
-  process.env.MYSQL_DATABASE &&
-  process.env.MYSQL_USER &&
-  process.env.MYSQL_PASSWORD
+  MYSQL_HOST &&
+  MYSQL_DATABASE &&
+  MYSQL_USER &&
+  MYSQL_PASSWORD
 );
 
 let mysqlPool: Pool | null = null;
@@ -71,11 +79,11 @@ function getMysqlPool(): Pool | null {
   if (!mysqlConfigured) return null;
   if (!mysqlPool) {
     mysqlPool = mysql.createPool({
-      host: process.env.MYSQL_HOST,
+      host: MYSQL_HOST,
       port: Number(process.env.MYSQL_PORT || 3306),
-      database: process.env.MYSQL_DATABASE,
-      user: process.env.MYSQL_USER,
-      password: process.env.MYSQL_PASSWORD,
+      database: MYSQL_DATABASE,
+      user: MYSQL_USER,
+      password: MYSQL_PASSWORD,
       connectionLimit: Number(process.env.MYSQL_CONNECTION_LIMIT || 8),
       waitForConnections: true,
       enableKeepAlive: true,
@@ -752,7 +760,7 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
         latencyMs,
         runtime: process.version,
         persistence: pool ? 'mysql' : 'unavailable',
-        database: pool ? process.env.MYSQL_DATABASE : null,
+        database: pool ? MYSQL_DATABASE : null,
         privateStoragePath: PRIVATE_STORAGE_PATH,
         issues: [
           ...(readBack === probeValue ? [] : ['Private storage probe readback mismatch']),
@@ -764,7 +772,7 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
         ready: false,
         issues: [mysqlErrorMessage(err), ...(mysqlErrorHint(err) ? [mysqlErrorHint(err)] : [])],
         privateStoragePath: PRIVATE_STORAGE_PATH,
-        database: process.env.MYSQL_DATABASE || null,
+        database: MYSQL_DATABASE || null,
         mysql: {
           configured: mysqlConfigured,
           reachable: mysqlReady,
