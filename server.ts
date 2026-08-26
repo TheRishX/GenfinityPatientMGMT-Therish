@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
+import { createServer as createNetServer } from 'net';
 import { createServer as createViteServer } from 'vite';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
@@ -27,6 +28,24 @@ const mysqlConfigured = Boolean(
 );
 
 let mysqlPool: Pool | null = null;
+
+function isPortAvailable(port: number): Promise<boolean> {
+  return new Promise(resolve => {
+    const probe = createNetServer();
+    probe.once('error', () => resolve(false));
+    probe.listen(port, '0.0.0.0', () => {
+      probe.close(() => resolve(true));
+    });
+  });
+}
+
+async function findAvailablePort(preferredPort: number): Promise<number> {
+  for (let offset = 0; offset < 20; offset += 1) {
+    const candidate = preferredPort + offset;
+    if (await isPortAvailable(candidate)) return candidate;
+  }
+  return 0;
+}
 
 function mysqlErrorMessage(error: any): string {
   const code = error?.code ? ` (${error.code})` : '';
@@ -1503,11 +1522,12 @@ Clinical Portal Support Team`;
   // development is explicitly requested; deployed Node apps must serve the
   // already-built dist/ bundle.
   if (process.env.NODE_ENV === 'development') {
+    const hmrPort = await findAvailablePort(Number(process.env.VITE_HMR_PORT || 24678));
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
         hmr: {
-          port: Number(process.env.VITE_HMR_PORT || 24678)
+          port: hmrPort
         }
       },
       appType: 'spa'
@@ -1521,8 +1541,18 @@ Clinical Portal Support Team`;
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const httpServer = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
+  });
+  httpServer.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use. The existing Genfinity server may already be running.`);
+      httpServer.close();
+      setImmediate(() => process.exit(0));
+      return;
+    }
+    console.error('Unable to start Genfinity server:', error);
+    process.exitCode = 1;
   });
 }
 
