@@ -28,6 +28,26 @@ const mysqlConfigured = Boolean(
 
 let mysqlPool: Pool | null = null;
 
+function mysqlErrorMessage(error: any): string {
+  const code = error?.code ? ` (${error.code})` : '';
+  return `${error?.message || 'Unknown MySQL error'}${code}`;
+}
+
+function mysqlErrorHint(error: any): string | null {
+  switch (error?.code) {
+    case 'ER_ACCESS_DENIED_ERROR':
+      return 'Verify MYSQL_USER and MYSQL_PASSWORD in Hostinger, then confirm this database user is allowed to connect from the deployed server host.';
+    case 'ER_BAD_DB_ERROR':
+      return 'Verify MYSQL_DATABASE matches the database name shown in Hostinger hPanel.';
+    case 'ENOTFOUND':
+    case 'ECONNREFUSED':
+    case 'ETIMEDOUT':
+      return 'Verify MYSQL_HOST, MYSQL_PORT, and Hostinger remote MySQL access settings.';
+    default:
+      return null;
+  }
+}
+
 function getMysqlPool(): Pool | null {
   if (!mysqlConfigured) return null;
   if (!mysqlPool) {
@@ -686,8 +706,13 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
     next();
   });
 
+  // Browsers request this automatically. Return a deliberate empty response
+  // until a branded icon is configured instead of logging a misleading 404.
+  app.get('/favicon.ico', (_req, res) => res.status(204).end());
+
   // API Routes
   app.get('/api/hostinger-status', async (req, res) => {
+    let mysqlReady = false;
     try {
       const startTime = Date.now();
       await fs.mkdir(PRIVATE_STORAGE_PATH, { recursive: true });
@@ -700,9 +725,9 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
       if (pool) {
         await ensureMysqlSchema(pool);
         await pool.query('SELECT 1');
+        mysqlReady = true;
       }
       const latencyMs = Date.now() - startTime;
-      const mysqlReady = Boolean(pool);
       res.json({
         ready: readBack === probeValue && mysqlReady,
         latencyMs,
@@ -718,8 +743,14 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
     } catch (err: any) {
       res.json({
         ready: false,
-        issues: [err.message],
-        privateStoragePath: PRIVATE_STORAGE_PATH
+        issues: [mysqlErrorMessage(err), ...(mysqlErrorHint(err) ? [mysqlErrorHint(err)] : [])],
+        privateStoragePath: PRIVATE_STORAGE_PATH,
+        database: process.env.MYSQL_DATABASE || null,
+        mysql: {
+          configured: mysqlConfigured,
+          reachable: mysqlReady,
+          code: err?.code || 'UNKNOWN'
+        }
       });
     }
   });
@@ -934,8 +965,10 @@ Clinical Portal Support Team`;
       res.json(db);
     } catch (err: any) {
       res.status(503).json({
-        error: `Hostinger MySQL is unavailable: ${err.message}`,
-        persistence: 'mysql'
+        error: `Hostinger MySQL is unavailable: ${mysqlErrorMessage(err)}`,
+        hint: mysqlErrorHint(err),
+        persistence: 'mysql',
+        code: err?.code || 'DATABASE_UNAVAILABLE'
       });
     }
   });
@@ -1369,6 +1402,36 @@ Clinical Portal Support Team`;
   });
 
   // 10. Update Fabrication Item
+  app.post('/api/fabrication', async (req, res) => {
+    try {
+      const { patientName, device, stage, priority, specifications } = req.body;
+      if (!patientName || !device) {
+        return res.status(400).json({ error: 'patientName and device are required' });
+      }
+
+      const db = await readDatabase();
+      const matchedPatient = db.patients.find(p => p.name.trim().toLowerCase() === patientName.trim().toLowerCase());
+      if (!matchedPatient) return res.status(400).json({ error: 'Select an existing patient.' });
+
+      const item: FabricationItem = {
+        id: `fab_${Date.now()}`,
+        patientId: matchedPatient.id,
+        patientName: matchedPatient.name,
+        device,
+        stage: stage || 'Layout',
+        priority: priority === 'High' || priority === 'Urgent' ? 'Urgent' : 'Standard',
+        techNotes: specifications || 'Created from guided visit flow.',
+        updatedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
+      };
+
+      db.fabrication.unshift(item);
+      await writeDatabase(db);
+      res.status(201).json(item);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.patch('/api/fabrication/:id', async (req, res) => {
     try {
       const { id } = req.params;

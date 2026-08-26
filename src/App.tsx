@@ -111,7 +111,8 @@ export default function App() {
       if (contentType && contentType.includes('application/json')) {
         const payload = await res.json();
         if (!res.ok) {
-          throw new Error(payload.error || `Hostinger API request failed (${res.status})`);
+          const hint = payload.hint ? ` ${payload.hint}` : '';
+          throw new Error(`${payload.error || `Hostinger API request failed (${res.status})`}${hint}`);
         }
         const data: DatabaseSchema = payload;
         setDb(data);
@@ -122,7 +123,7 @@ export default function App() {
     } catch (err: any) {
       console.error('Hostinger database connection failed.', err);
       setDb(null);
-      setError('The Hostinger database could not be reached. No local data is being used.');
+      setError(err?.message || 'The Hostinger database could not be reached. No local data is being used.');
     }
   };
 
@@ -132,7 +133,7 @@ export default function App() {
 
   // API Call: Add Patient
   const handleAddPatient = async (patientData: any) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const generatedMrn = generateMRN();
       const initials = getInitials(patientData.name);
       
@@ -192,7 +193,7 @@ export default function App() {
 
   // API Call: Add Document File
   const handleAddFile = async (patientId: string, fileData: any) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const newFile = {
         id: 'f_' + Date.now(),
         name: fileData.name,
@@ -234,7 +235,7 @@ export default function App() {
 
   // API Call: Delete Document File
   const handleDeleteFile = async (patientId: string, fileId: string) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const updatedPatients = db.patients.map(p => {
         if (p.id === patientId) {
           return {
@@ -265,7 +266,7 @@ export default function App() {
 
   // API Call: Update Patient workflow column
   const handleUpdatePatientStatus = async (patientId: string, status: Patient['status']) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const updatedPatients = db.patients.map(p => {
         if (p.id === patientId) {
           return {
@@ -314,7 +315,7 @@ export default function App() {
 
   // API Call: Comprehensive Patient Update (Demographics, Insurance, Notes)
   const handleUpdatePatient = async (patientId: string, patientData: any) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const currentPatient = db.patients.find(p => p.id === patientId);
       if (!currentPatient) return;
       const nextName = patientData.name?.trim() || currentPatient.name;
@@ -364,7 +365,7 @@ export default function App() {
 
   // API Call: Add Appointment
   const handleAddAppointment = async (apptData: any) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const patient = db.patients.find(p => p.name.trim().toLowerCase() === apptData.patientName.trim().toLowerCase());
       if (!patient) {
         alert('Select an existing patient.');
@@ -402,7 +403,7 @@ export default function App() {
 
   // API Call: Update Appointment Status / Details
   const handleUpdateAppointment = async (apptId: string, updateData: any) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const updatedAppointments = db.appointments.map(a => {
         if (a.id === apptId) {
           return {
@@ -435,7 +436,7 @@ export default function App() {
 
   // API Call: Delete Patient (Admin)
   const handleDeletePatient = async (patientId: string) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const patient = db.patients.find(p => p.id === patientId);
       if (!patient) return;
       const patientName = patient.name.trim().toLowerCase();
@@ -468,7 +469,7 @@ export default function App() {
 
   // API Call: Delete Appointment (Admin)
   const handleDeleteAppointment = async (apptId: string) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const updatedAppointments = db.appointments.filter(a => a.id !== apptId);
       saveStateLocally({
         ...db,
@@ -490,7 +491,7 @@ export default function App() {
 
   // API Call: Update Authorization
   const handleUpdateAuth = async (authId: string, updateData: any) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const updatedAuths = db.authorizations.map(a => {
         if (a.id === authId) {
           return {
@@ -523,7 +524,7 @@ export default function App() {
 
   // API Call: Add Authorization request
   const handleAddAuth = async (authData: any) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const newAuth: Authorization = {
         id: 'au_' + Date.now(),
         patientName: authData.patientName,
@@ -557,7 +558,7 @@ export default function App() {
 
   // API Call: Add Invoice Claim
   const handleAddClaim = async (claimData: any) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const count = db.claims.length + 890;
       const newClaim: Claim = {
         id: 'c_' + Date.now(),
@@ -592,7 +593,7 @@ export default function App() {
 
   // API Call: Update Invoice Claim Status
   const handleUpdateClaimStatus = async (claimId: string, status: Claim['status']) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const updatedClaims = db.claims.map(c => c.id === claimId ? { ...c, status } : c);
       saveStateLocally({
         ...db,
@@ -616,7 +617,7 @@ export default function App() {
 
   // API Call: Save settings config
   const handleSaveSettings = async (settingsData: ClinicSettings) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       saveStateLocally({
         ...db,
         settings: settingsData
@@ -650,7 +651,7 @@ export default function App() {
       updatedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
     };
 
-    if (isOfflineMode) {
+    if (isOfflineMode && db) {
       saveStateLocally({
         ...db,
         fabrication: [newItem, ...db.fabrication]
@@ -664,25 +665,16 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(itemData)
       });
-      if (!res.ok) {
-        saveStateLocally({
-          ...db,
-          fabrication: [newItem, ...db.fabrication]
-        });
-      } else {
-        await fetchState();
-      }
-    } catch {
-      saveStateLocally({
-        ...db,
-        fabrication: [newItem, ...db.fabrication]
-      });
+      if (!res.ok) throw new Error('Failed to create fabrication item');
+      await fetchState();
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
   // API Call: Update Fabrication Workshop item
   const handleUpdateFabrication = async (itemId: string, updateData: any) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const updatedFabs = db.fabrication.map(f => {
         if (f.id === itemId) {
           return {
@@ -736,7 +728,7 @@ export default function App() {
 
   // API Call: Dismiss Alert
   const handleDismissAlert = async (alertId: string) => {
-    if (isOfflineMode || !db) {
+    if (isOfflineMode && db) {
       const updatedAlerts = db ? db.alerts.filter(a => a.id !== alertId) : [];
       if (db) {
         saveStateLocally({
