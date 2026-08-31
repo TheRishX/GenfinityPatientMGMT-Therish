@@ -444,38 +444,51 @@ function buildInvoicePdf({
   clinic: ClinicSettings;
 }): Buffer {
   const money = `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const brand = '0.70 0.04 0.02';
+  const blush = '0.98 0.94 0.94';
+  const ink = '0.12 0.12 0.14';
+  const muted = '0.38 0.35 0.36';
   const lines = [
-    { text: clinic.clinicName || 'Genfinity O&P', x: 54, y: 748, size: 18, font: 'F2' },
-    { text: clinic.primaryAddress || '', x: 54, y: 728, size: 9, font: 'F1' },
-    { text: clinic.contactPhone || '', x: 54, y: 714, size: 9, font: 'F1' },
-    { text: 'PAID INVOICE / RECEIPT', x: 54, y: 664, size: 18, font: 'F2' },
-    { text: `Invoice no. ${claimNumber}`, x: 54, y: 638, size: 10, font: 'F1' },
-    { text: `Issued ${date}`, x: 390, y: 638, size: 10, font: 'F1' },
-    { text: 'PATIENT', x: 54, y: 594, size: 9, font: 'F2' },
-    { text: patient.name, x: 54, y: 576, size: 12, font: 'F2' },
-    { text: `MRN ${patient.mrn || 'Not provided'}`, x: 54, y: 558, size: 9, font: 'F1' },
-    { text: `DOB ${patient.dob || 'Not provided'}`, x: 250, y: 558, size: 9, font: 'F1' },
-    { text: patient.address || '', x: 54, y: 542, size: 9, font: 'F1' },
-    { text: 'BILLING DETAILS', x: 54, y: 494, size: 9, font: 'F2' },
-    { text: 'Description', x: 54, y: 468, size: 9, font: 'F2' },
-    { text: 'Amount', x: 450, y: 468, size: 9, font: 'F2' },
-    { text: 'Orthotic and prosthetic clinical services', x: 54, y: 442, size: 10, font: 'F1' },
-    { text: money, x: 450, y: 442, size: 10, font: 'F2' },
-    { text: `Billing payer: ${payer}`, x: 54, y: 406, size: 9, font: 'F1' },
-    { text: `Clinician: ${doctor}`, x: 54, y: 390, size: 9, font: 'F1' },
-    { text: 'TOTAL PAID', x: 330, y: 344, size: 11, font: 'F2' },
-    { text: money, x: 450, y: 344, size: 16, font: 'F2' },
-    { text: 'Thank you for choosing Genfinity O&P.', x: 54, y: 270, size: 10, font: 'F1' },
-    { text: `Questions? ${clinic.supportEmail || ''}`, x: 54, y: 252, size: 9, font: 'F1' }
+    { text: clinic.clinicName || 'Genfinity O&P', x: 106, y: 725, size: 19, font: 'F2', color: '1 1 1' },
+    { text: clinic.primaryAddress || 'Orthotics and Prosthetics Care', x: 106, y: 707, size: 9, font: 'F1', color: '1 1 1' },
+    { text: clinic.contactPhone || '', x: 106, y: 693, size: 9, font: 'F1', color: '1 1 1' },
+    { text: 'INVOICE', x: 402, y: 725, size: 20, font: 'F2', color: '1 1 1' },
+    { text: `# ${claimNumber}`, x: 402, y: 706, size: 10, font: 'F1', color: '1 1 1' },
+    { text: `Issued ${date}`, x: 402, y: 691, size: 9, font: 'F1', color: '1 1 1' },
+    { text: 'PAID', x: 484, y: 633, size: 10, font: 'F2', color: '0.08 0.45 0.28' },
+    { text: 'BILL TO', x: 60, y: 590, size: 9, font: 'F2', color: brand },
+    { text: patient.name, x: 60, y: 569, size: 15, font: 'F2', color: ink },
+    { text: `MRN ${patient.mrn || 'Not provided'}`, x: 60, y: 550, size: 9, font: 'F1', color: muted },
+    { text: `DOB ${patient.dob || 'Not provided'}`, x: 188, y: 550, size: 9, font: 'F1', color: muted },
+    { text: patient.address || 'Address not provided', x: 60, y: 533, size: 9, font: 'F1', color: muted },
+    { text: 'SERVICE SUMMARY', x: 60, y: 484, size: 9, font: 'F2', color: brand },
+    { text: 'Description', x: 60, y: 456, size: 9, font: 'F2', color: muted },
+    { text: 'Amount', x: 475, y: 456, size: 9, font: 'F2', color: muted },
+    { text: 'Orthotic and prosthetic clinical services', x: 60, y: 427, size: 10, font: 'F1', color: ink },
+    { text: money, x: 475, y: 427, size: 10, font: 'F2', color: ink },
+    { text: `Payer: ${payer || 'Self-pay'}`, x: 60, y: 397, size: 9, font: 'F1', color: muted },
+    { text: `Clinician: ${doctor || 'Not assigned'}`, x: 60, y: 381, size: 9, font: 'F1', color: muted },
+    { text: 'TOTAL PAID', x: 366, y: 326, size: 10, font: 'F2', color: muted },
+    { text: money, x: 475, y: 324, size: 17, font: 'F2', color: brand },
+    { text: 'Thank you for choosing Genfinity O&P.', x: 60, y: 236, size: 10, font: 'F2', color: ink },
+    { text: `Questions? ${clinic.supportEmail || 'Contact the clinic'}`, x: 60, y: 218, size: 9, font: 'F1', color: muted },
+    { text: 'This document is a payment receipt for the services listed above.', x: 60, y: 82, size: 8, font: 'F1', color: muted }
   ];
   const stream = [
     'q',
-    '0.96 0.96 0.96 rg 42 682 528 1 re f',
-    '0.96 0.96 0.96 rg 42 510 528 1 re f',
-    '0.96 0.96 0.96 rg 42 420 528 1 re f',
-    '0.76 0.01 0.08 RG 42 318 528 2 re S',
+    `${brand} rg 42 672 528 78 re f`,
+    // Small vector version of the Genfinity O&P mark in the brand header.
+    '1 0.78 0.77 rg 64 693 m 54 704 50 718 58 730 c 65 739 82 738 91 730 c 82 743 66 748 53 740 c 37 730 39 708 55 696 c 58 694 61 693 64 693 c f',
+    '1 0.78 0.77 rg 84 685 m 98 688 105 699 101 711 c 98 720 89 725 80 727 c 90 720 94 711 91 702 c 89 695 85 690 84 685 c f',
+    '1 1 1 rg 72 739 m 68 716 70 700 76 683 c 82 677 91 678 96 681 c 91 694 88 707 87 720 c 86 729 89 733 99 735 c 104 736 106 739 102 742 c 96 745 78 744 72 739 c f',
+    `${blush} rg 42 512 528 92 re f`,
+    '1 1 1 rg 42 604 528 1 re f',
+    `${blush} rg 42 450 528 1 re f`,
+    `${brand} rg 42 345 528 2 re f`,
+    `${blush} rg 358 294 212 70 re f`,
+    `${blush} rg 42 182 528 1 re f`,
     'Q',
-    ...lines.map(line => `BT /${line.font} ${line.size} Tf ${line.x} ${line.y} Td (${pdfEscape(line.text)}) Tj ET`)
+    ...lines.map(line => `${line.color} rg BT /${line.font} ${line.size} Tf ${line.x} ${line.y} Td (${pdfEscape(line.text)}) Tj ET`)
   ].join('\n');
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
