@@ -5,6 +5,7 @@ export interface PatientFile {
   date: string;
   size: string;
   content?: string;
+  description?: string;
 }
 
 export interface ClinicalNote {
@@ -199,6 +200,26 @@ export interface EmailLog {
   errorMessage?: string;
 }
 
+export interface SmsTemplate {
+  id: string;
+  name: string;
+  body: string;
+  triggerEvent: string;
+}
+
+export interface SmsLog {
+  id: string;
+  patientId?: string;
+  patientName: string;
+  recipientPhone: string;
+  message: string;
+  templateName: string;
+  sentAt: string;
+  status: 'Sent' | 'Failed' | 'Pending';
+  errorMessage?: string;
+  providerMessageId?: string;
+}
+
 export interface DatabaseSchema {
   patients: Patient[];
   appointments: Appointment[];
@@ -210,4 +231,6 @@ export interface DatabaseSchema {
   smtpConfig?: SmtpConfig;
   emailTemplates?: EmailTemplate[];
   emailLogs?: EmailLog[];
+  smsTemplates?: SmsTemplate[];
+  smsLogs?: SmsLog[];
 }

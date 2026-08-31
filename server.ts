@@ -8,7 +8,7 @@ import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import mysql, { Pool } from 'mysql2/promise';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { DatabaseSchema, Patient, PatientFile, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem, SmtpConfig, EmailTemplate, EmailLog } from './src/types.js';
+import { DatabaseSchema, Patient, PatientFile, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem, SmtpConfig, EmailTemplate, EmailLog, SmsLog, SmsTemplate } from './src/types.js';
 
 // Hostinger deployments can provide a private runtime file alongside standard
 // environment variables. Local development continues to use `.env`.
@@ -34,6 +34,21 @@ const mysqlConfigured = Boolean(
   MYSQL_USER &&
   MYSQL_PASSWORD
 );
+
+const BREVO_API_KEY = process.env.BREVO_API_KEY?.trim();
+const BREVO_SMTP_HOST = process.env.BREVO_SMTP_HOST?.trim() || 'smtp-relay.brevo.com';
+const BREVO_SMTP_PORT = Number(process.env.BREVO_SMTP_PORT || 587);
+const BREVO_SMTP_USER = process.env.BREVO_SMTP_USER?.trim();
+const BREVO_SMTP_PASSWORD = process.env.BREVO_SMTP_PASSWORD?.trim();
+const BREVO_FROM_EMAIL = process.env.BREVO_FROM_EMAIL?.trim();
+const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME?.trim() || 'Genfinity O&P';
+const BREVO_REPLY_TO = process.env.BREVO_REPLY_TO?.trim();
+const RINGCENTRAL_SERVER_URL = (process.env.RC_SERVER_URL?.trim() || 'https://platform.ringcentral.com').replace(/\/$/, '');
+const RC_APP_CLIENT_ID = process.env.RC_APP_CLIENT_ID?.trim();
+const RC_APP_CLIENT_SECRET = process.env.RC_APP_CLIENT_SECRET?.trim();
+const RC_USER_JWT = process.env.RC_USER_JWT?.trim();
+const RC_FROM_PHONE_NUMBER = process.env.RC_FROM_PHONE_NUMBER?.trim();
+let ringCentralToken: { accessToken: string; expiresAt: number } | null = null;
 
 let mysqlPool: Pool | null = null;
 
@@ -397,8 +412,123 @@ const DEFAULT_DATABASE: DatabaseSchema = {
   ]
 };
 
+interface EmailAttachment {
+  name: string;
+  content: string;
+  contentType?: string;
+}
+
+function pdfEscape(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+function moneyForEmail(amount: number): string {
+  return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function buildInvoicePdf({
+  patient,
+  claimNumber,
+  payer,
+  doctor,
+  amount,
+  date,
+  clinic
+}: {
+  patient: Patient;
+  claimNumber: string;
+  payer: string;
+  doctor: string;
+  amount: number;
+  date: string;
+  clinic: ClinicSettings;
+}): Buffer {
+  const money = `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const lines = [
+    { text: clinic.clinicName || 'Genfinity O&P', x: 54, y: 748, size: 18, font: 'F2' },
+    { text: clinic.primaryAddress || '', x: 54, y: 728, size: 9, font: 'F1' },
+    { text: clinic.contactPhone || '', x: 54, y: 714, size: 9, font: 'F1' },
+    { text: 'PAID INVOICE / RECEIPT', x: 54, y: 664, size: 18, font: 'F2' },
+    { text: `Invoice no. ${claimNumber}`, x: 54, y: 638, size: 10, font: 'F1' },
+    { text: `Issued ${date}`, x: 390, y: 638, size: 10, font: 'F1' },
+    { text: 'PATIENT', x: 54, y: 594, size: 9, font: 'F2' },
+    { text: patient.name, x: 54, y: 576, size: 12, font: 'F2' },
+    { text: `MRN ${patient.mrn || 'Not provided'}`, x: 54, y: 558, size: 9, font: 'F1' },
+    { text: `DOB ${patient.dob || 'Not provided'}`, x: 250, y: 558, size: 9, font: 'F1' },
+    { text: patient.address || '', x: 54, y: 542, size: 9, font: 'F1' },
+    { text: 'BILLING DETAILS', x: 54, y: 494, size: 9, font: 'F2' },
+    { text: 'Description', x: 54, y: 468, size: 9, font: 'F2' },
+    { text: 'Amount', x: 450, y: 468, size: 9, font: 'F2' },
+    { text: 'Orthotic and prosthetic clinical services', x: 54, y: 442, size: 10, font: 'F1' },
+    { text: money, x: 450, y: 442, size: 10, font: 'F2' },
+    { text: `Billing payer: ${payer}`, x: 54, y: 406, size: 9, font: 'F1' },
+    { text: `Clinician: ${doctor}`, x: 54, y: 390, size: 9, font: 'F1' },
+    { text: 'TOTAL PAID', x: 330, y: 344, size: 11, font: 'F2' },
+    { text: money, x: 450, y: 344, size: 16, font: 'F2' },
+    { text: 'Thank you for choosing Genfinity O&P.', x: 54, y: 270, size: 10, font: 'F1' },
+    { text: `Questions? ${clinic.supportEmail || ''}`, x: 54, y: 252, size: 9, font: 'F1' }
+  ];
+  const stream = [
+    'q',
+    '0.96 0.96 0.96 rg 42 682 528 1 re f',
+    '0.96 0.96 0.96 rg 42 510 528 1 re f',
+    '0.96 0.96 0.96 rg 42 420 528 1 re f',
+    '0.76 0.01 0.08 RG 42 318 528 2 re S',
+    'Q',
+    ...lines.map(line => `BT /${line.font} ${line.size} Tf ${line.x} ${line.y} Td (${pdfEscape(line.text)}) Tj ET`)
+  ].join('\n');
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
+    `<< /Length ${Buffer.byteLength(stream, 'ascii')} >>\nstream\n${stream}\nendstream`
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets[index + 1] = Buffer.byteLength(pdf, 'ascii');
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach(offset => { pdf += `${String(offset).padStart(10, '0')} 00000 n \n`; });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return Buffer.from(pdf, 'ascii');
+}
+
+async function sendBrevoEmail(to: string, subject: string, body: string, attachments: EmailAttachment[] = []): Promise<{ success: boolean; message: string; logs: string[] }> {
+  const logs = [`[${new Date().toLocaleTimeString()}] Sending through Brevo transactional email API...`];
+  if (!BREVO_API_KEY || !BREVO_FROM_EMAIL) {
+    return { success: false, message: 'Brevo API is not configured. Add BREVO_API_KEY and BREVO_FROM_EMAIL.', logs };
+  }
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { accept: 'application/json', 'api-key': BREVO_API_KEY, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sender: { email: BREVO_FROM_EMAIL, name: BREVO_SENDER_NAME },
+        to: [{ email: to }],
+        subject,
+        textContent: body,
+        htmlContent: `<div style="font-family:Arial,sans-serif;white-space:pre-wrap">${body.replace(/[&<>]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char] || char))}</div>`,
+        ...(attachments.length ? { attachment: attachments.map(({ name, content }) => ({ name, content })) } : {}),
+        ...(BREVO_REPLY_TO ? { replyTo: { email: BREVO_REPLY_TO } } : {})
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { success: false, message: data.message || `Brevo returned HTTP ${response.status}.`, logs };
+    logs.push(`[${new Date().toLocaleTimeString()}] Brevo accepted the message${data.messageId ? ` (${data.messageId})` : ''}.`);
+    return { success: true, message: data.messageId ? `Email sent through Brevo. Message ID: ${data.messageId}` : 'Email sent through Brevo.', logs };
+  } catch (error: any) {
+    return { success: false, message: `Brevo error: ${error.message}`, logs };
+  }
+}
+
 // Email Dispatch & Connection Diagnostics Helper
-async function sendEmail(smtp: SmtpConfig, to: string, subject: string, body: string): Promise<{ success: boolean; message: string; logs: string[] }> {
+async function sendEmail(smtp: SmtpConfig, to: string, subject: string, body: string, attachments: EmailAttachment[] = []): Promise<{ success: boolean; message: string; logs: string[] }> {
+  if (BREVO_API_KEY && BREVO_FROM_EMAIL) return sendBrevoEmail(to, subject, body, attachments);
   const logs: string[] = [];
   
   // Sanitize host string: remove protocols like https://, http://, smtp://, ://, and trailing slashes/ports
@@ -455,6 +585,7 @@ async function sendEmail(smtp: SmtpConfig, to: string, subject: string, body: st
       to,
       subject,
       text: body,
+      attachments: attachments.map(attachment => ({ filename: attachment.name, content: Buffer.from(attachment.content, 'base64'), contentType: attachment.contentType })),
     });
 
     logs.push(`[${new Date().toLocaleTimeString()}] Email sent successfully! MessageId: ${info.messageId}`);
@@ -463,6 +594,34 @@ async function sendEmail(smtp: SmtpConfig, to: string, subject: string, body: st
     logs.push(`[${new Date().toLocaleTimeString()}] SMTP Connection or Authentication Error: ${error.message}`);
     return { success: false, message: `SMTP Error: ${error.message}`, logs };
   }
+}
+
+async function getRingCentralAccessToken(): Promise<string> {
+  if (ringCentralToken && ringCentralToken.expiresAt > Date.now() + 30_000) return ringCentralToken.accessToken;
+  if (!RC_APP_CLIENT_ID || !RC_APP_CLIENT_SECRET || !RC_USER_JWT) throw new Error('RingCentral SMS is not configured. Add the RingCentral app credentials and user JWT.');
+  const credentials = Buffer.from(`${RC_APP_CLIENT_ID}:${RC_APP_CLIENT_SECRET}`).toString('base64');
+  const response = await fetch(`${RINGCENTRAL_SERVER_URL}/restapi/oauth/token`, {
+    method: 'POST',
+    headers: { Authorization: `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: RC_USER_JWT })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.access_token) throw new Error(data.error_description || data.message || `RingCentral authentication failed (HTTP ${response.status}).`);
+  ringCentralToken = { accessToken: data.access_token, expiresAt: Date.now() + Number(data.expires_in || 3600) * 1000 };
+  return data.access_token;
+}
+
+async function sendRingCentralSms(to: string, text: string): Promise<{ messageId?: string }> {
+  if (!RC_FROM_PHONE_NUMBER) throw new Error('RingCentral SMS is not configured. Add RC_FROM_PHONE_NUMBER.');
+  const accessToken = await getRingCentralAccessToken();
+  const response = await fetch(`${RINGCENTRAL_SERVER_URL}/restapi/v1.0/account/~/extension/~/sms`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: { phoneNumber: RC_FROM_PHONE_NUMBER }, to: [{ phoneNumber: to }], text })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || `RingCentral rejected the SMS (HTTP ${response.status}).`);
+  return { messageId: data.id ? String(data.id) : undefined };
 }
 
 // Database Accessor Helpers
@@ -788,6 +947,8 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
       const db = await readDatabase();
       res.json({
         smtpConfig: db.smtpConfig ? { ...db.smtpConfig, pass: db.smtpConfig.pass ? '********' : '' } : undefined,
+        provider: BREVO_API_KEY && BREVO_FROM_EMAIL ? 'Brevo API' : 'SMTP fallback',
+        brevoConfigured: Boolean(BREVO_API_KEY && BREVO_FROM_EMAIL),
         emailTemplates: db.emailTemplates,
         emailLogs: db.emailLogs
       });
@@ -948,8 +1109,11 @@ Clinical Portal Support Team`;
       const finalBody = String(body || template.body).trim();
       if (!finalSubject || !finalBody) return res.status(400).json({ error: 'Subject and message are required.' });
 
-      const config = db.smtpConfig;
-      if (!config) return res.status(400).json({ error: 'Brevo SMTP is not configured.' });
+      const config = db.smtpConfig || {
+        host: BREVO_SMTP_HOST, port: BREVO_SMTP_PORT, user: BREVO_SMTP_USER || '', pass: BREVO_SMTP_PASSWORD || '', secure: false,
+        fromEmail: BREVO_FROM_EMAIL || '', senderName: BREVO_SENDER_NAME, replyTo: BREVO_REPLY_TO
+      };
+      if (!BREVO_API_KEY && !BREVO_SMTP_PASSWORD && !db.smtpConfig) return res.status(400).json({ error: 'Configure Brevo API or SMTP before sending email.' });
 
       const result = await sendEmail(config, patient.email, finalSubject, finalBody);
       const newLog: EmailLog = {
@@ -982,6 +1146,47 @@ Clinical Portal Support Team`;
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/sms/config', async (_req, res) => {
+    res.json({ configured: Boolean(RC_APP_CLIENT_ID && RC_APP_CLIENT_SECRET && RC_USER_JWT && RC_FROM_PHONE_NUMBER), provider: 'RingCentral' });
+  });
+
+  app.get('/api/sms/templates', async (_req, res) => {
+    const db = await readDatabase();
+    const templates: SmsTemplate[] = db.smsTemplates?.length ? db.smsTemplates : [
+      { id: 'sms_appointment', name: 'Appointment reminder', body: 'Hi {patientName}, this is a reminder from {clinicName} about your {appointmentType}. Please call us if you need help.', triggerEvent: 'appointment_booked' },
+      { id: 'sms_documents', name: 'Documents needed', body: 'Hi {patientName}, {clinicName} still needs a document from you before we can continue your care. Please contact us when ready.', triggerEvent: 'documents_needed' },
+      { id: 'sms_auth', name: 'Insurance update', body: 'Hi {patientName}, we have an update about your insurance approval. Please contact {clinicName} so we can help with the next step.', triggerEvent: 'auth_status_approved' },
+      { id: 'sms_fitting', name: 'Fitting reminder', body: 'Hi {patientName}, your fitting with {clinicName} is coming up. Please call us if you need to reschedule.', triggerEvent: 'fitting_reminder' }
+    ];
+    res.json({ smsTemplates: templates });
+  });
+
+  app.post('/api/sms/send', async (req, res) => {
+    try {
+      const { patientId, templateId, body } = req.body;
+      const db = await readDatabase();
+      const patient = db.patients.find(item => item.id === patientId);
+      if (!patient) return res.status(404).json({ error: 'Patient not found.' });
+      if (!patient.phone) return res.status(400).json({ error: 'This patient does not have a phone number.' });
+      const templates: SmsTemplate[] = db.smsTemplates?.length ? db.smsTemplates : [
+        { id: 'sms_appointment', name: 'Appointment reminder', body: 'Hi {patientName}, this is a reminder from {clinicName} about your {appointmentType}. Please call us if you need help.', triggerEvent: 'appointment_booked' },
+        { id: 'sms_documents', name: 'Documents needed', body: 'Hi {patientName}, {clinicName} still needs a document from you before we can continue your care. Please contact us when ready.', triggerEvent: 'documents_needed' },
+        { id: 'sms_auth', name: 'Insurance update', body: 'Hi {patientName}, we have an update about your insurance approval. Please contact {clinicName} so we can help with the next step.', triggerEvent: 'auth_status_approved' },
+        { id: 'sms_fitting', name: 'Fitting reminder', body: 'Hi {patientName}, your fitting with {clinicName} is coming up. Please call us if you need to reschedule.', triggerEvent: 'fitting_reminder' }
+      ];
+      const template = templates.find(item => item.id === templateId) || templates[0];
+      const finalBody = String(body || template?.body || '').trim();
+      if (!finalBody) return res.status(400).json({ error: 'Message is required.' });
+      const result = await sendRingCentralSms(patient.phone, finalBody);
+      const log: SmsLog = { id: `smslog_${Date.now()}`, patientId: patient.id, patientName: patient.name, recipientPhone: patient.phone, message: finalBody, templateName: template?.name || 'Custom message', sentAt: new Date().toLocaleString(), status: 'Sent', providerMessageId: result.messageId };
+      db.smsLogs = [log, ...(db.smsLogs || [])];
+      await writeDatabase(db);
+      res.json({ success: true, message: 'SMS sent through RingCentral.', logEntry: log });
+    } catch (err: any) {
+      res.status(502).json({ error: err.message });
     }
   });
 
@@ -1084,7 +1289,7 @@ Clinical Portal Support Team`;
   app.patch('/api/patients/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, phone, dob, email, referralSource, status, insuranceCompany, insuranceId, address, gender, clinicalNotes, avatarUrl, important } = req.body;
+      const { name, phone, dob, email, referralSource, status, careStage, insuranceCompany, insuranceId, address, gender, clinicalNotes, avatarUrl, important } = req.body;
 
       const db = await readDatabase();
       const patient = db.patients.find(p => p.id === id);
@@ -1127,6 +1332,7 @@ Clinical Portal Support Team`;
       if (email !== undefined) patient.email = email;
       if (referralSource !== undefined) patient.referralSource = referralSource;
       if (status !== undefined) patient.status = status;
+      if (careStage !== undefined) patient.careStage = careStage;
       if (insuranceCompany !== undefined) patient.insuranceCompany = insuranceCompany;
       if (insuranceId !== undefined) patient.insuranceId = insuranceId;
       if (address !== undefined) patient.address = address;
@@ -1247,7 +1453,7 @@ Clinical Portal Support Team`;
   app.post('/api/patients/:id/files', async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, type, size, content } = req.body;
+      const { name, type, size, content, description } = req.body;
 
       if (!name) {
         return res.status(400).json({ error: 'Filename is required' });
@@ -1266,6 +1472,7 @@ Clinical Portal Support Team`;
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
         size: size || '1.0 MB',
         content: content || '' // Direct base64 content
+        , description: description || ''
       };
 
       patient.files = [newFile, ...(patient.files || [])] as PatientFile[];
@@ -1357,13 +1564,15 @@ Clinical Portal Support Team`;
   // 8. Add Claim
   app.post('/api/claims', async (req, res) => {
     try {
-      const { patientName, payer, doctor, amount, status } = req.body;
+      const { patientName, patientId, payer, doctor, amount, status, sendInvoice = false } = req.body;
       if (!patientName || !amount) {
         return res.status(400).json({ error: 'patientName and amount are required' });
       }
 
       const db = await readDatabase();
-      const matchedPatient = db.patients.find(p => p.name.trim().toLowerCase() === patientName.trim().toLowerCase());
+      const matchedPatient = patientId
+        ? db.patients.find(p => p.id === patientId)
+        : db.patients.find(p => p.name.trim().toLowerCase() === patientName.trim().toLowerCase());
       if (!matchedPatient) return res.status(400).json({ error: 'Select an existing patient.' });
       const count = db.claims.length + 890;
       const newClaim: Claim = {
@@ -1381,7 +1590,50 @@ Clinical Portal Support Team`;
       db.claims.unshift(newClaim);
       await writeDatabase(db);
 
-      res.status(201).json(newClaim);
+      let emailResult: { success: boolean; message: string } | undefined;
+      if (sendInvoice) {
+        if (!matchedPatient.email) {
+          emailResult = { success: false, message: 'Invoice saved, but this patient does not have an email address.' };
+        } else {
+          const invoicePdf = buildInvoicePdf({ patient: matchedPatient, claimNumber: newClaim.claimNumber, payer: newClaim.payer, doctor: newClaim.doctor, amount: newClaim.amount, date: newClaim.date, clinic: db.settings });
+          const finalSubject = `Paid invoice ${newClaim.claimNumber} - ${db.settings.clinicName}`;
+          const finalBody = `Hello ${matchedPatient.name},\n\nPlease find your invoice and receipt attached for ${moneyForEmail(newClaim.amount)}.\n\nInvoice: ${newClaim.claimNumber}\nBilling payer: ${newClaim.payer}\nClinician: ${newClaim.doctor}\n\nIf you have questions, please contact ${db.settings.supportEmail || 'our billing team'}.\n\nSincerely,\n${db.settings.clinicName}`;
+          const config = db.smtpConfig || { host: BREVO_SMTP_HOST, port: BREVO_SMTP_PORT, user: BREVO_SMTP_USER || '', pass: BREVO_SMTP_PASSWORD || '', secure: false, fromEmail: BREVO_FROM_EMAIL || '', senderName: BREVO_SENDER_NAME, replyTo: BREVO_REPLY_TO };
+          const result = await sendEmail(config, matchedPatient.email, finalSubject, finalBody, [{ name: `${newClaim.claimNumber}.pdf`, content: invoicePdf.toString('base64'), contentType: 'application/pdf' }]);
+          emailResult = { success: result.success, message: result.message };
+          const emailLog: EmailLog = {
+            id: `log_${Date.now()}`,
+            recipientEmail: matchedPatient.email,
+            patientName: matchedPatient.name,
+            subject: finalSubject,
+            body: finalBody,
+            templateName: 'Paid invoice receipt',
+            sentAt: new Date().toLocaleString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }),
+            status: result.success ? 'Sent' : 'Failed',
+            errorMessage: result.success ? undefined : result.message
+          };
+          db.emailLogs = [emailLog, ...(db.emailLogs || [])];
+          await writeDatabase(db);
+        }
+      }
+
+      res.status(201).json({ ...newClaim, emailResult });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/claims/:id/invoice.pdf', async (req, res) => {
+    try {
+      const db = await readDatabase();
+      const claim = db.claims.find(item => item.id === req.params.id);
+      if (!claim) return res.status(404).json({ error: 'Invoice not found.' });
+      const patient = db.patients.find(item => item.id === claim.patientId) || db.patients.find(item => item.name === claim.patientName);
+      if (!patient) return res.status(404).json({ error: 'Patient not found.' });
+      const pdf = buildInvoicePdf({ patient, claimNumber: claim.claimNumber, payer: claim.payer, doctor: claim.doctor, amount: claim.amount, date: claim.date, clinic: db.settings });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${claim.claimNumber}.pdf"`);
+      res.send(pdf);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

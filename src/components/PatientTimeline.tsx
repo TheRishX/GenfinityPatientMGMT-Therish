@@ -312,48 +312,6 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
     }
   });
 
-  // Add default demo clinical photos if none exist to ensure immediate rich visual feedback
-  if (aggregatedMedia.length === 0) {
-    aggregatedMedia.push(
-      {
-        id: 'demo_1',
-        name: 'Transtibial_Residual_Limb_Cast_Photo.jpg',
-        url: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=800&q=80',
-        category: 'casting',
-        date: '2026-07-20',
-        author: 'Dr. Sarah Jenkins',
-        size: '240 KB',
-        compressedStats: 'Saved 88% storage via lossless compression',
-        sourceTitle: 'Casting Session & Impression',
-        eventType: 'visit'
-      },
-      {
-        id: 'demo_2',
-        name: '3D_Digital_Limb_Laser_Scan_Mesh.png',
-        url: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=800&q=80',
-        category: 'scan',
-        date: '2026-07-18',
-        author: 'Tech. Marcus Vance',
-        size: '310 KB',
-        compressedStats: 'Saved 91% storage via lossless compression',
-        sourceTitle: 'Central Fab 3D Scan Ingestion',
-        eventType: 'fabrication'
-      },
-      {
-        id: 'demo_3',
-        name: 'Gait_Alignment_Post_Fitting_Analysis.jpg',
-        url: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=800&q=80',
-        category: 'casting',
-        date: '2026-07-15',
-        author: 'Dr. Sarah Jenkins',
-        size: '180 KB',
-        compressedStats: 'Saved 85% storage via lossless compression',
-        sourceTitle: 'Check Socket Trial & Dynamic Alignment',
-        eventType: 'visit'
-      }
-    );
-  }
-
   // Filter gallery media
   const filteredGalleryMedia = aggregatedMedia.filter(m => {
     if (galleryFilter === 'all') return true;

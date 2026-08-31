@@ -584,8 +584,14 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(claimData)
       });
-      if (!res.ok) throw new Error('Failed to post claim invoice');
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || 'Failed to post claim invoice');
       await fetchState();
+      if (claimData.sendInvoice) {
+        alert(payload.emailResult?.success
+          ? `Invoice ${payload.claimNumber} was created and emailed to the patient.`
+          : (payload.emailResult?.message || 'Invoice created, but the email could not be sent.'));
+      }
     } catch (err: any) {
       alert(err.message);
     }

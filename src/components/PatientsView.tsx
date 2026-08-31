@@ -3,6 +3,7 @@ import { Patient, PatientFile, Appointment, Authorization, Claim, ClinicalNote, 
 import { PatientTimeline } from './PatientTimeline';
 import { compressImageFile } from '../utils/imageCompressor';
 import PatientEmailModal from './PatientEmailModal';
+import PatientSmsModal from './PatientSmsModal';
 
 interface PatientsViewProps {
   patients: Patient[];
@@ -24,6 +25,18 @@ interface PatientsViewProps {
   selectedPatient?: Patient | null;
   setSelectedPatient?: (patient: Patient | null) => void;
 }
+
+const careStages: Array<{ value: NonNullable<Patient['careStage']>; label: string; color: string }> = [
+  { value: 'Referral', label: 'New referral', color: 'bg-slate-100 text-slate-700 border-slate-200' },
+  { value: 'Evaluation', label: 'Evaluation', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { value: 'Authorization', label: 'Insurance approval', color: 'bg-amber-100 text-amber-800 border-amber-200' },
+  { value: 'Casting/scan', label: 'Casting or scan', color: 'bg-violet-100 text-violet-800 border-violet-200' },
+  { value: 'Fabrication', label: 'Device being made', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+  { value: 'Fitting', label: 'Fitting', color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+  { value: 'Delivery', label: 'Delivery', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  { value: 'Follow-up', label: 'Follow-up', color: 'bg-teal-100 text-teal-800 border-teal-200' },
+  { value: 'Closed', label: 'Complete', color: 'bg-surface-container text-on-surface-variant border-surface-container-highest' }
+];
 
 export default function PatientsView({
   patients,
@@ -53,16 +66,19 @@ export default function PatientsView({
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
   const [patientView, setPatientView] = useState<'grid' | 'list' | 'compact'>('grid');
   const [sortBy, setSortBy] = useState<'priority' | 'name' | 'status'>('priority');
-  const [activeProfileTab, setActiveProfileTab] = useState<string>('timeline');
+  const [activeProfileTab, setActiveProfileTab] = useState<string>('info');
   const [viewingFile, setViewingFile] = useState<PatientFile | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   // Card Overflow Menu & Admin Security Delete Modal state
   const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
   const [deleteModalPatient, setDeleteModalPatient] = useState<Patient | null>(null);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
   const [emailPatient, setEmailPatient] = useState<Patient | null>(null);
+  const [smsPatient, setSmsPatient] = useState<Patient | null>(null);
   const [timelineCategory, setTimelineCategory] = useState<'all' | 'visits' | 'notes' | 'orders' | 'auth' | 'fabrication' | 'documents'>('all');
 
   // Quick Add Timeline Event States
@@ -88,6 +104,7 @@ export default function PatientsView({
   const [editInfoAddress, setEditInfoAddress] = useState('');
   const [editInfoGender, setEditInfoGender] = useState('');
   const [editInfoAvatarUrl, setEditInfoAvatarUrl] = useState('');
+  const [editInfoCareStage, setEditInfoCareStage] = useState<Patient['careStage']>('Referral');
 
   // Appointments Tab States
   const [newApptDate, setNewApptDate] = useState('');
@@ -133,7 +150,9 @@ export default function PatientsView({
       setEditInfoAddress(selectedPatient.address || '');
       setEditInfoGender(selectedPatient.gender || 'Not specified');
       setEditInfoAvatarUrl(selectedPatient.avatarUrl || '');
+      setEditInfoCareStage(selectedPatient.careStage || 'Referral');
       setIsEditingInfo(false);
+      setActiveProfileTab('info');
     }
   }, [selectedPatient?.id]);
 
@@ -255,6 +274,9 @@ export default function PatientsView({
     if (!selectedPatient) return;
 
     try {
+      setIsUploadingFile(true);
+      setUploadError('');
+      if (file.size > 15 * 1024 * 1024) throw new Error('This file is larger than 15 MB. Choose a smaller file.');
       const isImg = file.type.startsWith('image/') || file.name.match(/\.(jpg|jpeg|png|webp)$/i);
       let content = '';
       let sizeStr = '';
@@ -301,8 +323,10 @@ export default function PatientsView({
           files: [newFile, ...(prev.files || [])]
         };
       });
-    } catch (err) {
-      console.error('Error uploading file:', err);
+    } catch (err: any) {
+      setUploadError(err.message || 'The file could not be uploaded.');
+    } finally {
+      setIsUploadingFile(false);
     }
   };
 
@@ -440,7 +464,7 @@ export default function PatientsView({
 
           if (patientView === 'list') {
             return (
-              <div key={p.id} onClick={() => { setSelectedPatient(p); setActiveProfileTab('timeline'); }} className="group grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-surface-container-highest/70 bg-surface-container-lowest px-3 py-3 transition-all hover:border-secondary/50 hover:shadow-sm sm:grid-cols-[auto_minmax(180px,1.2fr)_minmax(160px,1fr)_minmax(140px,1fr)_auto]">
+              <div key={p.id} onClick={() => { setSelectedPatient(p); setActiveProfileTab('info'); }} className="group grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-surface-container-highest/70 bg-surface-container-lowest px-3 py-3 transition-all hover:border-secondary/50 hover:shadow-sm sm:grid-cols-[auto_minmax(180px,1.2fr)_minmax(160px,1fr)_minmax(140px,1fr)_auto]">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary/10 text-xs font-black text-secondary">
                   {p.avatarUrl ? <img className="h-full w-full object-cover" alt={p.name} src={p.avatarUrl} referrerPolicy="no-referrer" /> : <span>{p.avatarInitials}</span>}
                 </div>
@@ -454,7 +478,7 @@ export default function PatientsView({
 
           if (patientView === 'compact') {
             return (
-              <div key={p.id} onClick={() => { setSelectedPatient(p); setActiveProfileTab('timeline'); }} className="group flex cursor-pointer items-center gap-3 rounded-xl border border-surface-container-highest/70 bg-surface-container-lowest px-3 py-2.5 transition-all hover:border-secondary/50 hover:shadow-sm">
+              <div key={p.id} onClick={() => { setSelectedPatient(p); setActiveProfileTab('info'); }} className="group flex cursor-pointer items-center gap-3 rounded-xl border border-surface-container-highest/70 bg-surface-container-lowest px-3 py-2.5 transition-all hover:border-secondary/50 hover:shadow-sm">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary/10 text-[11px] font-black text-secondary">{p.avatarUrl ? <img className="h-full w-full object-cover" alt={p.name} src={p.avatarUrl} referrerPolicy="no-referrer" /> : p.avatarInitials}</div>
                 <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><h3 className="truncate text-xs font-black text-on-surface">{p.name}</h3>{p.important && <span className="material-symbols-outlined fill text-xs text-amber-600">star</span>}</div><p className="mt-0.5 truncate text-[10px] text-on-surface-variant">{p.careStage || p.status} · {p.nextAppointment || (nextAppt ? nextAppt.time : 'No visit')}</p></div>
                 <span className={`h-2 w-2 shrink-0 rounded-full ${p.blockerBadge ? 'bg-amber-500' : p.status === 'Archived' ? 'bg-surface-container-highest' : 'bg-emerald-500'}`} title={p.blockerBadge || p.status} />
@@ -467,7 +491,7 @@ export default function PatientsView({
               key={p.id}
               onClick={() => {
                 setSelectedPatient(p);
-                setActiveProfileTab('timeline');
+                setActiveProfileTab('info');
               }}
               className="bg-surface-container-lowest rounded-2xl p-4 shadow-xs border border-surface-container-highest/70 cursor-pointer hover:border-secondary/60 hover:shadow-md transition-all group flex flex-col justify-between relative min-h-[218px] space-y-4"
             >
@@ -546,6 +570,15 @@ export default function PatientsView({
                   >
                     <span className="material-symbols-outlined text-sm">mail</span>
                     Email
+                  </button>
+                  <button
+                    onClick={event => { event.stopPropagation(); setSmsPatient(p); }}
+                    disabled={!p.phone}
+                    title={p.phone ? `Text ${p.name}` : 'No phone number'}
+                    className="px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-bold cursor-pointer hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-sm">sms</span>
+                    Text
                   </button>
                 </div>
 
@@ -816,6 +849,9 @@ export default function PatientsView({
                       }`}>
                         {selectedPatient.status}
                       </span>
+                      <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${careStages.find(stage => stage.value === selectedPatient.careStage)?.color || 'bg-blue-100 text-blue-800 border-blue-200'}`}>
+                        {careStages.find(stage => stage.value === selectedPatient.careStage)?.label || 'Current stage not set'}
+                      </span>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-on-surface-variant">
                       <span className="font-mono">MRN {selectedPatient.mrn}</span>
@@ -827,82 +863,23 @@ export default function PatientsView({
                     </div>
                   </div>
                 </div>
-                <div className="rounded-xl bg-primary/5 border border-primary/10 px-4 py-3 min-w-0">
-                  <span className="block text-[9px] font-black uppercase tracking-wider text-primary">Next action</span>
-                  <p className="mt-0.5 text-xs font-bold text-on-surface truncate" title={selectedPatient.nextRequiredAction || 'Capture 3D scan & submit l-code auth'}>
-                    {selectedPatient.nextRequiredAction || 'Capture 3D scan & submit l-code auth'}
-                  </p>
-                  <p className="mt-1 text-[10px] text-on-surface-variant">
-                    Next visit: <strong className="text-on-surface">{selectedPatient.nextAppointment || 'Today 2:00 PM'}</strong>
-                  </p>
+                <div className="rounded-xl bg-surface-container-low px-4 py-3 min-w-0">
+                  <span className="block text-sm font-bold text-on-surface-variant">Patient record</span>
+                  <p className="mt-1 text-base font-bold text-on-surface">Basic information</p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2" aria-label="Patient actions">
-                {[
-                  ['appointments', 'calendar_today', 'Start visit'],
-                  ['notes', 'edit_note', 'Add note'],
-                  ['documents', 'upload_file', 'Upload document'],
-                  ['authorization', 'verified_user', 'Check insurance']
-                ].map(([tab, icon, label]) => (
-                  <button key={tab} onClick={() => setActiveProfileTab(tab)} className="min-h-11 rounded-xl border border-surface-container-highest bg-surface-container-lowest px-3 py-2 text-sm font-bold text-on-surface transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary">
-                    <span className="material-symbols-outlined mr-1.5 text-base align-[-3px]">{icon}</span>{label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-surface-container-highest rounded-xl border border-surface-container-highest overflow-hidden bg-surface-container-low/35">
-                <div className="px-3 py-2.5 min-w-0">
-                  <span className="block text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Diagnosis</span>
-                  <p className="mt-0.5 text-[11px] font-bold text-on-surface truncate" title={selectedPatient.diagnosis || 'Post-tibial tendon dysfunction / Pes Planus'}>
-                    {selectedPatient.diagnosis || 'Post-tibial tendon dysfunction / Pes Planus'}
-                  </p>
-                  <span className="text-[10px] text-primary font-semibold">{selectedPatient.affectedSide || 'Left'} side</span>
-                </div>
-                <div className="px-3 py-2.5 min-w-0">
-                  <span className="block text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Device</span>
-                  <p className="mt-0.5 text-[11px] font-bold text-on-surface truncate">{selectedPatient.deviceCategory || 'Custom Foot Orthosis'}</p>
-                  <span className="text-[10px] text-on-surface-variant">{selectedPatient.fabricationOwner || 'Tech Mike'}</span>
-                </div>
-                <div className="px-3 py-2.5 min-w-0 border-t lg:border-t-0 border-surface-container-highest">
-                  <span className="block text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Coverage</span>
-                  <p className="mt-0.5 text-[11px] font-bold text-on-surface truncate">{selectedPatient.insuranceCompany || 'Medicare Blue Cross'}</p>
-                  <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold">{selectedPatient.authStatus || 'Approved'}</span>
-                </div>
-                <div className="px-3 py-2.5 min-w-0 border-t lg:border-t-0 border-surface-container-highest">
-                  <span className="block text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">Care stage</span>
-                  <select
-                    aria-label="Care stage"
-                    value={selectedPatient.careStage || 'Evaluation'}
-                    onChange={async (event) => {
-                      const stage = event.target.value;
-                      await onUpdatePatient(selectedPatient.id, {
-                        careStage: stage as any,
-                        status: stage === 'Referral' ? 'New Referral' : stage === 'Authorization' ? 'Auth Pending' : stage === 'Fabrication' ? 'Fabrication' : stage === 'Closed' ? 'Archived' : 'In Progress'
-                      });
-                    }}
-                    className="mt-0.5 w-full bg-transparent text-[11px] font-bold text-on-surface outline-none cursor-pointer"
-                  >
-                    {['Referral', 'Evaluation', 'Authorization', 'Casting/scan', 'Fabrication', 'Fitting', 'Delivery', 'Follow-up', 'Closed'].map(stage => (
-                      <option key={stage} value={stage}>{stage}</option>
-                    ))}
-                  </select>
-                  <span className={`text-[10px] font-medium ${selectedPatient.allergies?.length ? 'text-red-600 dark:text-red-400' : 'text-on-surface-variant'}`}>
-                    {selectedPatient.allergies?.length ? selectedPatient.allergies.join(', ') : 'No known allergies'}
-                  </span>
-                </div>
-              </div>
             </div>
 
-            {/* Profile Tab Navigation */}
+            {/* One patient menu: every section stays in one predictable horizontal line. */}
             <nav className="px-4 flex gap-1 border-b border-surface-container-highest bg-surface-container-lowest shrink-0 overflow-x-auto select-none" aria-label="Patient profile sections">
               {[
-                { id: 'timeline', label: 'Overview', icon: 'space_dashboard' },
-                { id: 'info', label: 'Clinical', icon: 'clinical_notes' },
+                { id: 'info', label: 'Patient information', icon: 'contact_page' },
                 { id: 'appointments', label: 'Visits', icon: 'calendar_month' },
                 { id: 'documents', label: 'Files', icon: 'folder_open' },
-                { id: 'authorization', label: 'Auth', icon: 'verified_user' },
-                { id: 'billing', label: 'Billing', icon: 'receipt_long' },
+                { id: 'timeline', label: 'Overview', icon: 'space_dashboard' },
+                { id: 'authorization', label: 'Insurance', icon: 'verified_user' },
+                { id: 'billing', label: 'Payments', icon: 'receipt_long' },
                 { id: 'notes', label: 'Notes', icon: 'edit_note' }
               ].map(tab => (
                 <button
@@ -1033,6 +1010,8 @@ export default function PatientsView({
                         style={{ display: 'none' }}
                         accept="image/*,.pdf,.doc,.docx"
                       />
+                      {isUploadingFile && <p className="text-xs font-bold text-primary mb-3">Uploading securely…</p>}
+                      {uploadError && <p className="text-xs font-semibold text-red-700 mb-3" role="alert">{uploadError}</p>}
                       <div className="w-12 h-12 rounded-full bg-secondary-container/30 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
                         <span className="material-symbols-outlined text-xl text-on-secondary-container">cloud_upload</span>
                       </div>
@@ -1040,9 +1019,9 @@ export default function PatientsView({
                       <p className="text-[10px] font-semibold text-on-surface-variant leading-relaxed mb-4">
                         Drag and drop PDFs, JPGs, or scan directly.
                       </p>
-                      <button className="w-full py-2.5 rounded-full bg-secondary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer">
+                      <button disabled={isUploadingFile} className="w-full py-2.5 rounded-full bg-secondary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50">
                         <span className="material-symbols-outlined text-xs">add</span>
-                        Select Files
+                        {isUploadingFile ? 'Uploading…' : 'Select a file'}
                       </button>
                     </div>
                   </div>
@@ -1051,7 +1030,7 @@ export default function PatientsView({
                   <div>
                     <h2 className="text-sm font-black text-on-surface mb-4 flex items-center gap-2">
                       <span className="material-symbols-outlined text-secondary text-lg">folder_open</span>
-                      Patient Files
+                      Files for {selectedPatient.name}
                     </h2>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1138,6 +1117,7 @@ export default function PatientsView({
                           email: editInfoEmail,
                           referralSource: editInfoReferralSource,
                           status: editInfoStatus,
+                          careStage: editInfoCareStage,
                           insuranceCompany: editInfoInsuranceCompany,
                           insuranceId: editInfoInsuranceId,
                           address: editInfoAddress,
@@ -1197,6 +1177,16 @@ export default function PatientsView({
                             <option value="hospital">Hospital Discharge</option>
                             <option value="specialist">Orthopedic Specialist</option>
                             <option value="other">Other</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Current care stage</label>
+                          <select
+                            value={editInfoCareStage}
+                            onChange={(e) => setEditInfoCareStage(e.target.value as Patient['careStage'])}
+                            className={`w-full px-4 py-2.5 rounded-md border text-xs font-semibold focus:border-primary outline-none ${careStages.find(stage => stage.value === editInfoCareStage)?.color || ''}`}
+                          >
+                            {careStages.map(stage => <option key={stage.value} value={stage.value}>{stage.label}</option>)}
                           </select>
                         </div>
                         <div className="space-y-1">
@@ -1671,10 +1661,12 @@ export default function PatientsView({
                           e.preventDefault();
                           if (!newClaimPayer || !newClaimAmount) return;
                           await onAddClaim({
+                            patientId: selectedPatient.id,
                             patientName: selectedPatient.name,
                             payer: newClaimPayer,
                             amount: newClaimAmount,
-                            doctor: newClaimDoc || 'Dr. Sarah Jenkins'
+                            doctor: newClaimDoc || selectedPatient.primaryClinician || 'Dr. Sarah Jenkins',
+                            sendInvoice: true
                           });
                           // Reset
                           setNewClaimPayer('');
@@ -1721,7 +1713,7 @@ export default function PatientsView({
                           className="w-full py-2.5 rounded-md bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary-container transition-all cursor-pointer mt-4"
                         >
                           <span className="material-symbols-outlined text-xs">post_add</span>
-                          Generate Claim
+                          Generate Invoice &amp; Email
                         </button>
                       </form>
                     </div>
@@ -1749,7 +1741,7 @@ export default function PatientsView({
                                   </p>
                                 </div>
 
-                                <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3">
                                   <span className="text-xs font-bold text-on-surface">
                                     ${claim.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                   </span>
@@ -1763,6 +1755,13 @@ export default function PatientsView({
                                     {claim.status}
                                   </span>
                                 </div>
+                                <a
+                                  href={`/api/claims/${claim.id}/invoice.pdf`}
+                                  download={`${claim.claimNumber}.pdf`}
+                                  className="px-2.5 py-1 rounded bg-secondary/10 text-secondary hover:bg-secondary hover:text-white transition-all text-[10px] font-bold"
+                                >
+                                  Download PDF
+                                </a>
                               </div>
                             ))
                         ) : (
@@ -2203,6 +2202,9 @@ export default function PatientsView({
 
       {emailPatient && (
         <PatientEmailModal patient={emailPatient} onClose={() => setEmailPatient(null)} />
+      )}
+      {smsPatient && (
+        <PatientSmsModal patient={smsPatient} onClose={() => setSmsPatient(null)} />
       )}
     </div>
   );

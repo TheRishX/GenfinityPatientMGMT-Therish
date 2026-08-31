@@ -71,6 +71,19 @@
   .empty-state { @apply flex min-h-32 flex-col items-center justify-center gap-2 px-5 text-center text-sm text-on-surface-variant; }
   .empty-state .material-symbols-outlined { @apply text-3xl text-emerald-600; }
   .dashboard-columns { @apply grid grid-cols-1 gap-6 xl:grid-cols-2; }
+  .icon-button { @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-2 focus-visible:outline-primary; }
+  .avatar-large { @apply flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-secondary/10 text-lg font-extrabold text-secondary; }
+  .next-action-card { @apply flex flex-col gap-4 rounded-2xl border border-secondary/20 bg-secondary/5 p-5 sm:flex-row sm:items-center sm:justify-between; }
+  .next-action-card.attention { @apply border-primary/20 bg-primary/5; }
+  .action-button { @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-surface-container-highest bg-surface-container-lowest px-4 py-3 text-sm font-bold text-on-surface transition-colors hover:border-secondary/50 hover:bg-secondary/5 focus-visible:outline-2 focus-visible:outline-primary; }
+  .summary-line { @apply flex items-start gap-3; }
+  .summary-line strong { @apply block text-base font-bold text-on-surface; }
+  .summary-line p { @apply mt-0.5 text-base text-on-surface-variant; }
+  .detail-label { @apply mb-1 block text-sm font-bold text-on-surface-variant; }
+  .form-label { @apply mb-1.5 block text-base font-bold text-on-surface; }
+  .form-input { @apply min-h-12 w-full rounded-xl border border-surface-container-highest bg-surface px-4 py-3 text-base text-on-surface outline-none focus:border-primary focus-visible:outline-2 focus-visible:outline-primary; }
+  .secondary-button { @apply inline-flex min-h-12 items-center justify-center rounded-xl border border-surface-container-highest px-5 py-3 text-base font-bold text-on-surface transition-colors hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-primary; }
+  .activity-dot { @apply mt-1.5 h-3 w-3 shrink-0 rounded-full bg-secondary; }
 }
 
 /* Material Symbols alignment & Fill setups */
