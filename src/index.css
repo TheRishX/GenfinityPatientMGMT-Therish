@@ -36,12 +36,41 @@
     color: var(--color-on-surface);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
+    font-size: 16px;
   }
 
   h1, h2, h3, h4 {
     letter-spacing: -0.02em;
   }
+}
+
+@layer components {
+  .page-title { @apply text-2xl sm:text-3xl font-extrabold tracking-tight text-on-surface; }
+  .page-subtitle { @apply mt-1 text-base text-on-surface-variant; }
+  .eyebrow { @apply text-xs font-bold uppercase tracking-widest text-primary; }
+  .primary-button { @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary-container focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary; }
+  .text-button { @apply min-h-11 rounded-lg px-3 py-2 text-sm font-bold text-primary hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary; }
+  .workspace-section { @apply overflow-hidden rounded-2xl border border-surface-container-highest/60 bg-surface-container-lowest; }
+  .section-heading { @apply flex items-center justify-between gap-4 border-b border-surface-container-highest/50 px-5 py-4; }
+  .section-heading h3 { @apply text-lg font-extrabold text-on-surface; }
+  .section-heading p { @apply mt-0.5 text-sm text-on-surface-variant; }
+  .count-badge { @apply flex h-9 min-w-9 items-center justify-center rounded-full bg-primary/10 px-2 text-sm font-extrabold text-primary; }
+  .task-list { @apply divide-y divide-surface-container-highest/50; }
+  .task-row { @apply flex min-h-16 w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-surface-container-low focus-visible:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-primary; }
+  .task-icon { @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl; }
+  .task-icon.warning { @apply bg-amber-100 text-amber-800; }
+  .task-icon.blue { @apply bg-secondary/10 text-secondary; }
+  .task-copy { @apply min-w-0 flex-1; }
+  .task-copy strong { @apply block truncate text-base font-bold text-on-surface; }
+  .task-copy span { @apply mt-0.5 block truncate text-sm text-on-surface-variant; }
+  .task-stage { @apply hidden rounded-lg bg-surface-container-low px-2.5 py-1 text-xs font-bold text-on-surface-variant sm:block; }
+  .appointment-time { @apply shrink-0 text-sm font-bold text-secondary; }
+  .task-arrow { @apply shrink-0 text-on-surface-variant; }
+  .avatar-small { @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary/10 text-sm font-extrabold text-secondary; }
+  .empty-state { @apply flex min-h-32 flex-col items-center justify-center gap-2 px-5 text-center text-sm text-on-surface-variant; }
+  .empty-state .material-symbols-outlined { @apply text-3xl text-emerald-600; }
+  .dashboard-columns { @apply grid grid-cols-1 gap-6 xl:grid-cols-2; }
 }
 
 /* Material Symbols alignment & Fill setups */
@@ -88,5 +117,3 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
-
-

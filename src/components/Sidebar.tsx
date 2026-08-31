@@ -29,12 +29,8 @@ export default function Sidebar({
   onToggleModule
 }: SidebarProps) {
   const navItems = [
-    { id: 'dashboard', label: 'Overview', icon: 'speed' },
-    { id: 'patients', label: 'Patients', icon: 'groups' },
-    { id: 'appointments', label: 'Schedule', icon: 'calendar_month' },
-    { id: 'tracker', label: 'Orders', icon: 'precision_manufacturing' },
-    { id: 'email', label: 'Email', icon: 'outgoing_mail' },
-    { id: 'settings', label: 'Admin', icon: 'settings' }
+    { id: 'dashboard', label: 'Today', icon: 'today' },
+    { id: 'patients', label: 'Patients', icon: 'groups' }
   ];
 
   const getLabel = (id: string, defaultLabel: string) => {
@@ -42,7 +38,7 @@ export default function Sidebar({
   };
 
   return (
-    <nav id="app-sidebar" className="bg-surface-container-low dark:bg-surface-container-low shadow-sm h-screen w-72 flex-shrink-0 fixed left-0 top-0 h-full flex flex-col py-6 z-20 border-r border-surface-container-highest/30">
+    <nav id="app-sidebar" aria-label="Main navigation" className="bg-surface-container-low dark:bg-surface-container-low shadow-sm h-screen w-64 md:w-72 flex-shrink-0 fixed left-0 top-0 h-full flex flex-col py-6 z-20 border-r border-surface-container-highest/30">
       {/* Brand area */}
       <div className="px-5 mb-5 flex items-center gap-3">
         <ClinicLogo size="md" />
@@ -60,8 +56,8 @@ export default function Sidebar({
               {customLabels['clinic_branding_title'] || clinicName}
             </h1>
           )}
-          <p className="text-xs font-semibold text-on-surface-variant opacity-85 mt-0.5">
-            Clinical Portal
+          <p className="text-sm font-semibold text-on-surface-variant opacity-85 mt-0.5">
+            Patient care
           </p>
         </div>
       </div>
@@ -160,24 +156,15 @@ export default function Sidebar({
         })}
       </div>
 
-      {/* Bottom Profile / Support & Customize togglers */}
+      {/* Admin and account controls stay outside the clinical workflow. */}
       <div className="mt-auto px-2 pt-4 border-t border-surface-container-highest/40 space-y-1">
-        {/* Workspace Customization Toggle Button */}
-        {setIsWorkspaceEditMode && (
-          <button
-            onClick={() => setIsWorkspaceEditMode(!isWorkspaceEditMode)}
-            className={`w-full flex items-center gap-3 rounded-full px-5 py-2.5 text-xs font-bold transition-all cursor-pointer ${
-              isWorkspaceEditMode
-                ? 'bg-primary text-white shadow-md font-black animate-pulse'
-                : 'bg-surface-container text-on-surface border border-surface-container-highest/60 hover:bg-surface-container-high'
-            }`}
-          >
-            <span className="material-symbols-outlined text-sm font-bold">
-              {isWorkspaceEditMode ? 'task_alt' : 'tune'}
-            </span>
-            <span>{isWorkspaceEditMode ? 'Save Custom Layout' : 'Customize Workspace'}</span>
-          </button>
-        )}
+        <button
+          onClick={() => setActiveTab('settings')}
+          className="w-full flex items-center gap-4 rounded-full px-5 py-3 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
+        >
+          <span className="material-symbols-outlined">settings</span>
+          <span>Settings</span>
+        </button>
 
         <button
           onClick={() => {

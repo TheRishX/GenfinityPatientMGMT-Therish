@@ -913,7 +913,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col pl-72 min-h-screen bg-[#fbf9f8] text-[#1b1c1c]">
+      <div className="flex-1 flex flex-col pl-64 md:pl-72 min-h-screen bg-[#fbf9f8] text-[#1b1c1c]">
         {/* App bar search / user utility */}
         <Header
           title={
@@ -948,7 +948,7 @@ export default function App() {
         />
 
         {/* Inner Content stage */}
-        <main className="flex-1 overflow-y-auto p-8 md:p-10 max-w-7xl mx-auto w-full">
+        <main className="flex-1 overflow-y-auto p-5 sm:p-8 md:p-10 max-w-7xl mx-auto w-full">
           {renderTabContent()}
         </main>
       </div>

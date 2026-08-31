@@ -349,10 +349,10 @@ export default function PatientsView({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-surface-container-highest/20 pb-6">
         <div>
           <h2 className="text-3xl font-extrabold text-on-surface tracking-tight">
-            Patient Management
+            Patients
           </h2>
           <p className="text-sm font-semibold text-on-surface-variant opacity-85 mt-1">
-            Browse profile folders, intake requirements, and clinical history
+            Search for a patient, then choose the next action.
           </p>
         </div>
         <button
@@ -360,7 +360,7 @@ export default function PatientsView({
           className="w-full sm:w-auto bg-primary text-white font-bold text-sm px-6 py-3.5 rounded-full flex items-center justify-center gap-2 hover:bg-primary-container transition-colors shadow-sm cursor-pointer hover:scale-[1.02] active:scale-95 duration-200 shrink-0"
         >
           <span className="material-symbols-outlined text-sm">add</span>
-          Add Patient
+          New patient
         </button>
       </div>
 
@@ -645,9 +645,9 @@ export default function PatientsView({
             {/* Modal Header */}
             <div className="px-6 py-5 flex justify-between items-center border-b border-surface-container-highest bg-surface-bright">
               <div>
-                <h2 className="text-lg font-extrabold text-on-surface">Add New Patient</h2>
+                <h2 className="text-lg font-extrabold text-on-surface">New patient</h2>
                 <p className="text-xs text-on-surface-variant font-semibold mt-0.5">
-                  Enter patient details to create a new record.
+                  Start with the basics. You can add more details later.
                 </p>
               </div>
               <button
@@ -661,7 +661,7 @@ export default function PatientsView({
             {/* Modal Body */}
             <form onSubmit={handleSavePatientSubmit} className="p-6 overflow-y-auto space-y-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Full Name</label>
+                <label className="text-base font-bold text-on-surface">Full name</label>
                 <input
                   type="text"
                   required
@@ -674,7 +674,7 @@ export default function PatientsView({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Phone Number</label>
+                    <label className="text-base font-bold text-on-surface">Phone number</label>
                   <input
                     type="tel"
                     value={newPhone}
@@ -684,7 +684,7 @@ export default function PatientsView({
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Date of Birth</label>
+                  <label className="text-base font-bold text-on-surface">Date of birth</label>
                   <input
                     type="date"
                     value={newDob}
@@ -695,7 +695,7 @@ export default function PatientsView({
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Email Address</label>
+                <label className="text-base font-bold text-on-surface">Email address <span className="font-normal text-on-surface-variant">(optional)</span></label>
                 <input
                   type="email"
                   value={newEmail}
@@ -706,7 +706,7 @@ export default function PatientsView({
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Referral Source (Optional)</label>
+                <label className="text-base font-bold text-on-surface">Reason for visit <span className="font-normal text-on-surface-variant">(optional)</span></label>
                 <select
                   value={newReferral}
                   onChange={e => setNewReferral(e.target.value)}
@@ -722,7 +722,7 @@ export default function PatientsView({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Insurance Provider</label>
+                <label className="text-base font-bold text-on-surface">Insurance provider <span className="font-normal text-on-surface-variant">(optional)</span></label>
                   <input
                     type="text"
                     value={newInsuranceCompany}
@@ -732,7 +732,7 @@ export default function PatientsView({
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-on-surface uppercase tracking-wider">Primary Clinician</label>
+                  <label className="text-base font-bold text-on-surface">Primary clinician</label>
                   <select
                     value={newPrimaryClinician}
                     onChange={e => setNewPrimaryClinician(e.target.value)}
@@ -759,7 +759,7 @@ export default function PatientsView({
                   className="px-6 py-2.5 bg-primary text-white text-xs font-bold rounded-full hover:bg-primary-container transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <span className="material-symbols-outlined text-sm font-bold">check</span>
-                  Save Patient
+                  Save patient
                 </button>
               </div>
             </form>
@@ -836,6 +836,19 @@ export default function PatientsView({
                     Next visit: <strong className="text-on-surface">{selectedPatient.nextAppointment || 'Today 2:00 PM'}</strong>
                   </p>
                 </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2" aria-label="Patient actions">
+                {[
+                  ['appointments', 'calendar_today', 'Start visit'],
+                  ['notes', 'edit_note', 'Add note'],
+                  ['documents', 'upload_file', 'Upload document'],
+                  ['authorization', 'verified_user', 'Check insurance']
+                ].map(([tab, icon, label]) => (
+                  <button key={tab} onClick={() => setActiveProfileTab(tab)} className="min-h-11 rounded-xl border border-surface-container-highest bg-surface-container-lowest px-3 py-2 text-sm font-bold text-on-surface transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary">
+                    <span className="material-symbols-outlined mr-1.5 text-base align-[-3px]">{icon}</span>{label}
+                  </button>
+                ))}
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-surface-container-highest rounded-xl border border-surface-container-highest overflow-hidden bg-surface-container-low/35">
