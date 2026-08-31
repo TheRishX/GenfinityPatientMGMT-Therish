@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import logoImage from '../assets/images/clinic_logo_1784708559120.jpg';
+import logoImage from '../assets/images/genfinity-logo-uploaded.webp';
 
 interface ClinicLogoProps {
   className?: string;
@@ -17,10 +17,10 @@ export default function ClinicLogo({
   const [imageError, setImageError] = useState(false);
 
   const sizeClasses = {
-    sm: 'w-7 h-7',
-    md: 'w-10 h-10',
-    lg: 'w-14 h-14',
-    xl: 'w-20 h-20'
+    sm: 'w-28 h-7',
+    md: 'w-52 h-12',
+    lg: 'w-64 h-14',
+    xl: 'w-80 h-20'
   };
 
   const dimClass = sizeClasses[size] || sizeClasses.md;
@@ -30,10 +30,10 @@ export default function ClinicLogo({
       {!imageError ? (
         <img
           src={logoImage}
-          alt="Clinic Logo"
+          alt={clinicName || 'Genfinity Orthotics and Prosthetics Clinic logo'}
           referrerPolicy="no-referrer"
           onError={() => setImageError(true)}
-          className={`${dimClass} object-contain rounded-xl shadow-xs transition-transform hover:scale-105`}
+          className={`${dimClass} object-contain transition-transform hover:scale-[1.02]`}
         />
       ) : (
         /* Precise SVG vector logo representation of the O&P double limb + silver arc artwork */

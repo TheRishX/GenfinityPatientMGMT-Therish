@@ -40,26 +40,8 @@ export default function Sidebar({
   return (
     <nav id="app-sidebar" aria-label="Main navigation" className="bg-surface-container-low dark:bg-surface-container-low shadow-sm h-screen w-64 md:w-72 flex-shrink-0 fixed left-0 top-0 h-full flex flex-col py-6 z-20 border-r border-surface-container-highest/30">
       {/* Brand area */}
-      <div className="px-5 mb-5 flex items-center gap-3">
-        <ClinicLogo size="md" />
-        <div>
-          {isWorkspaceEditMode ? (
-            <input
-              type="text"
-              value={customLabels['clinic_branding_title'] || clinicName}
-              onChange={(e) => onUpdateLabel?.('clinic_branding_title', e.target.value)}
-              className="bg-surface border border-primary text-sm font-extrabold text-primary tracking-tight px-1 py-0.5 rounded outline-none w-44"
-              title="Edit Clinic Name Branding"
-            />
-          ) : (
-            <h1 className="text-xl font-extrabold text-primary tracking-tight leading-tight">
-              {customLabels['clinic_branding_title'] || clinicName}
-            </h1>
-          )}
-          <p className="text-sm font-semibold text-on-surface-variant opacity-85 mt-0.5">
-            Patient care
-          </p>
-        </div>
+      <div className="px-5 mb-5 flex items-center">
+        <ClinicLogo size="md" clinicName={clinicName} />
       </div>
 
       {/* New Patient CTA */}
