@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs/promises';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createNetServer } from 'net';
 import { createServer as createViteServer } from 'vite';
@@ -444,17 +445,23 @@ function buildInvoicePdf({
   clinic: ClinicSettings;
 }): Buffer {
   const money = `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const officialAddress = '18401 Burbank Blvd, Suite 215, Tarzana, CA 91356';
+  const officialPhone = '(888) 552-6188';
+  const officialEmail = 'support@genfinityoandp.com';
+  const address = !clinic.primaryAddress || clinic.primaryAddress.includes('123 Prosthetics Way') ? officialAddress : clinic.primaryAddress;
+  const phone = !clinic.contactPhone || clinic.contactPhone.includes('555') ? officialPhone : clinic.contactPhone;
+  const email = !clinic.supportEmail || clinic.supportEmail.includes('genfinity.com') ? officialEmail : clinic.supportEmail;
   const brand = '0.70 0.04 0.02';
   const blush = '0.98 0.94 0.94';
   const ink = '0.12 0.12 0.14';
   const muted = '0.38 0.35 0.36';
   const lines = [
     { text: clinic.clinicName || 'Genfinity O&P', x: 106, y: 725, size: 19, font: 'F2', color: '1 1 1' },
-    { text: clinic.primaryAddress || 'Orthotics and Prosthetics Care', x: 106, y: 707, size: 9, font: 'F1', color: '1 1 1' },
-    { text: clinic.contactPhone || '', x: 106, y: 693, size: 9, font: 'F1', color: '1 1 1' },
-    { text: 'INVOICE', x: 402, y: 725, size: 20, font: 'F2', color: '1 1 1' },
-    { text: `# ${claimNumber}`, x: 402, y: 706, size: 10, font: 'F1', color: '1 1 1' },
-    { text: `Issued ${date}`, x: 402, y: 691, size: 9, font: 'F1', color: '1 1 1' },
+    { text: address, x: 60, y: 641, size: 9, font: 'F1', color: muted },
+    { text: `${phone}  |  ${email}`, x: 60, y: 626, size: 9, font: 'F1', color: muted },
+    { text: 'INVOICE', x: 420, y: 725, size: 20, font: 'F2', color: brand },
+    { text: `# ${claimNumber}`, x: 420, y: 706, size: 10, font: 'F1', color: muted },
+    { text: `Issued ${date}`, x: 420, y: 691, size: 9, font: 'F1', color: muted },
     { text: 'PAID', x: 484, y: 633, size: 10, font: 'F2', color: '0.08 0.45 0.28' },
     { text: 'BILL TO', x: 60, y: 590, size: 9, font: 'F2', color: brand },
     { text: patient.name, x: 60, y: 569, size: 15, font: 'F2', color: ink },
@@ -471,44 +478,53 @@ function buildInvoicePdf({
     { text: 'TOTAL PAID', x: 366, y: 326, size: 10, font: 'F2', color: muted },
     { text: money, x: 475, y: 324, size: 17, font: 'F2', color: brand },
     { text: 'Thank you for choosing Genfinity O&P.', x: 60, y: 236, size: 10, font: 'F2', color: ink },
-    { text: `Questions? ${clinic.supportEmail || 'Contact the clinic'}`, x: 60, y: 218, size: 9, font: 'F1', color: muted },
+    { text: `Questions? ${email}`, x: 60, y: 218, size: 9, font: 'F1', color: muted },
+    { text: 'TERMS & CONDITIONS', x: 60, y: 158, size: 9, font: 'F2', color: brand },
+    { text: 'Payment is due according to the agreed billing arrangement.', x: 60, y: 142, size: 8, font: 'F1', color: muted },
+    { text: 'Please retain this invoice for your records. Balances may be subject to payer review.', x: 60, y: 129, size: 8, font: 'F1', color: muted },
+    { text: 'Services, adjustments, and warranties are provided under the clinic policy in effect on the date of service.', x: 60, y: 116, size: 8, font: 'F1', color: muted },
     { text: 'This document is a payment receipt for the services listed above.', x: 60, y: 82, size: 8, font: 'F1', color: muted }
   ];
   const stream = [
     'q',
-    `${brand} rg 42 672 528 78 re f`,
-    // Small vector version of the Genfinity O&P mark in the brand header.
-    '1 0.78 0.77 rg 64 693 m 54 704 50 718 58 730 c 65 739 82 738 91 730 c 82 743 66 748 53 740 c 37 730 39 708 55 696 c 58 694 61 693 64 693 c f',
-    '1 0.78 0.77 rg 84 685 m 98 688 105 699 101 711 c 98 720 89 725 80 727 c 90 720 94 711 91 702 c 89 695 85 690 84 685 c f',
-    '1 1 1 rg 72 739 m 68 716 70 700 76 683 c 82 677 91 678 96 681 c 91 694 88 707 87 720 c 86 729 89 733 99 735 c 104 736 106 739 102 742 c 96 745 78 744 72 739 c f',
+    '1 1 1 rg 42 672 528 78 re f',
+    `${brand} rg 42 655 528 1 re f`,
+    'q 150 0 0 37.5 54 692 cm /Im1 Do Q',
     `${blush} rg 42 512 528 92 re f`,
     '1 1 1 rg 42 604 528 1 re f',
     `${blush} rg 42 450 528 1 re f`,
     `${brand} rg 42 345 528 2 re f`,
     `${blush} rg 358 294 212 70 re f`,
     `${blush} rg 42 182 528 1 re f`,
+    `${blush} rg 42 104 528 1 re f`,
     'Q',
     ...lines.map(line => `${line.color} rg BT /${line.font} ${line.size} Tf ${line.x} ${line.y} Td (${pdfEscape(line.text)}) Tj ET`)
   ].join('\n');
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
-    `<< /Length ${Buffer.byteLength(stream, 'ascii')} >>\nstream\n${stream}\nendstream`
-  ];
-  let pdf = '%PDF-1.4\n';
-  const offsets = [0];
-  objects.forEach((object, index) => {
-    offsets[index + 1] = Buffer.byteLength(pdf, 'ascii');
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  const logoPath = [path.join(process.cwd(), 'public', 'genfinity-logo.jpg'), path.join(__dirname, 'public', 'genfinity-logo.jpg')].find(candidate => {
+    try { readFileSync(candidate); return true; } catch { return false; }
   });
-  const xrefOffset = Buffer.byteLength(pdf, 'ascii');
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  offsets.slice(1).forEach(offset => { pdf += `${String(offset).padStart(10, '0')} 00000 n \n`; });
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-  return Buffer.from(pdf, 'ascii');
+  const logo = logoPath ? readFileSync(logoPath) : Buffer.alloc(0);
+  const objectBodies: Buffer[] = [
+    Buffer.from('<< /Type /Catalog /Pages 2 0 R >>', 'ascii'),
+    Buffer.from('<< /Type /Pages /Kids [3 0 R] /Count 1 >>', 'ascii'),
+    Buffer.from('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> /XObject << /Im1 7 0 R >> >> /Contents 6 0 R >>', 'ascii'),
+    Buffer.from('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>', 'ascii'),
+    Buffer.from('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>', 'ascii'),
+    Buffer.from(`<< /Length ${Buffer.byteLength(stream, 'ascii')} >>\nstream\n${stream}\nendstream`, 'ascii'),
+    Buffer.concat([Buffer.from(`<< /Type /XObject /Subtype /Image /Width 1100 /Height 275 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${logo.length} >>\nstream\n`, 'ascii'), logo, Buffer.from('\nendstream', 'ascii')])
+  ];
+  const chunks: Buffer[] = [Buffer.from('%PDF-1.4\n', 'ascii')];
+  const offsets = [0];
+  objectBodies.forEach((body, index) => {
+    offsets[index + 1] = chunks.reduce((size, chunk) => size + chunk.length, 0);
+    chunks.push(Buffer.from(`${index + 1} 0 obj\n`, 'ascii'), body, Buffer.from('\nendobj\n', 'ascii'));
+  });
+  const xrefOffset = chunks.reduce((size, chunk) => size + chunk.length, 0);
+  let xref = `xref\n0 ${objectBodies.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach(offset => { xref += `${String(offset).padStart(10, '0')} 00000 n \n`; });
+  xref += `trailer\n<< /Size ${objectBodies.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  chunks.push(Buffer.from(xref, 'ascii'));
+  return Buffer.concat(chunks);
 }
 
 async function sendBrevoEmail(to: string, subject: string, body: string, attachments: EmailAttachment[] = []): Promise<{ success: boolean; message: string; logs: string[] }> {
