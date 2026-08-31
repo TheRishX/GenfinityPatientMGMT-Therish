@@ -544,20 +544,10 @@ async function sendEmail(smtp: SmtpConfig, to: string, subject: string, body: st
   logs.push(`[${new Date().toLocaleTimeString()}] Initiating SMTP connection handshake with ${sanitizedHost || 'unspecified'}:${smtp.port}...`);
   
   // Treat standard placeholder hosts as simulation so it works out-of-the-box
-  const isSimulation = !sanitizedHost || sanitizedHost.includes('mailtrap') || !smtp.user || !smtp.pass;
-  
+  const isSimulation = !sanitizedHost || !smtp.user || !smtp.pass;
+
   if (isSimulation) {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    logs.push(`[${new Date().toLocaleTimeString()}] Connection established securely using TLS/STARTTLS.`);
-    logs.push(`[${new Date().toLocaleTimeString()}] SMTP Client connected to sandbox SMTP server successfully.`);
-    logs.push(`[${new Date().toLocaleTimeString()}] Client Authenticated as "${smtp.senderName || 'Genfinity O&P'}" <${smtp.fromEmail || 'notifications@genfinityortho.com'}>.`);
-    logs.push(`[${new Date().toLocaleTimeString()}] Preparing RFC 2822 standard email headers...`);
-    logs.push(`[${new Date().toLocaleTimeString()}] Envelope Sender: <${smtp.fromEmail || 'notifications@genfinityortho.com'}>`);
-    logs.push(`[${new Date().toLocaleTimeString()}] Envelope Recipient: <${to}>`);
-    logs.push(`[${new Date().toLocaleTimeString()}] Message size: ${Math.round(body.length / 10.24) / 100} KB`);
-    logs.push(`[${new Date().toLocaleTimeString()}] Sending payload block...`);
-    logs.push(`[${new Date().toLocaleTimeString()}] [SMTP-SIMULATOR] Delivery confirmed by sandbox peer with status code 250 OK (Message Queued).`);
-    return { success: true, message: 'Simulated email sent successfully', logs };
+    return { success: false, message: 'Email provider is not configured. Add the Brevo API key and verified sender.', logs };
   }
 
   try {
@@ -651,7 +641,7 @@ async function readDatabase(): Promise<DatabaseSchema> {
   // Ensure default Email structures exist
   if (!db.smtpConfig) {
     db.smtpConfig = {
-      host: 'smtp.mailtrap.io',
+      host: BREVO_SMTP_HOST,
       port: 587,
       user: '',
       pass: '',
@@ -995,19 +985,9 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
       const logs: string[] = [];
       logs.push(`[${new Date().toLocaleTimeString()}] Testing SMTP Server: smtp://${config.host}:${config.port}...`);
       
-      const isDummy = !config.host || config.host.includes('mailtrap') || !config.user || !config.pass;
+      const isDummy = !config.host || !config.user || !config.pass;
       if (isDummy) {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        logs.push(`[${new Date().toLocaleTimeString()}] TCP Connection established successfully.`);
-        logs.push(`[${new Date().toLocaleTimeString()}] Server banner: 220 smtp.genfinityortho.com ESMTP Postfix`);
-        logs.push(`[${new Date().toLocaleTimeString()}] EHLO client.genfinityortho.com -> 250-STARTTLS, 250-8BITMIME`);
-        logs.push(`[${new Date().toLocaleTimeString()}] STARTTLS initiated -> 220 Ready to start TLS`);
-        logs.push(`[${new Date().toLocaleTimeString()}] Secure connection verified (Sandbox Simulation Mode).`);
-        return res.json({
-          success: true,
-          message: 'Connection verified in simulation mode.',
-          logs
-        });
+        return res.json({ success: false, message: 'Brevo email credentials are not configured.', logs });
       }
 
       const transporter = nodemailer.createTransport({

@@ -639,7 +639,7 @@ export const DEFAULT_DATABASE: DatabaseSchema = {
     }
   ],
   smtpConfig: {
-    host: 'smtp.mailtrap.io',
+    host: 'smtp-relay.brevo.com',
     port: 587,
     user: '',
     pass: '',

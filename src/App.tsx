@@ -9,7 +9,6 @@ import AuthView from './components/AuthView';
 import BillingView from './components/BillingView';
 import FabricationView from './components/FabricationView';
 import SettingsView from './components/SettingsView';
-import EmailView from './components/EmailView';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
 import { getInitials, generateMRN } from './utils/defaultDb';
 
@@ -888,8 +887,6 @@ export default function App() {
             onSaveSettings={handleSaveSettings}
           />
         );
-      case 'email':
-        return <EmailView patients={db.patients} />;
       default:
         return (
           <div className="p-8 text-center text-on-surface-variant font-bold text-sm">
