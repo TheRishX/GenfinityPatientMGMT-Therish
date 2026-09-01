@@ -434,7 +434,13 @@ function buildInvoicePdf({
   doctor,
   amount,
   date,
-  clinic
+  clinic,
+  serviceDescription = 'Orthotic and prosthetic clinical services',
+  repairDetails = '',
+  paymentMethod = 'Self-pay',
+  serviceTotal = amount,
+  gratuity = 0,
+  warrantyDays = 30
 }: {
   patient: Patient;
   claimNumber: string;
@@ -443,10 +449,17 @@ function buildInvoicePdf({
   amount: number;
   date: string;
   clinic: ClinicSettings;
+  serviceDescription?: string;
+  repairDetails?: string;
+  paymentMethod?: string;
+  serviceTotal?: number;
+  gratuity?: number;
+  warrantyDays?: number;
 }): Buffer {
   const money = `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const officialAddress = '18401 Burbank Blvd, Suite 215, Tarzana, CA 91356';
   const officialPhone = '(888) 552-6188';
+  const officialFax = '(323) 909-8512';
   const officialEmail = 'support@genfinityoandp.com';
   const address = !clinic.primaryAddress || clinic.primaryAddress.includes('123 Prosthetics Way') ? officialAddress : clinic.primaryAddress;
   const phone = !clinic.contactPhone || clinic.contactPhone.includes('555') ? officialPhone : clinic.contactPhone;
@@ -458,8 +471,8 @@ function buildInvoicePdf({
   const lines = [
     { text: clinic.clinicName || 'Genfinity O&P', x: 106, y: 725, size: 19, font: 'F2', color: '1 1 1' },
     { text: address, x: 60, y: 641, size: 9, font: 'F1', color: muted },
-    { text: `${phone}  |  ${email}`, x: 60, y: 626, size: 9, font: 'F1', color: muted },
-    { text: 'INVOICE', x: 420, y: 725, size: 20, font: 'F2', color: brand },
+    { text: `${phone}  |  Fax ${officialFax}  |  ${email}`, x: 60, y: 626, size: 8, font: 'F1', color: muted },
+    { text: 'PAID INVOICE', x: 390, y: 725, size: 20, font: 'F2', color: brand },
     { text: `# ${claimNumber}`, x: 420, y: 706, size: 10, font: 'F1', color: muted },
     { text: `Issued ${date}`, x: 420, y: 691, size: 9, font: 'F1', color: muted },
     { text: 'PAID', x: 484, y: 633, size: 10, font: 'F2', color: '0.08 0.45 0.28' },
@@ -471,16 +484,20 @@ function buildInvoicePdf({
     { text: 'SERVICE SUMMARY', x: 60, y: 484, size: 9, font: 'F2', color: brand },
     { text: 'Description', x: 60, y: 456, size: 9, font: 'F2', color: muted },
     { text: 'Amount', x: 475, y: 456, size: 9, font: 'F2', color: muted },
-    { text: 'Orthotic and prosthetic clinical services', x: 60, y: 427, size: 10, font: 'F1', color: ink },
-    { text: money, x: 475, y: 427, size: 10, font: 'F2', color: ink },
+    { text: serviceDescription.slice(0, 68), x: 60, y: 427, size: 10, font: 'F1', color: ink },
+    { text: moneyForEmail(serviceTotal), x: 475, y: 427, size: 10, font: 'F2', color: ink },
     { text: `Payer: ${payer || 'Self-pay'}`, x: 60, y: 397, size: 9, font: 'F1', color: muted },
     { text: `Clinician: ${doctor || 'Not assigned'}`, x: 60, y: 381, size: 9, font: 'F1', color: muted },
+    { text: `Payment method: ${paymentMethod}`, x: 60, y: 365, size: 9, font: 'F1', color: muted },
+    ...(repairDetails ? [{ text: `Details: ${repairDetails.slice(0, 82)}`, x: 60, y: 349, size: 8, font: 'F1', color: muted }] : []),
     { text: 'TOTAL PAID', x: 366, y: 326, size: 10, font: 'F2', color: muted },
     { text: money, x: 475, y: 324, size: 17, font: 'F2', color: brand },
+    { text: 'Balance due: $0.00 - PAID IN FULL', x: 366, y: 288, size: 8, font: 'F2', color: '0.08 0.45 0.28' },
+    ...(gratuity > 0 ? [{ text: `Includes voluntary gratuity / tip: ${moneyForEmail(gratuity)}`, x: 366, y: 306, size: 8, font: 'F1', color: muted }] : []),
     { text: 'Thank you for choosing Genfinity O&P.', x: 60, y: 236, size: 10, font: 'F2', color: ink },
     { text: `Questions? ${email}`, x: 60, y: 218, size: 9, font: 'F1', color: muted },
     { text: 'TERMS & CONDITIONS', x: 60, y: 158, size: 9, font: 'F2', color: brand },
-    { text: 'Payment is due according to the agreed billing arrangement.', x: 60, y: 142, size: 8, font: 'F1', color: muted },
+    { text: `Payment is due according to the agreed billing arrangement. Warranty: ${warrantyDays} days on workmanship.`, x: 60, y: 142, size: 8, font: 'F1', color: muted },
     { text: 'Please retain this invoice for your records. Balances may be subject to payer review.', x: 60, y: 129, size: 8, font: 'F1', color: muted },
     { text: 'Services, adjustments, and warranties are provided under the clinic policy in effect on the date of service.', x: 60, y: 116, size: 8, font: 'F1', color: muted },
     { text: 'This document is a payment receipt for the services listed above.', x: 60, y: 82, size: 8, font: 'F1', color: muted }
@@ -1573,7 +1590,7 @@ Clinical Portal Support Team`;
   // 8. Add Claim
   app.post('/api/claims', async (req, res) => {
     try {
-      const { patientName, patientId, payer, doctor, amount, status, sendInvoice = false } = req.body;
+      const { patientName, patientId, payer, doctor, amount, status, sendInvoice = false, serviceDescription, repairDetails, paymentMethod, serviceTotal, gratuity, warrantyDays } = req.body;
       if (!patientName || !amount) {
         return res.status(400).json({ error: 'patientName and amount are required' });
       }
@@ -1593,7 +1610,13 @@ Clinical Portal Support Team`;
         doctor: doctor || 'Dr. Sarah Jenkins',
         amount: parseFloat(amount),
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
-        status: status || 'Billed'
+        status: status || 'Billed',
+        serviceDescription: serviceDescription || 'Orthotic and prosthetic clinical services',
+        repairDetails: repairDetails || '',
+        paymentMethod: paymentMethod || 'Self-pay',
+        serviceTotal: Number(serviceTotal || amount),
+        gratuity: Number(gratuity || 0),
+        warrantyDays: Number(warrantyDays || 30)
       };
 
       db.claims.unshift(newClaim);
@@ -1604,7 +1627,7 @@ Clinical Portal Support Team`;
         if (!matchedPatient.email) {
           emailResult = { success: false, message: 'Invoice saved, but this patient does not have an email address.' };
         } else {
-          const invoicePdf = buildInvoicePdf({ patient: matchedPatient, claimNumber: newClaim.claimNumber, payer: newClaim.payer, doctor: newClaim.doctor, amount: newClaim.amount, date: newClaim.date, clinic: db.settings });
+          const invoicePdf = buildInvoicePdf({ patient: matchedPatient, claimNumber: newClaim.claimNumber, payer: newClaim.payer, doctor: newClaim.doctor, amount: newClaim.amount, date: newClaim.date, clinic: db.settings, serviceDescription: newClaim.serviceDescription, repairDetails: newClaim.repairDetails, paymentMethod: newClaim.paymentMethod, serviceTotal: newClaim.serviceTotal, gratuity: newClaim.gratuity, warrantyDays: newClaim.warrantyDays });
           const finalSubject = `Paid invoice ${newClaim.claimNumber} - ${db.settings.clinicName}`;
           const finalBody = `Hello ${matchedPatient.name},\n\nPlease find your invoice and receipt attached for ${moneyForEmail(newClaim.amount)}.\n\nInvoice: ${newClaim.claimNumber}\nBilling payer: ${newClaim.payer}\nClinician: ${newClaim.doctor}\n\nIf you have questions, please contact ${db.settings.supportEmail || 'our billing team'}.\n\nSincerely,\n${db.settings.clinicName}`;
           const config = db.smtpConfig || { host: BREVO_SMTP_HOST, port: BREVO_SMTP_PORT, user: BREVO_SMTP_USER || '', pass: BREVO_SMTP_PASSWORD || '', secure: false, fromEmail: BREVO_FROM_EMAIL || '', senderName: BREVO_SENDER_NAME, replyTo: BREVO_REPLY_TO };
@@ -1639,10 +1662,32 @@ Clinical Portal Support Team`;
       if (!claim) return res.status(404).json({ error: 'Invoice not found.' });
       const patient = db.patients.find(item => item.id === claim.patientId) || db.patients.find(item => item.name === claim.patientName);
       if (!patient) return res.status(404).json({ error: 'Patient not found.' });
-      const pdf = buildInvoicePdf({ patient, claimNumber: claim.claimNumber, payer: claim.payer, doctor: claim.doctor, amount: claim.amount, date: claim.date, clinic: db.settings });
+      const pdf = buildInvoicePdf({ patient, claimNumber: claim.claimNumber, payer: claim.payer, doctor: claim.doctor, amount: claim.amount, date: claim.date, clinic: db.settings, serviceDescription: claim.serviceDescription, repairDetails: claim.repairDetails, paymentMethod: claim.paymentMethod, serviceTotal: claim.serviceTotal, gratuity: claim.gratuity, warrantyDays: claim.warrantyDays });
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${claim.claimNumber}.pdf"`);
       res.send(pdf);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/claims/:id/send', async (req, res) => {
+    try {
+      const db = await readDatabase();
+      const claim = db.claims.find(item => item.id === req.params.id);
+      if (!claim) return res.status(404).json({ error: 'Invoice not found.' });
+      const patient = db.patients.find(item => item.id === claim.patientId) || db.patients.find(item => item.name === claim.patientName);
+      if (!patient) return res.status(404).json({ error: 'Patient not found.' });
+      if (!patient.email) return res.status(400).json({ error: 'This patient does not have an email address.' });
+      const invoicePdf = buildInvoicePdf({ patient, claimNumber: claim.claimNumber, payer: claim.payer, doctor: claim.doctor, amount: claim.amount, date: claim.date, clinic: db.settings, serviceDescription: claim.serviceDescription, repairDetails: claim.repairDetails, paymentMethod: claim.paymentMethod, serviceTotal: claim.serviceTotal, gratuity: claim.gratuity, warrantyDays: claim.warrantyDays });
+      const subject = `Invoice ${claim.claimNumber} - ${db.settings.clinicName}`;
+      const body = `Hello ${patient.name},\n\nPlease find your invoice attached.\n\nInvoice: ${claim.claimNumber}\nAmount: ${moneyForEmail(claim.amount)}\nBilling payer: ${claim.payer}\nClinician: ${claim.doctor}\n\nIf you have questions, please contact ${db.settings.supportEmail || 'our billing team'}.\n\nSincerely,\n${db.settings.clinicName}`;
+      const config = db.smtpConfig || { host: BREVO_SMTP_HOST, port: BREVO_SMTP_PORT, user: BREVO_SMTP_USER || '', pass: BREVO_SMTP_PASSWORD || '', secure: false, fromEmail: BREVO_FROM_EMAIL || '', senderName: BREVO_SENDER_NAME, replyTo: BREVO_REPLY_TO };
+      const result = await sendEmail(config, patient.email, subject, body, [{ name: `${claim.claimNumber}.pdf`, content: invoicePdf.toString('base64'), contentType: 'application/pdf' }]);
+      const log: EmailLog = { id: `log_${Date.now()}`, recipientEmail: patient.email, patientName: patient.name, subject, body, templateName: 'Invoice receipt resend', sentAt: new Date().toLocaleString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }), status: result.success ? 'Sent' : 'Failed', errorMessage: result.success ? undefined : result.message };
+      db.emailLogs = [log, ...(db.emailLogs || [])];
+      await writeDatabase(db);
+      res.status(result.success ? 200 : 502).json({ success: result.success, message: result.message, logEntry: log });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

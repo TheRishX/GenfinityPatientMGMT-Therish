@@ -137,6 +137,12 @@ export interface Claim {
   amount: number;
   date: string;
   status: 'Billed' | 'Paid' | 'Denied';
+  serviceDescription?: string;
+  repairDetails?: string;
+  paymentMethod?: string;
+  serviceTotal?: number;
+  gratuity?: number;
+  warrantyDays?: number;
 }
 
 export interface ClinicSettings {

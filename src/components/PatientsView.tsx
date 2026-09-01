@@ -121,6 +121,11 @@ export default function PatientsView({
   const [newClaimPayer, setNewClaimPayer] = useState('');
   const [newClaimAmount, setNewClaimAmount] = useState('');
   const [newClaimDoc, setNewClaimDoc] = useState('');
+  const [newClaimDescription, setNewClaimDescription] = useState('');
+  const [newClaimDetails, setNewClaimDetails] = useState('');
+  const [newClaimPaymentMethod, setNewClaimPaymentMethod] = useState('Cash / Self-Pay');
+  const [newClaimTip, setNewClaimTip] = useState('');
+  const [newClaimWarranty, setNewClaimWarranty] = useState('30');
 
   // Clinical Notes Tab States
   const [newNoteText, setNewNoteText] = useState('');
@@ -1666,12 +1671,19 @@ export default function PatientsView({
                             payer: newClaimPayer,
                             amount: newClaimAmount,
                             doctor: newClaimDoc || selectedPatient.primaryClinician || 'Dr. Sarah Jenkins',
+                            serviceDescription: newClaimDescription || 'Orthotic and prosthetic clinical services',
+                            repairDetails: newClaimDetails,
+                            paymentMethod: newClaimPaymentMethod,
+                            serviceTotal: Number(newClaimAmount) - Number(newClaimTip || 0),
+                            gratuity: Number(newClaimTip || 0),
+                            warrantyDays: Number(newClaimWarranty || 30),
                             sendInvoice: true
                           });
                           // Reset
                           setNewClaimPayer('');
                           setNewClaimAmount('');
                           setNewClaimDoc('');
+                          setNewClaimDescription(''); setNewClaimDetails(''); setNewClaimPaymentMethod('Cash / Self-Pay'); setNewClaimTip(''); setNewClaimWarranty('30');
                         }}
                         className="space-y-3"
                       >
@@ -1686,6 +1698,19 @@ export default function PatientsView({
                             className="w-full px-4 py-2 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           />
                         </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Service description</label>
+                          <input type="text" placeholder="e.g. Prosthetic repair and house visit" value={newClaimDescription} onChange={e => setNewClaimDescription(e.target.value)} className="w-full px-4 py-2 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Repair / service details</label>
+                          <textarea rows={2} placeholder="Optional details shown on the receipt" value={newClaimDetails} onChange={e => setNewClaimDetails(e.target.value)} className="w-full px-4 py-2 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none resize-none" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Payment method<select value={newClaimPaymentMethod} onChange={e => setNewClaimPaymentMethod(e.target.value)} className="w-full mt-1 px-3 py-2 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold outline-none"><option>Cash / Self-Pay</option><option>Credit / Debit Card</option><option>Insurance</option><option>Check</option><option>Other</option></select></label>
+                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Tip / gratuity<input type="number" min="0" step="0.01" placeholder="0.00" value={newClaimTip} onChange={e => setNewClaimTip(e.target.value)} className="w-full mt-1 px-3 py-2 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold outline-none" /></label>
+                        </div>
+                        <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Workmanship warranty (days)<input type="number" min="0" value={newClaimWarranty} onChange={e => setNewClaimWarranty(e.target.value)} className="w-full mt-1 px-3 py-2 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold outline-none" /></label>
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Invoice Amount ($)</label>
                           <input

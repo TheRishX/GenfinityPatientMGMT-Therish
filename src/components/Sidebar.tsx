@@ -30,7 +30,9 @@ export default function Sidebar({
 }: SidebarProps) {
   const navItems = [
     { id: 'dashboard', label: 'Today', icon: 'today' },
-    { id: 'patients', label: 'Patients', icon: 'groups' }
+    { id: 'patients', label: 'Patients', icon: 'groups' },
+    { id: 'billing', label: 'Invoices', icon: 'receipt_long' },
+    { id: 'email', label: 'Email', icon: 'mail' }
   ];
 
   const getLabel = (id: string, defaultLabel: string) => {

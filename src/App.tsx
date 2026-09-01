@@ -9,6 +9,7 @@ import AuthView from './components/AuthView';
 import BillingView from './components/BillingView';
 import FabricationView from './components/FabricationView';
 import SettingsView from './components/SettingsView';
+import CommunicationsView from './components/CommunicationsView';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
 import { getInitials, generateMRN } from './utils/defaultDb';
 
@@ -873,6 +874,8 @@ export default function App() {
             onUpdateLabel={handleUpdateLabel}
           />
         );
+      case 'email':
+        return <CommunicationsView patients={db.patients} claims={db.claims} />;
       case 'fabrication':
         return (
           <FabricationView
