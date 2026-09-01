@@ -153,6 +153,9 @@ export interface ClinicSettings {
   requirePin: boolean;
   pinCode: string;
   appearance: 'light' | 'dark';
+  logoUrl?: string;
+  doctorName?: string;
+  doctorImageUrl?: string;
 }
 
 export interface FabricationItem {

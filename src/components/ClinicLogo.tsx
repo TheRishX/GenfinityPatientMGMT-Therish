@@ -6,13 +6,15 @@ interface ClinicLogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showText?: boolean;
   clinicName?: string;
+  logoUrl?: string;
 }
 
 export default function ClinicLogo({
   className = '',
   size = 'md',
   showText = false,
-  clinicName
+  clinicName,
+  logoUrl
 }: ClinicLogoProps) {
   const [imageError, setImageError] = useState(false);
 
@@ -29,7 +31,7 @@ export default function ClinicLogo({
     <div className={`flex items-center gap-3 select-none ${className}`}>
       {!imageError ? (
         <img
-          src={logoImage}
+          src={logoUrl || logoImage}
           alt={clinicName || 'Genfinity Orthotics and Prosthetics Clinic logo'}
           referrerPolicy="no-referrer"
           onError={() => setImageError(true)}

@@ -10,6 +10,7 @@ import BillingView from './components/BillingView';
 import FabricationView from './components/FabricationView';
 import SettingsView from './components/SettingsView';
 import CommunicationsView from './components/CommunicationsView';
+import PasscodeGate from './components/PasscodeGate';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
 import { getInitials, generateMRN } from './utils/defaultDb';
 
@@ -19,6 +20,10 @@ export default function App() {
   // would otherwise see a different database.
   const [db, setDb] = useState<DatabaseSchema | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deviceUnlocked, setDeviceUnlocked] = useState(() => {
+    const until = Number(localStorage.getItem('genfinity_device_unlock_until') || 0);
+    return until > Date.now();
+  });
   // Kept as an explicit false value for child component compatibility. There
   // is intentionally no offline clinical-data mode.
   const isOfflineMode = false;
@@ -644,6 +649,12 @@ export default function App() {
     }
   };
 
+  const handleSignOut = () => {
+    localStorage.removeItem('genfinity_device_unlock_until');
+    setDeviceUnlocked(false);
+    fetch('/_logout').catch(() => undefined);
+  };
+
   // API Call: Add Fabrication Workshop item
   const handleAddFabricationItem = async (itemData: any) => {
     if (!db) return;
@@ -775,6 +786,10 @@ export default function App() {
         </button>
       </div>
     );
+  }
+
+  if (!deviceUnlocked) {
+    return <PasscodeGate clinicName={db.settings.clinicName} logoUrl={db.settings.logoUrl} passcode={db.settings.pinCode === '1234' ? '7770' : (db.settings.pinCode || '7770')} onUnlock={() => setDeviceUnlocked(true)} />;
   }
 
   // Helper to safely access custom labels
@@ -910,6 +925,10 @@ export default function App() {
           setIsNewPatientModalOpen(true);
         }}
         clinicName={db?.settings.clinicName}
+        logoUrl={db?.settings.logoUrl}
+        doctorImageUrl={db?.settings.doctorImageUrl}
+        doctorName={db?.settings.doctorName}
+        onSignOut={handleSignOut}
         isWorkspaceEditMode={isWorkspaceEditMode}
         setIsWorkspaceEditMode={setIsWorkspaceEditMode}
         customLabels={customLabels}
@@ -947,6 +966,8 @@ export default function App() {
           setSearchTerm={setSearchTerm}
           onSyncClick={fetchState}
           clinicName={db?.settings.clinicName}
+          doctorName={db?.settings.doctorName}
+          doctorImageUrl={db?.settings.doctorImageUrl}
           appointments={db.appointments}
           alerts={db.alerts}
           onAlertAction={handleAlertActionRedirect}

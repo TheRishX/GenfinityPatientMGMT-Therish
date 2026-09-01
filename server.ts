@@ -1714,7 +1714,7 @@ Clinical Portal Support Team`;
   // 9. Update Clinic Settings
   app.put('/api/settings', async (req, res) => {
     try {
-      const { clinicName, primaryAddress, contactPhone, supportEmail, requirePin, pinCode, appearance } = req.body;
+      const { clinicName, primaryAddress, contactPhone, supportEmail, requirePin, pinCode, appearance, logoUrl, doctorName, doctorImageUrl } = req.body;
 
       const db = await readDatabase();
       db.settings = {
@@ -1724,7 +1724,10 @@ Clinical Portal Support Team`;
         supportEmail: supportEmail || db.settings.supportEmail,
         requirePin: requirePin !== undefined ? requirePin : db.settings.requirePin,
         pinCode: pinCode || db.settings.pinCode,
-        appearance: appearance || db.settings.appearance
+        appearance: appearance || db.settings.appearance,
+        logoUrl: logoUrl !== undefined ? logoUrl : db.settings.logoUrl,
+        doctorName: doctorName !== undefined ? doctorName : db.settings.doctorName,
+        doctorImageUrl: doctorImageUrl !== undefined ? doctorImageUrl : db.settings.doctorImageUrl
       };
 
       await writeDatabase(db);

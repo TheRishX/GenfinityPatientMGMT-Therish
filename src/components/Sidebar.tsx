@@ -6,6 +6,8 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   onNewPatientClick: () => void;
   clinicName?: string;
+  logoUrl?: string;
+  doctorImageUrl?: string;
   doctorName?: string;
   isWorkspaceEditMode?: boolean;
   setIsWorkspaceEditMode?: (val: boolean) => void;
@@ -13,6 +15,7 @@ interface SidebarProps {
   onUpdateLabel?: (key: string, value: string) => void;
   enabledModules?: Record<string, boolean>;
   onToggleModule?: (moduleId: string) => void;
+  onSignOut?: () => void;
 }
 
 export default function Sidebar({
@@ -20,13 +23,16 @@ export default function Sidebar({
   setActiveTab,
   onNewPatientClick,
   clinicName = 'Genfinity O&P',
+  logoUrl,
+  doctorImageUrl,
   doctorName = 'Dr. Deepak Kumar Bhardwaj',
   isWorkspaceEditMode = false,
   setIsWorkspaceEditMode,
   customLabels = {},
   onUpdateLabel,
   enabledModules = {},
-  onToggleModule
+  onToggleModule,
+  onSignOut
 }: SidebarProps) {
   const navItems = [
     { id: 'dashboard', label: 'Today', icon: 'today' },
@@ -43,7 +49,7 @@ export default function Sidebar({
     <nav id="app-sidebar" aria-label="Main navigation" className="bg-surface-container-low dark:bg-surface-container-low shadow-sm h-screen w-64 md:w-72 flex-shrink-0 fixed left-0 top-0 h-full flex flex-col py-6 z-20 border-r border-surface-container-highest/30">
       {/* Brand area */}
       <div className="px-5 mb-5 flex items-center">
-        <ClinicLogo size="md" clinicName={clinicName} />
+        <ClinicLogo size="md" clinicName={clinicName} logoUrl={logoUrl} />
       </div>
 
       {/* New Patient CTA */}
@@ -152,7 +158,7 @@ export default function Sidebar({
 
         <button
           onClick={() => {
-            alert('Signing out is disabled in Dev Mode');
+            onSignOut?.();
           }}
           className="w-full flex items-center gap-4 rounded-full px-5 py-2.5 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
         >
@@ -162,11 +168,12 @@ export default function Sidebar({
 
         {/* Lead Doctor info block */}
         <div className="mt-3 px-4 py-2 flex items-center gap-3 bg-surface-container-lowest/50 rounded-2xl mx-2 border border-surface-container/20">
+          {!doctorImageUrl && <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black shrink-0">{doctorName.split(' ').map(part => part[0]).slice(0, 2).join('')}</div>}
           <img
-            className="w-10 h-10 rounded-full object-cover border border-surface shadow-xs shrink-0"
+            className={`${doctorImageUrl ? '' : 'hidden '}w-10 h-10 rounded-full object-cover border border-surface shadow-xs shrink-0`}
             alt={doctorName}
             referrerPolicy="no-referrer"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvfLEXk4bMT-A7W-x1bqrduVGRKwngE-nhzs84lU6yGX-DX9UJDUo1JCQr-C0eDq9yuvRY7B2zKHj3ZLxBi-_8Y5zpLVvtHoVn-x2QH_thaHd375Fvcll1Ulk3I63xZjPeRxglkZGxVL7BAGmn_knQ_7QBEnCCDYd4nY8pdAfKoT5uNhHSCtayeekgLJdSrD5Tj2ZE5FGc8AkYeNvEcsfNoAhFqbvtq9ICtMOF4-GluADzdxQLsXpuuw"
+            src={doctorImageUrl || ''}
           />
           <div className="min-w-0">
             <p className="text-xs font-bold text-on-surface truncate">{doctorName}</p>

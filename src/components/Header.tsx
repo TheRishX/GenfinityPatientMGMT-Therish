@@ -8,6 +8,7 @@ interface HeaderProps {
   onSyncClick?: () => void;
   doctorName?: string;
   clinicName?: string;
+  doctorImageUrl?: string;
   isOfflineMode?: boolean;
   appointments?: Appointment[];
   alerts?: AlertItem[];
@@ -22,6 +23,7 @@ export default function Header({
   onSyncClick,
   doctorName = 'Dr. Deepak Kumar Bhardwaj',
   clinicName,
+  doctorImageUrl,
   isOfflineMode = false,
   appointments = [],
   alerts = [],
@@ -288,8 +290,9 @@ export default function Header({
 
         {/* User profile picture */}
         <div className="flex items-center gap-3 border-l border-surface-container-highest/60 pl-4">
+          {doctorImageUrl && <img className="w-9 h-9 rounded-full object-cover border border-surface-container-highest" src={doctorImageUrl} alt={doctorName} />}
           <img
-            className="w-9 h-9 rounded-full object-cover border border-surface-container-highest"
+            className={`${doctorImageUrl ? 'hidden ' : ''}w-9 h-9 rounded-full object-cover border border-surface-container-highest`}
             referrerPolicy="no-referrer"
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlc5eW89oFLhxkWhbcqvfXUSPr-QBhECg-K3I7ysVAyhotpdE1_5HUGPlpT-wv6wQh1hi5eDwPfAJnWFmD47efUWRrznOAFh-gf_6y1QVRhe61qyFzYsn-72GDzs9JhamBVe0qN0P8uG-O1q0JwLlUjCeRecGewuIlMEDQCidiHmGTh5Du5WswqHmJHtHIqshjcIsi2e2KvNwj_19Af8pS6icq6rbRtykEN0Vq80Br30yyPiJp1RY8Mg"
             alt={doctorName}
