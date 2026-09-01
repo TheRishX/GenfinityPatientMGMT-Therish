@@ -626,6 +626,27 @@ export default function App() {
     }
   };
 
+  // API Call: Delete Invoice Claim
+  const handleDeleteClaim = async (claimId: string) => {
+    if (isOfflineMode && db) {
+      saveStateLocally({
+        ...db,
+        claims: db.claims.filter(claim => claim.id !== claimId)
+      });
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/claims/${claimId}`, { method: 'DELETE' });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || 'Failed to delete invoice');
+      await fetchState();
+    } catch (err: any) {
+      alert(err.message);
+      throw err;
+    }
+  };
+
   // API Call: Save settings config
   const handleSaveSettings = async (settingsData: ClinicSettings) => {
     if (isOfflineMode && db) {
@@ -884,6 +905,7 @@ export default function App() {
             claims={db.claims}
             onAddClaim={handleAddClaim}
             onUpdateClaimStatus={handleUpdateClaimStatus}
+            onDeleteClaim={handleDeleteClaim}
             isWorkspaceEditMode={isWorkspaceEditMode}
             customLabels={customLabels}
             onUpdateLabel={handleUpdateLabel}

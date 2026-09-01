@@ -5,6 +5,7 @@ interface BillingViewProps {
   claims: Claim[];
   onAddClaim: (claimData: any) => Promise<void>;
   onUpdateClaimStatus: (claimId: string, status: Claim['status']) => Promise<void>;
+  onDeleteClaim: (claimId: string) => Promise<void>;
   isWorkspaceEditMode?: boolean;
   customLabels?: Record<string, string>;
   onUpdateLabel?: (key: string, value: string) => void;
@@ -14,12 +15,16 @@ export default function BillingView({
   claims,
   onAddClaim,
   onUpdateClaimStatus,
+  onDeleteClaim,
   isWorkspaceEditMode = false,
   customLabels = {},
   onUpdateLabel
 }: BillingViewProps) {
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('All');
   const [billingSearch, setBillingSearch] = useState<string>('');
+  const [editingClaimId, setEditingClaimId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Claim | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // New Claim Modal State
   const [isAddClaimOpen, setIsAddClaimOpen] = useState(false);
@@ -234,29 +239,50 @@ export default function BillingView({
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex justify-end gap-2">
-                            {claim.status !== 'Paid' && (
+                            {editingClaimId === claim.id ? (
                               <button
-                                onClick={async () => {
-                                  if (confirm(`Mark claim ${claim.claimNumber} for ${claim.patientName} as paid?`)) {
-                                    await onUpdateClaimStatus(claim.id, 'Paid');
-                                  }
-                                }}
-                                className="px-2.5 py-1 rounded bg-secondary-container text-on-secondary-container hover:bg-secondary hover:text-white transition-all text-[10px] font-bold cursor-pointer"
+                                type="button"
+                                onClick={() => setDeleteTarget(claim)}
+                                className="px-2.5 py-1 rounded bg-primary-container/10 text-primary hover:bg-primary hover:text-white transition-all text-[10px] font-bold cursor-pointer"
                               >
-                                Mark Paid
+                                Delete
                               </button>
-                            )}
-                            {claim.status === 'Billed' && (
-                              <button
-                                onClick={async () => {
-                                  if (confirm(`Mark claim ${claim.claimNumber} as denied?`)) {
-                                    await onUpdateClaimStatus(claim.id, 'Denied');
-                                  }
-                                }}
-                                className="px-2.5 py-1 rounded bg-surface border border-surface-container-highest text-primary hover:bg-primary-container/10 transition-all text-[10px] font-bold cursor-pointer"
-                              >
-                                Mark Denied
-                              </button>
+                            ) : (
+                              <>
+                                {claim.status !== 'Paid' && (
+                                  <button
+                                    onClick={async () => {
+                                      if (confirm(`Mark claim ${claim.claimNumber} for ${claim.patientName} as paid?`)) {
+                                        await onUpdateClaimStatus(claim.id, 'Paid');
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 rounded bg-secondary-container text-on-secondary-container hover:bg-secondary hover:text-white transition-all text-[10px] font-bold cursor-pointer"
+                                  >
+                                    Mark Paid
+                                  </button>
+                                )}
+                                {claim.status === 'Billed' && (
+                                  <button
+                                    onClick={async () => {
+                                      if (confirm(`Mark claim ${claim.claimNumber} as denied?`)) {
+                                        await onUpdateClaimStatus(claim.id, 'Denied');
+                                      }
+                                    }}
+                                    className="px-2.5 py-1 rounded bg-surface border border-surface-container-highest text-primary hover:bg-primary-container/10 transition-all text-[10px] font-bold cursor-pointer"
+                                  >
+                                    Mark Denied
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingClaimId(claim.id)}
+                                  aria-label={`Manage invoice ${claim.claimNumber}`}
+                                  title="Manage invoice"
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-surface-container-highest text-on-surface-variant hover:border-primary hover:text-primary transition-colors cursor-pointer"
+                                >
+                                  <span className="material-symbols-outlined text-[15px]">edit</span>
+                                </button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -275,6 +301,44 @@ export default function BillingView({
           </div>
         </div>
       </div>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-on-surface/40 modal-backdrop-blur" role="presentation">
+          <div role="dialog" aria-modal="true" aria-labelledby="delete-invoice-title" className="w-full max-w-sm rounded-3xl bg-surface-container-lowest p-6 shadow-lg">
+            <h3 id="delete-invoice-title" className="text-lg font-extrabold text-on-surface">Delete this invoice?</h3>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Invoice <span className="font-bold text-on-surface">{deleteTarget.claimNumber}</span> for {deleteTarget.patientName} will be permanently removed.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setDeleteTarget(null); setEditingClaimId(null); }}
+                disabled={isDeleting}
+                className="rounded-full border border-surface-container-highest px-4 py-2 text-xs font-bold text-on-surface hover:bg-surface-container disabled:opacity-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={async () => {
+                  setIsDeleting(true);
+                  try {
+                    await onDeleteClaim(deleteTarget.id);
+                    setDeleteTarget(null);
+                    setEditingClaimId(null);
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+                className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary-container disabled:opacity-50 cursor-pointer"
+              >
+                {isDeleting ? 'Deleting…' : 'Delete invoice'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: SUBMIT NEW CLAIM */}
       {isAddClaimOpen && (

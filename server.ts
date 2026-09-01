@@ -1711,6 +1711,23 @@ Clinical Portal Support Team`;
     }
   });
 
+  // 8b. Delete Claim Invoice
+  app.delete('/api/claims/:id', async (req, res) => {
+    try {
+      const db = await readDatabase();
+      const claimIndex = db.claims.findIndex(claim => claim.id === req.params.id);
+      if (claimIndex === -1) {
+        return res.status(404).json({ error: 'Invoice not found' });
+      }
+
+      const [deletedClaim] = db.claims.splice(claimIndex, 1);
+      await writeDatabase(db);
+      res.json({ success: true, claim: deletedClaim });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // 9. Update Clinic Settings
   app.put('/api/settings', async (req, res) => {
     try {
