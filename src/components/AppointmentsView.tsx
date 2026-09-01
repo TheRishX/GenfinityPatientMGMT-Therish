@@ -90,7 +90,7 @@ export default function AppointmentsView({
         phone: matched.phone || '(555) 000-1234',
         mrn: matched.mrn,
         status: matched.status,
-        clinician: matched.primaryClinician || 'Dr. Sarah Jenkins'
+        clinician: matched.primaryClinician || 'Dr. Deepak Kumar Bhardwaj'
       };
     }
     return {
@@ -98,7 +98,7 @@ export default function AppointmentsView({
       phone: '(555) 019-2834',
       mrn: '#NEW-APPT',
       status: 'Consultation' as const,
-      clinician: 'Dr. Sarah Jenkins'
+      clinician: 'Dr. Deepak Kumar Bhardwaj'
     };
   };
 

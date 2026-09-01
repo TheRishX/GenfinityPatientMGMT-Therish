@@ -20,7 +20,7 @@ export default function Sidebar({
   setActiveTab,
   onNewPatientClick,
   clinicName = 'Genfinity O&P',
-  doctorName = 'Dr. Sarah Jenkins',
+  doctorName = 'Dr. Deepak Kumar Bhardwaj',
   isWorkspaceEditMode = false,
   setIsWorkspaceEditMode,
   customLabels = {},

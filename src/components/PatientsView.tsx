@@ -89,7 +89,7 @@ export default function PatientsView({
   const [newTlOutcome, setNewTlOutcome] = useState('');
   const [newTlNextAction, setNewTlNextAction] = useState('');
   const [newTlStatus, setNewTlStatus] = useState('Completed');
-  const [newTlAuthor, setNewTlAuthor] = useState('Dr. Sarah Jenkins');
+  const [newTlAuthor, setNewTlAuthor] = useState('Dr. Deepak Kumar Bhardwaj');
 
   // Info Tab States
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -129,7 +129,7 @@ export default function PatientsView({
 
   // Clinical Notes Tab States
   const [newNoteText, setNewNoteText] = useState('');
-  const [newNoteAuthor, setNewNoteAuthor] = useState('Dr. Aris Thorne');
+  const [newNoteAuthor, setNewNoteAuthor] = useState('Dr. Deepak Kumar Bhardwaj');
 
   // Keep selectedPatient state in sync with updated database props
   useEffect(() => {
@@ -168,7 +168,7 @@ export default function PatientsView({
   const [newEmail, setNewEmail] = useState('');
   const [newReferral, setNewReferral] = useState('');
   const [newInsuranceCompany, setNewInsuranceCompany] = useState('');
-  const [newPrimaryClinician, setNewPrimaryClinician] = useState('Dr. Sarah Jenkins');
+  const [newPrimaryClinician, setNewPrimaryClinician] = useState('Dr. Deepak Kumar Bhardwaj');
 
   // Interactive Checklist states for Profile (Info / checklist on profile)
   const [checklist, setChecklist] = useState<Record<string, boolean>>({
@@ -219,7 +219,7 @@ export default function PatientsView({
       email: newEmail,
       referralSource: newReferral,
       insuranceCompany: newInsuranceCompany || 'Medicare Blue Cross',
-      primaryClinician: newPrimaryClinician || 'Dr. Sarah Jenkins',
+      primaryClinician: newPrimaryClinician || 'Dr. Deepak Kumar Bhardwaj',
       status: 'In Progress'
     });
 
@@ -230,7 +230,7 @@ export default function PatientsView({
     setNewEmail('');
     setNewReferral('');
     setNewInsuranceCompany('');
-    setNewPrimaryClinician('Dr. Sarah Jenkins');
+    setNewPrimaryClinician('Dr. Deepak Kumar Bhardwaj');
     setIsNewPatientModalOpen(false);
   };
 
@@ -776,9 +776,8 @@ export default function PatientsView({
                     onChange={e => setNewPrimaryClinician(e.target.value)}
                     className="w-full px-4 py-3 bg-surface rounded-full border-2 border-surface-container-highest text-sm focus:border-secondary outline-none transition-all text-on-surface"
                   >
-                    <option value="Dr. Sarah Jenkins">Dr. Sarah Jenkins</option>
-                    <option value="Dr. Aris Thorne">Dr. Aris Thorne</option>
-                    <option value="Dr. Michael Jenkins">Dr. Michael Jenkins</option>
+                            <option value="Dr. Deepak Kumar Bhardwaj">Dr. Deepak Kumar Bhardwaj</option>
+                            <option value="Dr. Blake Jackson Sanders">Dr. Blake Jackson Sanders</option>
                   </select>
                 </div>
               </div>
@@ -1851,9 +1850,8 @@ export default function PatientsView({
                             onChange={(e) => setNewNoteAuthor(e.target.value)}
                             className="w-full px-4 py-2 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           >
-                            <option value="Dr. Aris Thorne">Dr. Aris Thorne</option>
-                            <option value="Dr. Sarah Jenkins">Dr. Sarah Jenkins</option>
-                            <option value="Dr. Michael Jenkins">Dr. Michael Jenkins</option>
+                            <option value="Dr. Deepak Kumar Bhardwaj">Dr. Deepak Kumar Bhardwaj</option>
+                            <option value="Dr. Blake Jackson Sanders">Dr. Blake Jackson Sanders</option>
                           </select>
                         </div>
                         <button

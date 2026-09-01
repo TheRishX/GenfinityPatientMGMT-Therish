@@ -329,7 +329,7 @@ const DEFAULT_DATABASE: DatabaseSchema = {
       claimNumber: 'INV-2023-0891',
       patientName: 'Sarah Jenkins',
       payer: 'Medicare',
-      doctor: 'Dr. Sarah Jenkins',
+      doctor: 'Dr. Deepak Kumar Bhardwaj',
       amount: 2450.00,
       date: 'Oct 25',
       status: 'Billed'
@@ -1607,7 +1607,7 @@ Clinical Portal Support Team`;
         claimNumber: `INV-2023-0${count}`,
         patientName: matchedPatient.name,
         payer: payer || 'Self',
-        doctor: doctor || 'Dr. Sarah Jenkins',
+        doctor: doctor || 'Dr. Deepak Kumar Bhardwaj',
         amount: parseFloat(amount),
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
         status: status || 'Billed',

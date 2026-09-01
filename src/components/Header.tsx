@@ -20,7 +20,7 @@ export default function Header({
   searchTerm,
   setSearchTerm,
   onSyncClick,
-  doctorName = 'Dr. Sarah Jenkins',
+  doctorName = 'Dr. Deepak Kumar Bhardwaj',
   clinicName,
   isOfflineMode = false,
   appointments = [],

@@ -565,7 +565,7 @@ export default function App() {
         claimNumber: `INV-2023-0${count}`,
         patientName: claimData.patientName,
         payer: claimData.payer || 'Self',
-        doctor: claimData.doctor || 'Dr. Sarah Jenkins',
+        doctor: claimData.doctor || 'Dr. Deepak Kumar Bhardwaj',
         amount: parseFloat(claimData.amount),
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
         status: claimData.status || 'Billed'

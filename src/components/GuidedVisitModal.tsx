@@ -167,7 +167,7 @@ export const GuidedVisitModal: React.FC<GuidedVisitModalProps> = ({
 
   // Step 7: Checkout, Signature & Schedule Follow-Up
   const [isFinalized, setIsFinalized] = useState(true);
-  const [signedBy, setSignedBy] = useState('Dr. Sarah Jenkins');
+  const [signedBy, setSignedBy] = useState('Dr. Deepak Kumar Bhardwaj');
   const [scheduleFollowUp, setScheduleFollowUp] = useState(true);
   const [followUpDate, setFollowUpDate] = useState(() => {
     const d = new Date();
@@ -299,7 +299,7 @@ NEXT TASK: ${nextTaskTitle} (Due: ${nextTaskDueDate})
       const newNote: ClinicalNote = {
         id: `cn_${Date.now()}`,
         date: `${dateStr} · ${timeStr}`,
-        author: signedBy || 'Dr. Sarah Jenkins',
+        author: signedBy || 'Dr. Deepak Kumar Bhardwaj',
         visitType,
         subjective,
         objective,
@@ -333,7 +333,7 @@ NEXT TASK: ${nextTaskTitle} (Due: ${nextTaskDueDate})
       const newTlEvent: TimelineEvent = {
         id: `tl_visit_${Date.now()}`,
         dateTime: `${dateStr} · ${timeStr}`,
-        author: signedBy || 'Dr. Sarah Jenkins',
+        author: signedBy || 'Dr. Deepak Kumar Bhardwaj',
         eventType: outcome === 'sent to fabrication' ? 'fabrication' : outcome === 'needs authorization' ? 'authorization' : 'visit',
         title: `Clinical Visit (${visitType})`,
         summary: `${visitType} completed by ${signedBy}. ${assessment.slice(0, 120)}...`,

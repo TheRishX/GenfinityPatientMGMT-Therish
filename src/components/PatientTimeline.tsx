@@ -50,7 +50,7 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
   const [newSummary, setNewSummary] = useState('');
   const [newOutcome, setNewOutcome] = useState('');
   const [newNextAction, setNewNextAction] = useState('');
-  const [newAuthor, setNewAuthor] = useState('Dr. Sarah Jenkins');
+  const [newAuthor, setNewAuthor] = useState('Dr. Deepak Kumar Bhardwaj');
   const [newStatus, setNewStatus] = useState('Completed');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
