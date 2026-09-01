@@ -678,8 +678,8 @@ export default function PatientsView({
 
       {/* MODAL 1: ADD NEW PATIENT */}
       {isNewPatientModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-on-surface/40 modal-backdrop-blur">
-          <div className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-lg overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-on-surface/40 modal-backdrop-blur" onClick={() => setIsNewPatientModalOpen(false)}>
+          <div className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-lg overflow-hidden flex flex-col max-h-[90vh]" onClick={(event) => event.stopPropagation()}>
             {/* Modal Header */}
             <div className="px-6 py-5 flex justify-between items-center border-b border-surface-container-highest bg-surface-bright">
               <div>
@@ -806,8 +806,8 @@ export default function PatientsView({
 
       {/* MODAL 2: PATIENT PROFILE (Eleanor Vance Setup, Image 5) */}
       {selectedPatient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-5 bg-on-surface/40 modal-backdrop-blur">
-          <div className="bg-surface-container-lowest w-full max-w-6xl rounded-2xl shadow-xl relative flex flex-col max-h-[94vh] overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-5 bg-on-surface/40 modal-backdrop-blur" onClick={() => setSelectedPatient(null)}>
+          <div className="bg-surface-container-lowest w-full max-w-6xl rounded-2xl shadow-xl relative flex flex-col max-h-[94vh] overflow-hidden" onClick={(event) => event.stopPropagation()}>
             {/* Close trigger */}
             <button
               onClick={() => setSelectedPatient(null)}
@@ -881,9 +881,9 @@ export default function PatientsView({
                 { id: 'info', label: 'Patient information', icon: 'contact_page' },
                 { id: 'appointments', label: 'Visits', icon: 'calendar_month' },
                 { id: 'documents', label: 'Files', icon: 'folder_open' },
-                { id: 'timeline', label: 'Overview', icon: 'space_dashboard' },
                 { id: 'authorization', label: 'Insurance', icon: 'verified_user' },
                 { id: 'billing', label: 'Payments', icon: 'receipt_long' },
+                { id: 'timeline', label: 'Overview', icon: 'space_dashboard' },
                 { id: 'notes', label: 'Notes', icon: 'edit_note' }
               ].map(tab => (
                 <button

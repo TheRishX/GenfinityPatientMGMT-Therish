@@ -589,7 +589,9 @@ export const DEFAULT_DATABASE: DatabaseSchema = {
     supportEmail: 'support@genfinity.com',
     requirePin: true,
     pinCode: '7770',
-    appearance: 'light'
+    appearance: 'light',
+    defaultReferralSource: 'physician',
+    defaultPrimaryClinician: 'Dr. Deepak Kumar Bhardwaj'
   },
   fabrication: [
     {

@@ -156,6 +156,8 @@ export interface ClinicSettings {
   logoUrl?: string;
   doctorName?: string;
   doctorImageUrl?: string;
+  defaultReferralSource?: string;
+  defaultPrimaryClinician?: string;
 }
 
 export interface FabricationItem {

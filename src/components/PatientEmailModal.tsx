@@ -96,8 +96,8 @@ export default function PatientEmailModal({ patient, onClose, onSent }: PatientE
   };
 
   return (
-    <div className="fixed inset-0 z-[90] bg-on-surface/45 modal-backdrop-blur flex items-center justify-center p-3" role="dialog" aria-modal="true" aria-labelledby="patient-email-title">
-      <div className="w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-surface-container-lowest rounded-2xl shadow-xl border border-surface-container-highest">
+    <div onClick={onClose} className="fixed inset-0 z-[90] bg-on-surface/45 modal-backdrop-blur flex items-center justify-center p-3" role="dialog" aria-modal="true" aria-labelledby="patient-email-title">
+      <div onClick={(event) => event.stopPropagation()} className="w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-surface-container-lowest rounded-2xl shadow-xl border border-surface-container-highest">
         <header className="px-5 py-4 border-b border-surface-container-highest/50 flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-secondary">Email patient</p>

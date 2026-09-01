@@ -44,8 +44,8 @@ export default function PatientSmsModal({ patient, onClose, onSent }: Props) {
     } catch (err: any) { setError(err.message); } finally { setSending(false); }
   };
 
-  return <div className="fixed inset-0 z-[90] bg-on-surface/45 modal-backdrop-blur flex items-center justify-center p-3" role="dialog" aria-modal="true" aria-labelledby="patient-sms-title">
-    <div className="w-full max-w-xl max-h-[92vh] overflow-y-auto bg-surface-container-lowest rounded-2xl shadow-xl border border-surface-container-highest">
+  return <div onClick={onClose} className="fixed inset-0 z-[90] bg-on-surface/45 modal-backdrop-blur flex items-center justify-center p-3" role="dialog" aria-modal="true" aria-labelledby="patient-sms-title">
+    <div onClick={(event) => event.stopPropagation()} className="w-full max-w-xl max-h-[92vh] overflow-y-auto bg-surface-container-lowest rounded-2xl shadow-xl border border-surface-container-highest">
       <header className="px-5 py-4 border-b border-surface-container-highest/50 flex items-start justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-secondary">Text patient</p><h2 id="patient-sms-title" className="text-lg font-extrabold text-on-surface mt-0.5">{patient.name}</h2><p className="text-xs text-on-surface-variant mt-0.5">{patient.phone} · {patient.careStage || patient.status}</p></div><button onClick={onClose} aria-label="Close SMS composer" className="w-10 h-10 rounded-full bg-surface-container-low text-on-surface-variant flex items-center justify-center cursor-pointer hover:bg-surface-container"><span className="material-symbols-outlined">close</span></button></header>
       <div className="p-5 space-y-4">{loading ? <div className="py-12 text-center text-sm text-on-surface-variant">Loading message templates…</div> : <>
         <div><label className="form-label">Message template</label><select value={templateId} onChange={e => { const template = templates.find(item => item.id === e.target.value); if (template) apply(template); }} className="form-input">{templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}</select></div>
