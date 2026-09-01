@@ -38,7 +38,8 @@ export default function Sidebar({
     { id: 'dashboard', label: 'Today', icon: 'today' },
     { id: 'patients', label: 'Patients', icon: 'groups' },
     { id: 'billing', label: 'Invoices', icon: 'receipt_long' },
-    { id: 'email', label: 'Email', icon: 'mail' }
+    { id: 'email', label: 'Email', icon: 'mail' },
+    { id: 'sms', label: 'SMS', icon: 'sms' }
   ];
 
   const getLabel = (id: string, defaultLabel: string) => {

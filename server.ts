@@ -1179,6 +1179,17 @@ Clinical Portal Support Team`;
     res.json({ configured: Boolean(RC_APP_CLIENT_ID && RC_APP_CLIENT_SECRET && RC_USER_JWT && RC_FROM_PHONE_NUMBER), provider: 'RingCentral' });
   });
 
+  // Verify the RingCentral JWT without sending a message. This keeps setup
+  // checks safe and gives the UI a useful diagnostic before a clinic sends.
+  app.post('/api/sms/verify', async (_req, res) => {
+    try {
+      await getRingCentralAccessToken();
+      res.json({ success: true, message: 'RingCentral is connected and ready to send SMS.' });
+    } catch (err: any) {
+      res.status(502).json({ success: false, error: err.message });
+    }
+  });
+
   app.get('/api/sms/templates', async (_req, res) => {
     const db = await readDatabase();
     const templates: SmsTemplate[] = db.smsTemplates?.length ? db.smsTemplates : [

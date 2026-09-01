@@ -10,6 +10,7 @@ import BillingView from './components/BillingView';
 import FabricationView from './components/FabricationView';
 import SettingsView from './components/SettingsView';
 import CommunicationsView from './components/CommunicationsView';
+import SmsView from './components/SmsView';
 import PasscodeGate from './components/PasscodeGate';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
 import { getInitials, generateMRN } from './utils/defaultDb';
@@ -913,6 +914,8 @@ export default function App() {
         );
       case 'email':
         return <CommunicationsView patients={db.patients} claims={db.claims} />;
+      case 'sms':
+        return <SmsView patients={db.patients} appointments={db.appointments} />;
       case 'fabrication':
         return (
           <FabricationView
@@ -982,6 +985,8 @@ export default function App() {
               ? getSidebarLabel('settings', 'Admin Settings')
               : activeTab === 'email'
               ? getSidebarLabel('email', 'Email')
+              : activeTab === 'sms'
+              ? getSidebarLabel('sms', 'SMS')
               : 'Genfinity Clinical Portal'
           }
           searchTerm={searchTerm}
