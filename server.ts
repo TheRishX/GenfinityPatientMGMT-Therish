@@ -20,6 +20,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PRIVATE_STORAGE_PATH = process.env.PRIVATE_STORAGE_PATH || path.resolve(__dirname, '..', 'private-clinic-storage');
+const LOCAL_DATABASE_PATH = path.join(__dirname, 'src', 'db.json');
+const isLocalDevelopment = process.env.NODE_ENV === 'development';
 
 // Hostinger's environment editor can normalize these identifiers to uppercase,
 // while MySQL account names on the server are lowercase and case-sensitive.
@@ -670,25 +672,28 @@ async function sendRingCentralSms(to: string, text: string): Promise<{ messageId
 // Database Accessor Helpers
 async function readDatabase(): Promise<DatabaseSchema> {
   let db: DatabaseSchema;
-  const pool = getMysqlPool();
+  const pool = isLocalDevelopment ? null : getMysqlPool();
 
   if (!pool) {
-    throw new Error('Hostinger MySQL is not configured. Clinical data access is disabled.');
-  }
-
-  await ensureMysqlSchema(pool);
-  const [rows] = await pool.execute<any[]>(
-    'SELECT payload FROM app_state WHERE state_key = ? LIMIT 1',
-    ['clinic']
-  );
-  if (rows.length) {
-    db = JSON.parse(rows[0].payload);
+    if (!isLocalDevelopment) {
+      throw new Error('Hostinger MySQL is not configured. Clinical data access is disabled.');
+    }
+    db = JSON.parse(await fs.readFile(LOCAL_DATABASE_PATH, 'utf8'));
   } else {
-    db = JSON.parse(JSON.stringify(DEFAULT_DATABASE));
-    await pool.execute(
-      'INSERT INTO app_state (state_key, payload) VALUES (?, ?)',
-      ['clinic', JSON.stringify(db)]
+    await ensureMysqlSchema(pool);
+    const [rows] = await pool.execute<any[]>(
+      'SELECT payload FROM app_state WHERE state_key = ? LIMIT 1',
+      ['clinic']
     );
+    if (rows.length) {
+      db = JSON.parse(rows[0].payload);
+    } else {
+      db = JSON.parse(JSON.stringify(DEFAULT_DATABASE));
+      await pool.execute(
+        'INSERT INTO app_state (state_key, payload) VALUES (?, ?)',
+        ['clinic', JSON.stringify(db)]
+      );
+    }
   }
 
   // Ensure default Email structures exist
@@ -838,20 +843,28 @@ Billing & Patient Accounts
   const nextLinkedState = JSON.stringify([db.appointments, db.authorizations, db.claims, db.fabrication]);
 
   if (nextLinkedState !== previousLinkedState) {
-    await pool.execute(
-      `INSERT INTO app_state (state_key, payload) VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE payload = VALUES(payload)`,
-      ['clinic', JSON.stringify(db)]
-    );
+    if (pool) {
+      await pool.execute(
+        `INSERT INTO app_state (state_key, payload) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE payload = VALUES(payload)`,
+        ['clinic', JSON.stringify(db)]
+      );
+    } else if (isLocalDevelopment) {
+      await fs.writeFile(LOCAL_DATABASE_PATH, JSON.stringify(db, null, 2));
+    }
   }
 
   return db;
 }
 
 async function writeDatabase(db: DatabaseSchema): Promise<void> {
-  const pool = getMysqlPool();
+  const pool = isLocalDevelopment ? null : getMysqlPool();
   if (!pool) {
-    throw new Error('Hostinger MySQL is not configured. Clinical data writes are disabled.');
+    if (!isLocalDevelopment) {
+      throw new Error('Hostinger MySQL is not configured. Clinical data writes are disabled.');
+    }
+    await fs.writeFile(LOCAL_DATABASE_PATH, JSON.stringify(db, null, 2));
+    return;
   }
   await ensureMysqlSchema(pool);
   await pool.execute(
@@ -955,18 +968,19 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
       await fs.writeFile(probePath, probeValue, 'utf-8');
       const readBack = await fs.readFile(probePath, 'utf-8');
       await fs.unlink(probePath);
-      const pool = getMysqlPool();
+      const pool = isLocalDevelopment ? null : getMysqlPool();
       if (pool) {
         await ensureMysqlSchema(pool);
         await pool.query('SELECT 1');
         mysqlReady = true;
       }
+      if (isLocalDevelopment) mysqlReady = true;
       const latencyMs = Date.now() - startTime;
       res.json({
         ready: readBack === probeValue && mysqlReady,
         latencyMs,
         runtime: process.version,
-        persistence: pool ? 'mysql' : 'unavailable',
+        persistence: isLocalDevelopment ? 'local-json' : 'mysql',
         database: pool ? MYSQL_DATABASE : null,
         privateStoragePath: PRIVATE_STORAGE_PATH,
         issues: [
