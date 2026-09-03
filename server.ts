@@ -642,7 +642,14 @@ async function getRingCentralAccessToken(): Promise<string> {
     body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: RC_USER_JWT })
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.access_token) throw new Error(data.error_description || data.message || `RingCentral authentication failed (HTTP ${response.status}).`);
+  if (!response.ok || !data.access_token) {
+    const providerError = [data.error_description, data.message, data.errorCode].filter(Boolean).join(' — ');
+    const invalidClient = /invalid client application|invalid client credentials/i.test(providerError);
+    const detail = invalidClient
+      ? `RingCentral rejected the client application credentials for ${RINGCENTRAL_SERVER_URL}. Check that RC_APP_CLIENT_ID and RC_APP_CLIENT_SECRET belong to the same RingCentral app and environment (production vs sandbox), then redeploy.`
+      : providerError || `RingCentral authentication failed (HTTP ${response.status}).`;
+    throw new Error(detail);
+  }
   ringCentralToken = { accessToken: data.access_token, expiresAt: Date.now() + Number(data.expires_in || 3600) * 1000 };
   return data.access_token;
 }
@@ -856,7 +863,12 @@ async function writeDatabase(db: DatabaseSchema): Promise<void> {
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT || 3000);
+  const requestedPort = Number(process.env.PORT || 3000);
+  // Keep local development usable when a previous Genfinity process is still
+  // holding port 3000. Hostinger must continue to use its assigned PORT.
+  const PORT = process.env.NODE_ENV === 'development'
+    ? await findAvailablePort(requestedPort)
+    : requestedPort;
 
   app.disable('x-powered-by');
   app.use(express.json({ limit: '50mb' }));
