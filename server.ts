@@ -37,6 +37,7 @@ const mysqlConfigured = Boolean(
   MYSQL_USER &&
   MYSQL_PASSWORD
 );
+const useLocalJsonDatabase = isLocalDevelopment && !mysqlConfigured;
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY?.trim();
 const BREVO_SMTP_HOST = process.env.BREVO_SMTP_HOST?.trim() || 'smtp-relay.brevo.com';
@@ -672,7 +673,7 @@ async function sendRingCentralSms(to: string, text: string): Promise<{ messageId
 // Database Accessor Helpers
 async function readDatabase(): Promise<DatabaseSchema> {
   let db: DatabaseSchema;
-  const pool = isLocalDevelopment ? null : getMysqlPool();
+  const pool = useLocalJsonDatabase ? null : getMysqlPool();
 
   if (!pool) {
     if (!isLocalDevelopment) {
@@ -849,7 +850,7 @@ Billing & Patient Accounts
          ON DUPLICATE KEY UPDATE payload = VALUES(payload)`,
         ['clinic', JSON.stringify(db)]
       );
-    } else if (isLocalDevelopment) {
+    } else if (useLocalJsonDatabase) {
       await fs.writeFile(LOCAL_DATABASE_PATH, JSON.stringify(db, null, 2));
     }
   }
@@ -858,7 +859,7 @@ Billing & Patient Accounts
 }
 
 async function writeDatabase(db: DatabaseSchema): Promise<void> {
-  const pool = isLocalDevelopment ? null : getMysqlPool();
+  const pool = useLocalJsonDatabase ? null : getMysqlPool();
   if (!pool) {
     if (!isLocalDevelopment) {
       throw new Error('Hostinger MySQL is not configured. Clinical data writes are disabled.');
@@ -968,19 +969,19 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
       await fs.writeFile(probePath, probeValue, 'utf-8');
       const readBack = await fs.readFile(probePath, 'utf-8');
       await fs.unlink(probePath);
-      const pool = isLocalDevelopment ? null : getMysqlPool();
+      const pool = useLocalJsonDatabase ? null : getMysqlPool();
       if (pool) {
         await ensureMysqlSchema(pool);
         await pool.query('SELECT 1');
         mysqlReady = true;
       }
-      if (isLocalDevelopment) mysqlReady = true;
+      if (useLocalJsonDatabase) mysqlReady = true;
       const latencyMs = Date.now() - startTime;
       res.json({
         ready: readBack === probeValue && mysqlReady,
         latencyMs,
         runtime: process.version,
-        persistence: isLocalDevelopment ? 'local-json' : 'mysql',
+        persistence: useLocalJsonDatabase ? 'local-json' : 'mysql',
         database: pool ? MYSQL_DATABASE : null,
         privateStoragePath: PRIVATE_STORAGE_PATH,
         issues: [
