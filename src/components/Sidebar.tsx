@@ -38,8 +38,7 @@ export default function Sidebar({
     { id: 'dashboard', label: 'Today', icon: 'today' },
     { id: 'patients', label: 'Patients', icon: 'groups' },
     { id: 'billing', label: 'Invoices', icon: 'receipt_long' },
-    { id: 'email', label: 'Email', icon: 'mail' },
-    { id: 'sms', label: 'SMS', icon: 'sms' }
+    { id: 'communications', label: 'Communications', icon: 'forum' }
   ];
 
   const getLabel = (id: string, defaultLabel: string) => {
@@ -50,7 +49,7 @@ export default function Sidebar({
     <nav id="app-sidebar" aria-label="Main navigation" className="bg-surface-container-low dark:bg-surface-container-low shadow-sm h-screen w-64 md:w-72 flex-shrink-0 fixed left-0 top-0 h-full flex flex-col py-6 z-20 border-r border-surface-container-highest/30">
       {/* Brand area */}
       <div className="px-5 mb-5 flex items-center">
-        <ClinicLogo size="md" clinicName={clinicName} logoUrl={logoUrl} />
+        <ClinicLogo size="md" clinicName={clinicName} logoUrl={logoUrl} onClick={() => setActiveTab('dashboard')} />
       </div>
 
       {/* New Patient CTA */}

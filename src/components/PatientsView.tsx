@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Patient, PatientFile, Appointment, Authorization, Claim, ClinicalNote, TimelineEvent, TimelineEventType } from '../types';
+import { Patient, PatientFile, Appointment, Authorization, Claim, ClinicalNote, TimelineEvent, TimelineEventType, REASONS_FOR_VISIT } from '../types';
 import { PatientTimeline } from './PatientTimeline';
 import { compressImageFile } from '../utils/imageCompressor';
 import PatientEmailModal from './PatientEmailModal';
 import PatientSmsModal from './PatientSmsModal';
+import BookAppointmentModal from './BookAppointmentModal';
 
 interface PatientsViewProps {
   patients: Patient[];
@@ -11,7 +12,7 @@ interface PatientsViewProps {
   authorizations: Authorization[];
   claims: Claim[];
   searchTerm: string;
-  onAddPatient: (patientData: any) => Promise<void>;
+  onAddPatient: (patientData: any) => Promise<boolean | void>;
   onAddFile: (patientId: string, fileData: any) => Promise<void>;
   onDeleteFile: (patientId: string, fileId: string) => Promise<void>;
   onUpdatePatient: (patientId: string, patientData: any) => Promise<void>;
@@ -72,6 +73,7 @@ export default function PatientsView({
   const [isDragging, setIsDragging] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [showBookingModal, setShowBookingModal] = useState(false);
 
   // Card Overflow Menu & Admin Security Delete Modal state
   const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
@@ -385,11 +387,11 @@ export default function PatientsView({
           </p>
         </div>
         <button
-          onClick={() => setIsNewPatientModalOpen(true)}
+          onClick={() => setShowBookingModal(true)}
           className="w-full sm:w-auto bg-primary text-white font-bold text-sm px-6 py-3.5 rounded-full flex items-center justify-center gap-2 hover:bg-primary-container transition-colors shadow-sm cursor-pointer hover:scale-[1.02] active:scale-95 duration-200 shrink-0"
         >
-          <span className="material-symbols-outlined text-sm">add</span>
-          New patient
+          <span className="material-symbols-outlined text-sm">calendar_add_on</span>
+          Book new appointment
         </button>
       </div>
 
@@ -554,6 +556,7 @@ export default function PatientsView({
                 <div className="mt-4 space-y-3">
                   <div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Device</p><p className="mt-0.5 truncate text-xs font-bold text-on-surface">{p.deviceCategory || activeDevice}</p></div><span className="shrink-0 rounded-md bg-primary/8 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-primary">{p.careStage || p.status}</span></div>
                   <div className="border-t border-surface-container pt-3"><p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Next action</p><p className="mt-0.5 truncate text-xs font-semibold text-on-surface">{p.nextRequiredAction || (nextAppt ? `${nextAppt.type} · ${nextAppt.time}` : 'Review patient chart')}</p></div>
+                  {!p.files?.length && <p className="truncate text-[10px] font-bold text-amber-700 dark:text-amber-400">Document upload pending</p>}
                   {p.blockerBadge && <p className="truncate text-[10px] font-bold text-amber-700 dark:text-amber-400">Attention: {p.blockerBadge}</p>}
                 </div>
               </div>
@@ -677,7 +680,7 @@ export default function PatientsView({
       </div>
 
       {/* MODAL 1: ADD NEW PATIENT */}
-      {isNewPatientModalOpen && (
+      {false && isNewPatientModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-on-surface/40 modal-backdrop-blur" onClick={() => setIsNewPatientModalOpen(false)}>
           <div className="bg-surface-container-lowest w-full max-w-lg rounded-3xl shadow-lg overflow-hidden flex flex-col max-h-[90vh]" onClick={(event) => event.stopPropagation()}>
             {/* Modal Header */}
@@ -750,11 +753,8 @@ export default function PatientsView({
                   onChange={e => setNewReferral(e.target.value)}
                   className="w-full px-4 py-3 bg-surface rounded-full border-2 border-surface-container-highest text-sm focus:border-secondary outline-none transition-all text-on-surface"
                 >
-                  <option value="">Select a source...</option>
-                  <option value="physician">Primary Care Physician</option>
-                  <option value="hospital">Hospital Discharge</option>
-                  <option value="specialist">Orthopedic Specialist</option>
-                  <option value="other">Other</option>
+                  <option value="">Select a reason...</option>
+                  {REASONS_FOR_VISIT.map(reason => <option key={reason.value} value={reason.value}>{reason.label}</option>)}
                 </select>
               </div>
 
@@ -802,6 +802,35 @@ export default function PatientsView({
             </form>
           </div>
         </div>
+      )}
+
+      {showBookingModal && (
+        <BookAppointmentModal
+          patients={patients}
+          onAddPatient={onAddPatient}
+          onAddAppointment={onAddAppointment}
+          onViewPatient={(patient) => {
+            setShowBookingModal(false);
+            setSelectedPatient(patient);
+            setActiveProfileTab('info');
+          }}
+          onClose={() => setShowBookingModal(false)}
+        />
+      )}
+
+      {isNewPatientModalOpen && (
+        <BookAppointmentModal
+          patients={patients}
+          onAddPatient={onAddPatient}
+          onAddAppointment={onAddAppointment}
+          onViewPatient={(patient) => {
+            setIsNewPatientModalOpen(false);
+            setSelectedPatient(patient);
+            setActiveProfileTab('info');
+          }}
+          includeAppointment={false}
+          onClose={() => setIsNewPatientModalOpen(false)}
+        />
       )}
 
       {/* MODAL 2: PATIENT PROFILE (Eleanor Vance Setup, Image 5) */}
@@ -1177,10 +1206,7 @@ export default function PatientsView({
                             onChange={(e) => setEditInfoReferralSource(e.target.value)}
                             className="w-full px-4 py-2.5 bg-surface rounded-md border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           >
-                            <option value="physician">Primary Care Physician</option>
-                            <option value="hospital">Hospital Discharge</option>
-                            <option value="specialist">Orthopedic Specialist</option>
-                            <option value="other">Other</option>
+                            {REASONS_FOR_VISIT.map(reason => <option key={reason.value} value={reason.value}>{reason.label}</option>)}
                           </select>
                         </div>
                         <div className="space-y-1">

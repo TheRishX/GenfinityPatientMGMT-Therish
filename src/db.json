@@ -1,6 +1,23 @@
 {
   "patients": [
     {
+      "id": "p_1788760528051",
+      "name": "Rishabh",
+      "phone": "7982959690",
+      "dob": "1997-02-10",
+      "email": "therishx@gmail.com",
+      "referralSource": "other",
+      "status": "New Referral",
+      "mrn": "#4413-QW",
+      "avatarInitials": "R",
+      "files": [],
+      "insuranceCompany": "",
+      "insuranceId": "",
+      "address": "",
+      "gender": "Not specified",
+      "clinicalNotes": []
+    },
+    {
       "id": "p1",
       "name": "Jane Doe",
       "phone": "(555) 123-4567",
@@ -85,9 +102,39 @@
       "files": []
     }
   ],
-  "appointments": [],
+  "appointments": [
+    {
+      "id": "a_1788760528075",
+      "patientId": "p_1788760528051",
+      "patientName": "Rishabh",
+      "time": "09:00 AM",
+      "type": "Initial Consultation",
+      "status": "Scheduled",
+      "initials": "R",
+      "date": "2026-09-07"
+    }
+  ],
   "authorizations": [],
-  "claims": [],
+  "claims": [
+    {
+      "id": "c_1788762367562",
+      "patientId": "p_1788760528051",
+      "claimNumber": "INV-2023-0890",
+      "patientName": "Rishabh",
+      "payer": "blueCross",
+      "doctor": "Dr Deepak Bhardwaj",
+      "amount": 1000,
+      "date": "Sep 07",
+      "status": "Billed",
+      "serviceDescription": "Orthotic and prosthetic clinical services",
+      "repairDetails": "Orthotic and prosthetic clinical services",
+      "paymentMethod": "Self-pay",
+      "serviceTotal": 500,
+      "gratuity": 500,
+      "warrantyDays": 30,
+      "invoicePurpose": "Payment for services"
+    }
+  ],
   "settings": {
     "clinicName": "Genfinity O&P",
     "primaryAddress": "123 Prosthetics Way, Suite 400",
@@ -177,6 +224,17 @@
     }
   ],
   "emailLogs": [
+    {
+      "id": "log_1788762367567",
+      "recipientEmail": "therishx@gmail.com",
+      "patientName": "Rishabh",
+      "subject": "Paid invoice INV-2023-0890 - Genfinity O&P",
+      "body": "Hello Rishabh,\n\nPlease find your invoice and receipt attached for $1,000.00.\n\nInvoice: INV-2023-0890\nBilling payer: blueCross\nClinician: Dr Deepak Bhardwaj\n\nIf you have questions, please contact support@genfinity.com.\n\nSincerely,\nGenfinity O&P",
+      "templateName": "Paid invoice receipt",
+      "sentAt": "Sep 07, 2026, 12:11 PM",
+      "status": "Failed",
+      "errorMessage": "Email provider is not configured. Add the Brevo API key and verified sender."
+    },
     {
       "id": "log_2",
       "recipientEmail": "maria@example.com",

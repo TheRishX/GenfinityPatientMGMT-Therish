@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Patient } from '../types';
+import { Patient, REASONS_FOR_VISIT } from '../types';
 
 interface TrackerViewProps {
   patients: Patient[];
@@ -36,7 +36,7 @@ export default function TrackerView({
   const [newPatientPhone, setNewPatientPhone] = useState('');
   const [newPatientDob, setNewPatientDob] = useState('');
   const [newPatientEmail, setNewPatientEmail] = useState('');
-  const [newPatientReferral, setNewPatientReferral] = useState('physician');
+  const [newPatientReferral, setNewPatientReferral] = useState('orthotics');
 
   // Helpers to get stage label safely
   const getStageLabel = (id: string, defaultLabel: string) => {
@@ -518,10 +518,7 @@ export default function TrackerView({
                       onChange={e => setNewPatientReferral(e.target.value)}
                       className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs focus:border-secondary outline-none"
                     >
-                      <option value="physician">Physician Referral</option>
-                      <option value="hospital">Hospital Discharge</option>
-                      <option value="specialist">Specialist</option>
-                      <option value="other">Other</option>
+                      {REASONS_FOR_VISIT.map(reason => <option key={reason.value} value={reason.value}>{reason.label}</option>)}
                     </select>
                   </div>
                 </div>

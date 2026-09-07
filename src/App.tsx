@@ -10,7 +10,7 @@ import BillingView from './components/BillingView';
 import FabricationView from './components/FabricationView';
 import SettingsView from './components/SettingsView';
 import CommunicationsView from './components/CommunicationsView';
-import SmsView from './components/SmsView';
+import BookAppointmentModal from './components/BookAppointmentModal';
 import PasscodeGate from './components/PasscodeGate';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
 import { getInitials, generateMRN } from './utils/defaultDb';
@@ -35,6 +35,7 @@ export default function App() {
 
   // New patient modal trigger inside PatientsView
   const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState<boolean>(false);
+  const [showDashboardBookingModal, setShowDashboardBookingModal] = useState(false);
 
   // Selected patient state for syncing between Dashboard and Patient Profile Modal
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -192,8 +193,10 @@ export default function App() {
       });
       if (!res.ok) throw new Error('Failed to save patient');
       await fetchState();
+      return true;
     } catch (err: any) {
       alert(err.message);
+      return false;
     }
   };
 
@@ -826,22 +829,37 @@ export default function App() {
     switch (activeTab) {
       case 'dashboard':
         return (
-          <DashboardView
-            patients={db.patients}
-            appointments={db.appointments}
-            authorizations={db.authorizations}
-            fabrication={db.fabrication}
-            alerts={db.alerts}
-            onNavigateToTab={(tab) => setActiveTab(tab)}
-            onAlertAction={handleAlertActionRedirect}
-            onDismissAlert={handleDismissAlert}
-            onPatientClick={handleSelectPatientByName}
-            onUpdatePatient={handleUpdatePatient}
-            isWorkspaceEditMode={isWorkspaceEditMode}
-            customLabels={customLabels}
-            onUpdateLabel={handleUpdateLabel}
-            onUpdateAppointment={handleUpdateAppointment}
-          />
+          <>
+            <DashboardView
+              patients={db.patients}
+              appointments={db.appointments}
+              authorizations={db.authorizations}
+              fabrication={db.fabrication}
+              alerts={db.alerts}
+              onNavigateToTab={(tab) => setActiveTab(tab)}
+              onAlertAction={handleAlertActionRedirect}
+              onDismissAlert={handleDismissAlert}
+              onPatientClick={handleSelectPatientByName}
+              onUpdatePatient={handleUpdatePatient}
+              isWorkspaceEditMode={isWorkspaceEditMode}
+              customLabels={customLabels}
+              onUpdateLabel={handleUpdateLabel}
+              onUpdateAppointment={handleUpdateAppointment}
+              onBookAppointment={() => setShowDashboardBookingModal(true)}
+            />
+            {showDashboardBookingModal && (
+              <BookAppointmentModal
+                patients={db.patients}
+                onAddPatient={handleAddPatient}
+                onAddAppointment={handleAddAppointment}
+                onViewPatient={(patient) => {
+                  setShowDashboardBookingModal(false);
+                  handleSelectPatientByName(patient.name);
+                }}
+                onClose={() => setShowDashboardBookingModal(false)}
+              />
+            )}
+          </>
         );
       case 'patients':
       case 'documents':
@@ -903,6 +921,7 @@ export default function App() {
       case 'billing':
         return (
           <BillingView
+            patients={db.patients}
             claims={db.claims}
             onAddClaim={handleAddClaim}
             onUpdateClaimStatus={handleUpdateClaimStatus}
@@ -912,10 +931,8 @@ export default function App() {
             onUpdateLabel={handleUpdateLabel}
           />
         );
-      case 'email':
-        return <CommunicationsView patients={db.patients} claims={db.claims} />;
-      case 'sms':
-        return <SmsView patients={db.patients} appointments={db.appointments} />;
+      case 'communications':
+        return <CommunicationsView patients={db.patients} appointments={db.appointments} />;
       case 'fabrication':
         return (
           <FabricationView
@@ -983,10 +1000,8 @@ export default function App() {
               ? getSidebarLabel('fabrication', 'Active Workshop')
               : activeTab === 'settings'
               ? getSidebarLabel('settings', 'Admin Settings')
-              : activeTab === 'email'
-              ? getSidebarLabel('email', 'Email')
-              : activeTab === 'sms'
-              ? getSidebarLabel('sms', 'SMS')
+              : activeTab === 'communications'
+              ? getSidebarLabel('communications', 'Communications')
               : 'Genfinity Clinical Portal'
           }
           searchTerm={searchTerm}

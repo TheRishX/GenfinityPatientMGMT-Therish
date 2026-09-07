@@ -7,6 +7,7 @@ interface ClinicLogoProps {
   showText?: boolean;
   clinicName?: string;
   logoUrl?: string;
+  onClick?: () => void;
 }
 
 export default function ClinicLogo({
@@ -14,7 +15,8 @@ export default function ClinicLogo({
   size = 'md',
   showText = false,
   clinicName,
-  logoUrl
+  logoUrl,
+  onClick
 }: ClinicLogoProps) {
   const [imageError, setImageError] = useState(false);
 
@@ -28,7 +30,19 @@ export default function ClinicLogo({
   const dimClass = sizeClasses[size] || sizeClasses.md;
 
   return (
-    <div className={`flex items-center gap-3 select-none ${className}`}>
+    <div
+      className={`flex items-center gap-3 select-none ${onClick ? 'cursor-pointer rounded-xl transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary' : ''} ${className}`}
+      onClick={onClick}
+      onKeyDown={event => {
+        if (onClick && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? 'Go to home dashboard' : undefined}
+    >
       {!imageError ? (
         <img
           src={logoUrl || logoImage}

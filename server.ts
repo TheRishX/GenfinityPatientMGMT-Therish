@@ -37,7 +37,11 @@ const mysqlConfigured = Boolean(
   MYSQL_USER &&
   MYSQL_PASSWORD
 );
-const useLocalJsonDatabase = isLocalDevelopment && !mysqlConfigured;
+// Never let copied production credentials make a localhost server depend on
+// Hostinger. Remote MySQL is an explicit local-development opt-in, while
+// deployed environments continue to use MySQL by default.
+const useRemoteMysql = !isLocalDevelopment || process.env.MYSQL_USE_REMOTE === 'true';
+const useLocalJsonDatabase = isLocalDevelopment && !useRemoteMysql;
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY?.trim();
 const BREVO_SMTP_HOST = process.env.BREVO_SMTP_HOST?.trim() || 'smtp-relay.brevo.com';
@@ -132,6 +136,9 @@ const getInitials = (name: string): string => {
     .join('')
     .toUpperCase();
 };
+
+const normalizePatientField = (value?: string): string =>
+  String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 
 // Helper to generate MRN
 const generateMRN = (): string => {
@@ -547,7 +554,7 @@ function buildInvoicePdf({
   return Buffer.concat(chunks);
 }
 
-async function sendBrevoEmail(to: string, subject: string, body: string, attachments: EmailAttachment[] = []): Promise<{ success: boolean; message: string; logs: string[] }> {
+async function sendBrevoEmail(to: string, subject: string, body: string, attachments: EmailAttachment[] = [], htmlBody?: string): Promise<{ success: boolean; message: string; logs: string[] }> {
   const logs = [`[${new Date().toLocaleTimeString()}] Sending through Brevo transactional email API...`];
   if (!BREVO_API_KEY || !BREVO_FROM_EMAIL) {
     return { success: false, message: 'Brevo API is not configured. Add BREVO_API_KEY and BREVO_FROM_EMAIL.', logs };
@@ -561,7 +568,7 @@ async function sendBrevoEmail(to: string, subject: string, body: string, attachm
         to: [{ email: to }],
         subject,
         textContent: body,
-        htmlContent: `<div style="font-family:Arial,sans-serif;white-space:pre-wrap">${body.replace(/[&<>]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char] || char))}</div>`,
+        htmlContent: htmlBody || `<div style="font-family:Arial,sans-serif;white-space:pre-wrap">${body.replace(/[&<>]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char] || char))}</div>`,
         ...(attachments.length ? { attachment: attachments.map(({ name, content }) => ({ name, content })) } : {}),
         ...(BREVO_REPLY_TO ? { replyTo: { email: BREVO_REPLY_TO } } : {})
       })
@@ -576,8 +583,8 @@ async function sendBrevoEmail(to: string, subject: string, body: string, attachm
 }
 
 // Email Dispatch & Connection Diagnostics Helper
-async function sendEmail(smtp: SmtpConfig, to: string, subject: string, body: string, attachments: EmailAttachment[] = []): Promise<{ success: boolean; message: string; logs: string[] }> {
-  if (BREVO_API_KEY && BREVO_FROM_EMAIL) return sendBrevoEmail(to, subject, body, attachments);
+async function sendEmail(smtp: SmtpConfig, to: string, subject: string, body: string, attachments: EmailAttachment[] = [], htmlBody?: string): Promise<{ success: boolean; message: string; logs: string[] }> {
+  if (BREVO_API_KEY && BREVO_FROM_EMAIL) return sendBrevoEmail(to, subject, body, attachments, htmlBody);
   const logs: string[] = [];
   
   // Sanitize host string: remove protocols like https://, http://, smtp://, ://, and trailing slashes/ports
@@ -624,6 +631,7 @@ async function sendEmail(smtp: SmtpConfig, to: string, subject: string, body: st
       to,
       subject,
       text: body,
+      html: htmlBody,
       attachments: attachments.map(attachment => ({ filename: attachment.name, content: Buffer.from(attachment.content, 'base64'), contentType: attachment.contentType })),
     });
 
@@ -633,6 +641,46 @@ async function sendEmail(smtp: SmtpConfig, to: string, subject: string, body: st
     logs.push(`[${new Date().toLocaleTimeString()}] SMTP Connection or Authentication Error: ${error.message}`);
     return { success: false, message: `SMTP Error: ${error.message}`, logs };
   }
+}
+
+const appointmentClinic = {
+  name: 'Genfinity O&P',
+  provider: 'Deepak Kumar Bhardwaj',
+  address: '18401 Burbank Blvd, Suite 215, Tarzana, CA 91356',
+  phone: '(888) 552-6188',
+  email: 'support@genfinityoandp.com',
+  directions: 'https://maps.app.goo.gl/BubTETC1SF6pHEbQ8'
+};
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
+}
+
+function appointmentFirstName(name: string): string {
+  return name.trim().split(/\s+/)[0] || 'there';
+}
+
+function appointmentDateLabel(value: string): string {
+  const parsed = new Date(`${value}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function appointmentSms(patient: Patient, date: string, time: string): string {
+  return `Hi ${appointmentFirstName(patient.name)}, your appointment with ${appointmentClinic.provider} at ${appointmentClinic.name} is confirmed.\n📅 ${appointmentDateLabel(date)} at ${time}\n📍 ${appointmentClinic.address}\n🗺️ Directions: ${appointmentClinic.directions}\nNeed to reschedule? Call us at ${appointmentClinic.phone}.\n— ${appointmentClinic.name}`;
+}
+
+function appointmentEmail(patient: Patient, date: string, time: string): { subject: string; text: string; html: string } {
+  const firstName = escapeHtml(appointmentFirstName(patient.name));
+  const dateLabel = escapeHtml(appointmentDateLabel(date));
+  const safeTime = escapeHtml(time);
+  const logoPath = [path.join(process.cwd(), 'public', 'genfinity-logo.jpg'), path.join(__dirname, 'public', 'genfinity-logo.jpg')].find(candidate => {
+    try { readFileSync(candidate); return true; } catch { return false; }
+  });
+  const logo = logoPath ? `data:image/jpeg;base64,${readFileSync(logoPath).toString('base64')}` : '';
+  const subject = `Appointment confirmed - ${appointmentClinic.name}`;
+  const text = `Hi ${appointmentFirstName(patient.name)},\n\nYour appointment with ${appointmentClinic.provider} at ${appointmentClinic.name} has been successfully booked.\n\nAPPOINTMENT DETAILS\nDate: ${appointmentDateLabel(date)}\nTime: ${time}\nProvider: ${appointmentClinic.provider}\nLocation: ${appointmentClinic.name}\nAddress: ${appointmentClinic.address}\nGet Directions: ${appointmentClinic.directions}\n\nIf you need to reschedule your appointment or have any questions, please call us at ${appointmentClinic.phone}.\n\nWe look forward to seeing you!\n\nWarm regards,\n${appointmentClinic.name}\n${appointmentClinic.address}\n${appointmentClinic.phone}\n${appointmentClinic.email}`;
+  const html = `<!doctype html><html><body style="margin:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;color:#202124"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;padding:32px 12px"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 8px 30px rgba(31,41,55,.10)"><tr><td style="background:#8f0011;padding:24px 32px;text-align:center">${logo ? `<img src="${logo}" alt="${appointmentClinic.name}" width="180" style="display:inline-block;max-width:180px;height:auto;background:#fff;border-radius:8px;padding:6px">` : `<div style="font-size:24px;font-weight:700;color:#fff">${appointmentClinic.name}</div>`}</td></tr><tr><td style="padding:36px 40px 12px"><p style="margin:0;color:#8f0011;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">Appointment confirmed</p><h1 style="margin:10px 0 12px;font-size:28px;line-height:1.2;color:#202124">Hi ${firstName},</h1><p style="margin:0;font-size:16px;line-height:1.7">Your appointment with <strong>${appointmentClinic.provider}</strong> at <strong>${appointmentClinic.name}</strong> has been successfully booked.</p></td></tr><tr><td style="padding:18px 40px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff7f7;border:1px solid #f0d8db;border-radius:12px"><tr><td style="padding:22px 24px"><h2 style="margin:0 0 16px;font-size:16px;color:#8f0011">Appointment details</h2><p style="margin:8px 0;font-size:14px"><strong>Date:</strong> ${dateLabel}</p><p style="margin:8px 0;font-size:14px"><strong>Time:</strong> ${safeTime}</p><p style="margin:8px 0;font-size:14px"><strong>Provider:</strong> ${appointmentClinic.provider}</p><p style="margin:8px 0;font-size:14px"><strong>Location:</strong> ${appointmentClinic.name}</p><p style="margin:8px 0;font-size:14px"><strong>Address:</strong> ${appointmentClinic.address}</p><p style="margin:18px 0 0"><a href="${appointmentClinic.directions}" style="display:inline-block;background:#8f0011;color:#fff;text-decoration:none;border-radius:999px;padding:11px 18px;font-size:13px;font-weight:700">🗺️ Get directions</a></p></td></tr></table></td></tr><tr><td style="padding:10px 40px 34px"><p style="margin:0;font-size:15px;line-height:1.7">If you need to reschedule your appointment or have any questions, please call us at <strong>${appointmentClinic.phone}</strong>.</p><p style="margin:24px 0 0;font-size:15px;line-height:1.7">We look forward to seeing you!</p><p style="margin:24px 0 0;font-size:14px;line-height:1.6">Warm regards,<br><strong>${appointmentClinic.name}</strong><br>${appointmentClinic.address}<br>${appointmentClinic.phone}<br><a href="mailto:${appointmentClinic.email}" style="color:#8f0011">${appointmentClinic.email}</a></p></td></tr><tr><td style="background:#fafafa;padding:18px 40px;text-align:center;color:#6b7280;font-size:11px;line-height:1.5">This is an automated appointment confirmation from ${appointmentClinic.name}.</td></tr></table></td></tr></table></body></html>`;
+  return { subject, text, html };
 }
 
 async function getRingCentralAccessToken(): Promise<string> {
@@ -1272,16 +1320,36 @@ Clinical Portal Support Team`;
   // 2. Add Patient
   app.post('/api/patients', async (req, res) => {
     try {
-      const { name, phone, dob, email, referralSource, status } = req.body;
+      const {
+        name, phone, dob, email, referralSource, status, files, insuranceCompany,
+        insuranceId, primaryClinician, address, gender, diagnosis, deviceCategory,
+        affectedSide, careStage, allergies, communicationPreference, consentStatus,
+        notes
+      } = req.body;
       if (!name) {
         return res.status(400).json({ error: 'Name is required' });
       }
 
-      const generatedMrn = generateMRN();
       const db = await readDatabase();
+      const normalizedName = normalizePatientField(name);
+      const normalizedPhone = normalizePatientField(phone);
+      const normalizedEmail = normalizePatientField(email);
+      const existingPatient = db.patients.find(patient => (
+        (normalizedName.length >= 2 && normalizePatientField(patient.name) === normalizedName)
+        || (normalizedPhone.length >= 7 && normalizePatientField(patient.phone) === normalizedPhone)
+        || (normalizedEmail.length >= 5 && normalizePatientField(patient.email) === normalizedEmail)
+      ));
+      if (existingPatient) {
+        return res.status(409).json({
+          error: 'This patient already exists. Use the existing patient record to book an appointment.',
+          existingPatient
+        });
+      }
+
+      const generatedMrn = generateMRN();
       const newPatient: Patient = {
         id: `p_${Date.now()}`,
-        name,
+        name: String(name).trim(),
         phone: phone || '',
         dob: dob || '',
         email: email || '',
@@ -1289,12 +1357,20 @@ Clinical Portal Support Team`;
         status: status || 'In Progress',
         mrn: generatedMrn,
         avatarInitials: getInitials(name),
-        files: [],
-        insuranceCompany: '',
-        insuranceId: '',
-        address: '',
-        gender: 'Not specified',
-        clinicalNotes: []
+        files: Array.isArray(files) ? files : [],
+        insuranceCompany: insuranceCompany || '',
+        insuranceId: insuranceId || '',
+        primaryClinician: primaryClinician || '',
+        address: address || '',
+        gender: gender || 'Not specified',
+        clinicalNotes: notes ? [{ id: `note_${Date.now()}`, date: new Date().toISOString(), author: primaryClinician || 'Admin', text: String(notes), subjective: String(notes) }] : [],
+        diagnosis: diagnosis || '',
+        deviceCategory: deviceCategory || undefined,
+        affectedSide: affectedSide || undefined,
+        careStage: careStage || 'Referral',
+        allergies: Array.isArray(allergies) ? allergies : [],
+        communicationPreference: communicationPreference || undefined,
+        consentStatus: consentStatus || undefined
       };
       db.patients.unshift(newPatient);
 
@@ -1437,7 +1513,39 @@ Clinical Portal Support Team`;
       db.appointments.unshift(newAppointment);
       await writeDatabase(db);
 
-      res.status(201).json(newAppointment);
+      const notifications: { email?: { success: boolean; message: string }; sms?: { success: boolean; message: string } } = {};
+      const appointmentDate = newAppointment.date || new Date().toISOString().split('T')[0];
+
+      if (matchedPatient.email) {
+        const emailMessage = appointmentEmail(matchedPatient, appointmentDate, newAppointment.time);
+        const config = db.smtpConfig || { host: BREVO_SMTP_HOST, port: BREVO_SMTP_PORT, user: BREVO_SMTP_USER || '', pass: BREVO_SMTP_PASSWORD || '', secure: false, fromEmail: BREVO_FROM_EMAIL || appointmentClinic.email, senderName: appointmentClinic.name, replyTo: BREVO_REPLY_TO };
+        const result = await sendEmail(config, matchedPatient.email, emailMessage.subject, emailMessage.text, [], emailMessage.html);
+        notifications.email = { success: result.success, message: result.message };
+        const log: EmailLog = {
+          id: `log_${Date.now()}`,
+          recipientEmail: matchedPatient.email,
+          patientName: matchedPatient.name,
+          subject: emailMessage.subject,
+          body: emailMessage.text,
+          templateName: 'Automatic appointment confirmation',
+          sentAt: new Date().toLocaleString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }),
+          status: result.success ? 'Sent' : 'Failed',
+          errorMessage: result.success ? undefined : result.message
+        };
+        db.emailLogs = [log, ...(db.emailLogs || [])];
+      }
+
+      if (matchedPatient.phone) {
+        try {
+          const result = await sendRingCentralSms(matchedPatient.phone, appointmentSms(matchedPatient, appointmentDate, newAppointment.time));
+          notifications.sms = { success: true, message: `SMS sent through RingCentral${result.messageId ? ` (${result.messageId})` : ''}.` };
+        } catch (notificationError: any) {
+          notifications.sms = { success: false, message: notificationError.message || 'SMS could not be sent.' };
+        }
+      }
+
+      if (matchedPatient.email) await writeDatabase(db);
+      res.status(201).json({ ...newAppointment, notifications });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1628,7 +1736,7 @@ Clinical Portal Support Team`;
   // 8. Add Claim
   app.post('/api/claims', async (req, res) => {
     try {
-      const { patientName, patientId, payer, doctor, amount, status, sendInvoice = false, serviceDescription, repairDetails, paymentMethod, serviceTotal, gratuity, warrantyDays } = req.body;
+      const { patientName, patientId, payer, doctor, amount, status, sendInvoice = false, invoicePurpose, serviceDescription, repairDetails, paymentMethod, serviceTotal, gratuity, warrantyDays } = req.body;
       if (!patientName || !amount) {
         return res.status(400).json({ error: 'patientName and amount are required' });
       }
@@ -1649,12 +1757,13 @@ Clinical Portal Support Team`;
         amount: parseFloat(amount),
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
         status: status || 'Billed',
-        serviceDescription: serviceDescription || 'Orthotic and prosthetic clinical services',
+        serviceDescription: serviceDescription || invoicePurpose || 'Orthotic and prosthetic clinical services',
         repairDetails: repairDetails || '',
         paymentMethod: paymentMethod || 'Self-pay',
         serviceTotal: Number(serviceTotal || amount),
         gratuity: Number(gratuity || 0),
-        warrantyDays: Number(warrantyDays || 30)
+        warrantyDays: Number(warrantyDays || 30),
+        invoicePurpose: invoicePurpose || 'Payment for services'
       };
 
       db.claims.unshift(newClaim);

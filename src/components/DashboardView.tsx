@@ -6,6 +6,7 @@ interface DashboardViewProps {
   onNavigateToTab: (tab: string) => void; onAlertAction: (actionTarget: string, alertId: string) => void; onDismissAlert: (alertId: string) => void;
   onPatientClick?: (patientName: string) => void; onUpdatePatient?: (patientId: string, patientData: any) => Promise<void>; isWorkspaceEditMode?: boolean;
   customLabels?: Record<string, string>; onUpdateLabel?: (key: string, value: string) => void; onUpdateAppointment?: (apptId: string, updateData: any) => Promise<void>;
+  onBookAppointment?: () => void;
 }
 
 const readableStage = (patient: Patient) => {
@@ -20,7 +21,7 @@ const age = (dob?: string) => {
   const now = new Date(); return now.getFullYear() - birth.getFullYear() - (now < new Date(now.getFullYear(), birth.getMonth(), birth.getDate()) ? 1 : 0);
 };
 
-export default function DashboardView({ patients, appointments, onNavigateToTab, onPatientClick }: DashboardViewProps) {
+export default function DashboardView({ patients, appointments, onNavigateToTab, onPatientClick, onBookAppointment }: DashboardViewProps) {
   const activePatients = patients.filter(patient => patient.status !== 'Archived');
   const attentionPatients = activePatients.filter(patient => patient.blockerBadge || patient.nextRequiredAction);
   const todayKey = new Date().toISOString().slice(0, 10);
@@ -30,7 +31,7 @@ export default function DashboardView({ patients, appointments, onNavigateToTab,
   return <div className="space-y-8 animate-fade-in pb-12">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div><p className="eyebrow">Clinical workspace</p><h2 className="page-title">Good morning. What needs your attention?</h2><p className="page-subtitle">Choose a patient or continue the next task.</p></div>
-      <button onClick={() => onNavigateToTab('patients')} className="primary-button"><span className="material-symbols-outlined">groups</span> Find a patient</button>
+      <button onClick={() => onBookAppointment?.()} className="primary-button"><span className="material-symbols-outlined">calendar_add_on</span> Book new appointment</button>
     </header>
 
     <section className="workspace-section" aria-labelledby="attention-heading"><div className="section-heading"><div><h3 id="attention-heading">Needs attention</h3><p>Start with the next important step.</p></div><span className="count-badge">{attentionPatients.length}</span></div>

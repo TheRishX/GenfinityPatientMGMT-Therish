@@ -103,6 +103,14 @@ export interface Patient {
   timeline?: TimelineEvent[];
 }
 
+export const REASONS_FOR_VISIT = [
+  { value: 'orthotics', label: 'Orthotics' },
+  { value: 'prosthetics', label: 'Prosthetics' },
+  { value: 'orthotics_and_prosthetics', label: 'Orthotics and Prosthetics' },
+  { value: 'mastectomy_prosthesis', label: 'Mastectomy prosthesis' },
+  { value: 'foot_orthotics', label: 'Foot Orthotics' }
+] as const;
+
 export interface Appointment {
   id: string;
   patientId?: string;
@@ -143,6 +151,7 @@ export interface Claim {
   serviceTotal?: number;
   gratuity?: number;
   warrantyDays?: number;
+  invoicePurpose?: string;
 }
 
 export interface ClinicSettings {
