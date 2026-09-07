@@ -555,8 +555,20 @@ export default function PatientsView({
                 </div>
 
                 <div className="mt-4 space-y-3">
-                  <div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Device</p><p className="mt-0.5 truncate text-xs font-bold text-on-surface">{p.deviceCategory || activeDevice}</p></div><span className="shrink-0 rounded-md bg-primary/8 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-primary">{p.careStage || p.status}</span></div>
-                  <div className="border-t border-surface-container pt-3"><p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Next action</p><p className="mt-0.5 truncate text-xs font-semibold text-on-surface">{p.nextRequiredAction || (nextAppt ? `${nextAppt.type} · ${nextAppt.time}` : 'Review patient chart')}</p></div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-on-surface-variant"><span className="material-symbols-outlined text-xs">call</span> Phone</p>
+                      <p className="mt-0.5 truncate text-xs font-bold text-on-surface">{p.phone || 'Not provided'}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-on-surface-variant"><span className="material-symbols-outlined text-xs">mail</span> Email</p>
+                      <p className="mt-0.5 truncate text-xs font-bold text-on-surface">{p.email || 'Not provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-surface-container pt-3 text-xs">
+                    <span className="text-on-surface-variant"><strong className="font-bold">DOB:</strong> {p.dob || 'Not provided'}</span>
+                    <span className="truncate text-on-surface-variant"><strong className="font-bold">Address:</strong> {p.address || 'Not provided'}</span>
+                  </div>
                   {!p.files?.length && <p className="truncate text-[10px] font-bold text-amber-700 dark:text-amber-400">Document upload pending</p>}
                   {p.blockerBadge && <p className="truncate text-[10px] font-bold text-amber-700 dark:text-amber-400">Attention: {p.blockerBadge}</p>}
                 </div>
