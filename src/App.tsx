@@ -980,7 +980,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col pl-64 md:pl-72 min-h-screen bg-[#fbf9f8] text-[#1b1c1c]">
+      <div className="min-w-0 max-w-full flex-1 flex flex-col overflow-x-hidden pl-64 md:pl-72 min-h-screen bg-[#fbf9f8] text-[#1b1c1c]">
         {/* App bar search / user utility */}
         <Header
           title={

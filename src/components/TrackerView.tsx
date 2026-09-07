@@ -133,7 +133,7 @@ export default function TrackerView({
   });
 
   return (
-    <div id="tracker-workflow-container" className="flex flex-col h-[calc(100vh-120px)] animate-fade-in relative">
+    <div id="tracker-workflow-container" className="flex min-w-0 w-full max-w-full flex-col h-[calc(100vh-120px)] animate-fade-in relative overflow-hidden">
       {/* Tracker Header Area */}
       <div className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
@@ -157,7 +157,7 @@ export default function TrackerView({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           {/* Tracker search */}
           <div className="relative w-full sm:w-48">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-xs">
@@ -212,7 +212,7 @@ export default function TrackerView({
           </div>
           <p className="text-xs font-semibold text-on-surface-variant">{activePatientCount} active · {trackedPatientCount} tracked</p>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
           {allStatuses.map((stage, index) => {
             const count = getPatientsByColumn(stage.id).length;
             const isClosed = stage.id === 'Archived' || stage.id === 'In Progress';
@@ -221,7 +221,7 @@ export default function TrackerView({
                 key={stage.id}
                 type="button"
                 onClick={() => setKanbanFilter(isClosed ? 'inactive' : 'active')}
-                className="min-w-[132px] rounded-2xl border border-surface-container-highest/45 bg-surface-container-low/45 px-3 py-2 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-surface"
+                className="min-w-0 rounded-2xl border border-surface-container-highest/45 bg-surface-container-low/45 px-3 py-2 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-surface"
               >
                 <span className="flex items-center justify-between gap-2">
                   <span className={`h-2.5 w-2.5 rounded-full ${stage.colorClass}`} />
@@ -239,8 +239,8 @@ export default function TrackerView({
       </section>
 
       {/* Kanban Board Layout */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden kanban-scroll pb-4 -mx-6 px-6">
-        <div className="flex gap-5 h-full w-max py-2">
+      <div className="min-w-0 w-full flex-1 overflow-x-auto overflow-y-hidden kanban-scroll pb-4 -mx-6 px-6">
+        <div className="flex h-full min-w-max gap-5 py-2">
           {columns.map(col => {
             const colPatients = getPatientsByColumn(col.id);
             return (
