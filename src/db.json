@@ -104,6 +104,16 @@
   ],
   "appointments": [
     {
+      "id": "a_1788763855130",
+      "patientId": "p_1788760528051",
+      "patientName": "Rishabh",
+      "time": "06:00 PM",
+      "type": "Follow-up",
+      "status": "Scheduled",
+      "initials": "R",
+      "date": "2026-09-07"
+    },
+    {
       "id": "a_1788760528075",
       "patientId": "p_1788760528051",
       "patientName": "Rishabh",
@@ -117,20 +127,20 @@
   "authorizations": [],
   "claims": [
     {
-      "id": "c_1788762367562",
+      "id": "c_1788763956200",
       "patientId": "p_1788760528051",
       "claimNumber": "INV-2023-0890",
       "patientName": "Rishabh",
-      "payer": "blueCross",
-      "doctor": "Dr Deepak Bhardwaj",
-      "amount": 1000,
+      "payer": "My XYZ",
+      "doctor": "Hey",
+      "amount": 100,
       "date": "Sep 07",
       "status": "Billed",
-      "serviceDescription": "Orthotic and prosthetic clinical services",
-      "repairDetails": "Orthotic and prosthetic clinical services",
-      "paymentMethod": "Self-pay",
-      "serviceTotal": 500,
-      "gratuity": 500,
+      "serviceDescription": "Prosthetics",
+      "repairDetails": "None",
+      "paymentMethod": "Credit / Debit Card",
+      "serviceTotal": -900,
+      "gratuity": 1000,
       "warrantyDays": 30,
       "invoicePurpose": "Payment for services"
     }
@@ -224,6 +234,28 @@
     }
   ],
   "emailLogs": [
+    {
+      "id": "log_1788763956204",
+      "recipientEmail": "therishx@gmail.com",
+      "patientName": "Rishabh",
+      "subject": "Paid invoice INV-2023-0890 - Genfinity O&P",
+      "body": "Hello Rishabh,\n\nPlease find your invoice and receipt attached for $100.00.\n\nInvoice: INV-2023-0890\nBilling payer: My XYZ\nClinician: Hey\n\nIf you have questions, please contact support@genfinity.com.\n\nSincerely,\nGenfinity O&P",
+      "templateName": "Paid invoice receipt",
+      "sentAt": "Sep 07, 2026, 12:37 PM",
+      "status": "Failed",
+      "errorMessage": "Email provider is not configured. Add the Brevo API key and verified sender."
+    },
+    {
+      "id": "log_1788763855133",
+      "recipientEmail": "therishx@gmail.com",
+      "patientName": "Rishabh",
+      "subject": "Appointment confirmed - Genfinity O&P",
+      "body": "Hi Rishabh,\n\nYour appointment with Deepak Kumar Bhardwaj at Genfinity O&P has been successfully booked.\n\nAPPOINTMENT DETAILS\nDate: September 7, 2026\nTime: 06:00 PM\nProvider: Deepak Kumar Bhardwaj\nLocation: Genfinity O&P\nAddress: 18401 Burbank Blvd, Suite 215, Tarzana, CA 91356\nGet Directions: https://maps.app.goo.gl/BubTETC1SF6pHEbQ8\n\nIf you need to reschedule your appointment or have any questions, please call us at (888) 552-6188.\n\nWe look forward to seeing you!\n\nWarm regards,\nGenfinity O&P\n18401 Burbank Blvd, Suite 215, Tarzana, CA 91356\n(888) 552-6188\nsupport@genfinityoandp.com",
+      "templateName": "Automatic appointment confirmation",
+      "sentAt": "Sep 07, 2026, 12:35 PM",
+      "status": "Failed",
+      "errorMessage": "Email provider is not configured. Add the Brevo API key and verified sender."
+    },
     {
       "id": "log_1788762367567",
       "recipientEmail": "therishx@gmail.com",

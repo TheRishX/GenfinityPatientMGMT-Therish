@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Patient, PatientFile, REASONS_FOR_VISIT } from '../types';
+import TimePicker from './TimePicker';
 
 interface BookAppointmentModalProps {
   patients: Patient[];
@@ -228,7 +229,7 @@ export default function BookAppointmentModal({ patients, onAddPatient, onAddAppo
             <h3 className="mb-4 flex items-center gap-2 text-sm font-black text-on-surface"><span className="material-symbols-outlined text-primary">calendar_month</span>Appointment details</h3>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="form-label">Appointment date<input required type="date" value={date} onChange={event => setDate(event.target.value)} className="form-input mt-1" /></label>
-              <label className="form-label">Appointment time<input required type="text" value={time} onChange={event => setTime(event.target.value)} className="form-input mt-1" placeholder="09:00 AM" /></label>
+              <label className="form-label">Appointment time<TimePicker value={time} onChange={setTime} className="mt-1" /></label>
               <label className="form-label">Visit type<select value={type} onChange={event => setType(event.target.value)} className="form-input mt-1"><option>Initial Consultation</option><option>Evaluation</option><option>Device Fitting</option><option>Follow-up</option><option>Adjustment Session</option><option>Delivery</option></select></label>
               <label className="form-label">Status<select value={status} onChange={event => setStatus(event.target.value as typeof status)} className="form-input mt-1"><option>Scheduled</option><option>Checked In</option></select></label>
               <label className="form-label sm:col-span-2">Notes <span className="font-normal">(optional)</span><textarea value={notes} onChange={event => setNotes(event.target.value)} rows={3} className="form-input mt-1 resize-none" placeholder="Add preparation notes or special instructions" /></label>

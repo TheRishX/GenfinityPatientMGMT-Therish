@@ -5,6 +5,7 @@ import { compressImageFile } from '../utils/imageCompressor';
 import PatientEmailModal from './PatientEmailModal';
 import PatientSmsModal from './PatientSmsModal';
 import BookAppointmentModal from './BookAppointmentModal';
+import TimePicker from './TimePicker';
 
 interface PatientsViewProps {
   patients: Patient[];
@@ -110,7 +111,7 @@ export default function PatientsView({
 
   // Appointments Tab States
   const [newApptDate, setNewApptDate] = useState('');
-  const [newApptTime, setNewApptTime] = useState('');
+  const [newApptTime, setNewApptTime] = useState('09:00 AM');
   const [newApptType, setNewApptType] = useState('Consultation');
   const [newApptStatus, setNewApptStatus] = useState<'Scheduled' | 'Checked In'>('Scheduled');
 
@@ -1426,7 +1427,7 @@ export default function PatientsView({
                             });
                             // Reset
                             setNewApptDate('');
-                            setNewApptTime('');
+                            setNewApptTime('09:00 AM');
                           }}
                           className="space-y-3"
                         >
@@ -1442,14 +1443,7 @@ export default function PatientsView({
                           </div>
                           <div className="space-y-1">
                             <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Time</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. 10:30 AM"
-                              required
-                              value={newApptTime}
-                              onChange={(e) => setNewApptTime(e.target.value)}
-                              className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
-                            />
+                            <TimePicker value={newApptTime || '09:00 AM'} onChange={setNewApptTime} className="mt-1" />
                           </div>
                           <div className="space-y-1">
                             <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Session Type</label>
