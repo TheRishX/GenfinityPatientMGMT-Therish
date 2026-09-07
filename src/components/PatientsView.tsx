@@ -575,31 +575,28 @@ export default function PatientsView({
               </div>
 
               {/* Card Footer */}
-              <div className="pt-3 border-t border-surface-container/60 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black text-secondary group-hover:text-primary flex items-center gap-1 transition-colors">
-                    View chart
-                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                  </span>
+              <div className="flex items-center justify-end gap-2 border-t border-surface-container/60 pt-3 shrink-0">
+                <div className="flex items-center gap-1.5">
                   <button
                     onClick={event => {
                       event.stopPropagation();
                       setEmailPatient(p);
                     }}
                     disabled={!p.email}
-                    className="px-2.5 py-1.5 rounded-lg bg-secondary/10 text-secondary text-[10px] font-bold cursor-pointer hover:bg-secondary/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                    title={p.email ? `Email ${p.name}` : 'No email address'}
+                    aria-label={p.email ? `Email ${p.name}` : 'No email address'}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary/10 text-secondary transition-colors hover:bg-secondary/20 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    <span className="material-symbols-outlined text-sm">mail</span>
-                    Email
+                    <span className="material-symbols-outlined text-base">mail</span>
                   </button>
                   <button
                     onClick={event => { event.stopPropagation(); setSmsPatient(p); }}
                     disabled={!p.phone}
                     title={p.phone ? `Text ${p.name}` : 'No phone number'}
-                    className="px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-bold cursor-pointer hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                    aria-label={p.phone ? `Text ${p.name}` : 'No phone number'}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    <span className="material-symbols-outlined text-sm">sms</span>
-                    Text
+                    <span className="material-symbols-outlined text-base">sms</span>
                   </button>
                 </div>
 
