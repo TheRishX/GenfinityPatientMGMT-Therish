@@ -496,6 +496,11 @@ function buildInvoicePdf({
   };
   const serviceLines = wrapText(serviceDescription, 64).slice(0, 2);
   const detailLines = repairDetails ? wrapText(repairDetails, 74).slice(0, 2) : [];
+  const balanceText = 'Balance due: $0.00 - PAID IN FULL';
+  const rightAlignedX = (text: string, size: number, rightEdge = 550): number => {
+    const estimatedWidth = text.length * size * 0.52;
+    return Math.max(60, rightEdge - estimatedWidth);
+  };
   const lines = [
     { text: clinic.clinicName || 'Genfinity O&P', x: 106, y: 725, size: 19, font: 'F2', color: '1 1 1' },
     { text: address, x: 60, y: 641, size: 9, font: 'F1', color: muted },
@@ -519,9 +524,9 @@ function buildInvoicePdf({
     { text: `Payment method: ${paymentMethod}`, x: 60, y: 353, size: 9, font: 'F1', color: muted },
     ...detailLines.map((text, index) => ({ text: `Details: ${text}`, x: 60, y: 337 - (index * 13), size: 8, font: 'F1', color: muted })),
     { text: 'TOTAL PAID', x: 60, y: 270, size: 10, font: 'F2', color: muted },
-    { text: money, x: 454, y: 266, size: 17, font: 'F2', color: brand },
+    { text: money, x: rightAlignedX(money, 17), y: 266, size: 17, font: 'F2', color: brand },
     ...(gratuity > 0 ? [{ text: `Includes voluntary gratuity / tip: ${moneyForEmail(gratuity)}`, x: 60, y: 247, size: 8, font: 'F1', color: muted }] : []),
-    { text: 'Balance due: $0.00 - PAID IN FULL', x: 350, y: 247, size: 8, font: 'F2', color: '0.08 0.45 0.28' },
+    { text: balanceText, x: rightAlignedX(balanceText, 8), y: 247, size: 8, font: 'F2', color: '0.08 0.45 0.28' },
     { text: 'Thank you for choosing Genfinity O&P.', x: 60, y: 190, size: 10, font: 'F2', color: ink },
     { text: `Questions? ${email}`, x: 60, y: 172, size: 9, font: 'F1', color: muted },
     { text: 'TERMS & CONDITIONS', x: 60, y: 132, size: 9, font: 'F2', color: brand },
