@@ -543,7 +543,7 @@ export default function PatientsView({
                         await onUpdatePatient(p.id, { important: !p.important });
                       }}
                       aria-label={p.important ? `Remove ${p.name} from important patients` : `Mark ${p.name} as important`}
-                      title={p.important ? 'Pinned to dashboard' : 'Pin to dashboard'}
+                      title={p.important ? 'Remove from Needs attention' : 'Add to Needs attention'}
                       className={`w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors ${p.important ? 'bg-amber-500/15 text-amber-700' : 'bg-surface-container-low text-on-surface-variant hover:text-amber-700'}`}
                     >
                       <span className={`material-symbols-outlined text-lg ${p.important ? 'fill' : ''}`}>star</span>
