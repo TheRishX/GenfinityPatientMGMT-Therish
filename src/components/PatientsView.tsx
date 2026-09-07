@@ -537,17 +537,6 @@ export default function PatientsView({
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={async event => {
-                        event.stopPropagation();
-                        await onUpdatePatient(p.id, { important: !p.important });
-                      }}
-                      aria-label={p.important ? `Remove ${p.name} from important patients` : `Mark ${p.name} as important`}
-                      title={p.important ? 'Remove from Needs attention' : 'Add to Needs attention'}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors ${p.important ? 'bg-amber-500/15 text-amber-700' : 'bg-surface-container-low text-on-surface-variant hover:text-amber-700'}`}
-                    >
-                      <span className="material-symbols-outlined text-lg font-black">priority_high</span>
-                    </button>
                     <span className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${statusStyle}`}>
                       {p.status}
                     </span>
@@ -619,6 +608,18 @@ export default function PatientsView({
                       onClick={(e) => e.stopPropagation()}
                       className="absolute right-0 bottom-8 w-48 bg-surface-container-lowest border border-surface-container-highest rounded-2xl shadow-lg z-30 py-2 animate-fade-in text-xs font-semibold"
                     >
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setOpenCardMenuId(null);
+                          await onUpdatePatient(p.id, { important: !p.important });
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-on-surface transition-colors hover:bg-surface-container"
+                      >
+                        <span className="material-symbols-outlined text-sm text-amber-600">priority_high</span>
+                        {p.important ? 'Remove from Needs attention' : 'Mark as Important'}
+                      </button>
+
                       <button
                         onClick={() => {
                           setOpenCardMenuId(null);
