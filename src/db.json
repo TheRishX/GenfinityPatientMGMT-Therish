@@ -7,7 +7,7 @@
       "dob": "1997-02-10",
       "email": "therishx@gmail.com",
       "referralSource": "other",
-      "status": "New Referral",
+      "status": "Consultation",
       "mrn": "#4413-QW",
       "avatarInitials": "R",
       "files": [],
@@ -48,7 +48,7 @@
       "dob": "1994-08-12",
       "email": "robert@example.com",
       "referralSource": "physician",
-      "status": "New Referral",
+      "status": "Consultation",
       "mrn": "#899-23A",
       "avatarInitials": "RC",
       "files": []
@@ -103,6 +103,24 @@
     }
   ],
   "appointments": [
+    {
+      "id": "a_1788789678559",
+      "patientId": "p5",
+      "patientName": "Robert Chen",
+      "time": "02:00 PM",
+      "type": "Initial Consult",
+      "status": "Scheduled",
+      "initials": "RC"
+    },
+    {
+      "id": "a_1788789671233",
+      "patientId": "p_1788760528051",
+      "patientName": "Rishabh",
+      "time": "02:00 PM",
+      "type": "Initial Consult",
+      "status": "Scheduled",
+      "initials": "R"
+    },
     {
       "id": "a_1788763855130",
       "patientId": "p_1788760528051",
