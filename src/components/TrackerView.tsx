@@ -306,6 +306,7 @@ export default function TrackerView({
                             )}
 
                             <button
+                              type="button"
                               onClick={() => setActivePickerPatientId(isPickerOpen ? null : p.id)}
                               className={`p-1 hover:bg-surface-container rounded-full cursor-pointer transition-colors ${
                                 isPickerOpen ? 'bg-primary-container/15 text-primary' : 'text-on-surface-variant'
@@ -356,6 +357,7 @@ export default function TrackerView({
                               </div>
                               {allStatuses.map(option => (
                                 <button
+                                  type="button"
                                   key={option.id}
                                   onClick={() => handleStatusChange(p.id, option.id)}
                                   className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-surface-container-low flex items-center justify-between transition-colors cursor-pointer border-0 bg-transparent ${

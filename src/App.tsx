@@ -275,6 +275,7 @@ export default function App() {
 
   // API Call: Update Patient workflow column
   const handleUpdatePatientStatus = async (patientId: string, status: Patient['status']) => {
+    const currentTab = activeTab;
     if (isOfflineMode && db) {
       const updatedPatients = db.patients.map(p => {
         if (p.id === patientId) {
@@ -317,6 +318,8 @@ export default function App() {
       });
       if (!res.ok) throw new Error('Failed to transition patient status');
       await fetchState();
+      // Refresh the authoritative data without leaving the workflow board.
+      setActiveTab(currentTab);
     } catch (err: any) {
       alert(err.message);
     }
