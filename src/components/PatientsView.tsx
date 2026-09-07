@@ -614,18 +614,6 @@ export default function PatientsView({
                         onClick={() => {
                           setOpenCardMenuId(null);
                           setSelectedPatient(p);
-                          setActiveProfileTab('story');
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-surface-container flex items-center gap-2 text-on-surface cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-sm text-secondary">history</span>
-                        Unified Story Chart
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setOpenCardMenuId(null);
-                          setSelectedPatient(p);
                           setActiveProfileTab('info');
                           setIsEditingInfo(true);
                         }}
