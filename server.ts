@@ -674,7 +674,7 @@ const appointmentClinic = {
   email: 'support@genfinityoandp.com',
   directions: 'https://maps.app.goo.gl/BubTETC1SF6pHEbQ8'
 };
-const appointmentEmailLogoUrl = 'https://res.cloudinary.com/f6trn8aq/image/upload/v1788242404/genfinity-logo-uploaded-D3Ul5i3newo_glijdx.webp';
+const appointmentEmailLogoUrl = 'https://res.cloudinary.com/f6trn8aq/image/upload/v1788789211/newcopy_of_genfinity-logo-uploaded-d3ul5i3newo_glijdx.webp';
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
