@@ -476,7 +476,7 @@ export default function PatientsView({
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary/10 text-xs font-black text-secondary">
                   {p.avatarUrl ? <img className="h-full w-full object-cover" alt={p.name} src={p.avatarUrl} referrerPolicy="no-referrer" /> : <span>{p.avatarInitials}</span>}
                 </div>
-                <div className="min-w-0"><div className="flex items-center gap-2"><h3 className="truncate text-sm font-black text-on-surface">{p.name}</h3>{p.important && <span className="material-symbols-outlined fill text-sm text-amber-600">star</span>}</div><p className="mt-0.5 font-mono text-[10px] font-semibold text-on-surface-variant">{p.mrn}</p></div>
+                <div className="min-w-0"><div className="flex items-center gap-2"><h3 className="truncate text-sm font-black text-on-surface">{p.name}</h3>{p.important && <span className="material-symbols-outlined text-sm font-black text-amber-600">priority_high</span>}</div><p className="mt-0.5 font-mono text-[10px] font-semibold text-on-surface-variant">{p.mrn}</p></div>
                 <div className="hidden min-w-0 sm:block"><p className="truncate text-xs font-bold text-on-surface">{p.deviceCategory || activeDevice}</p><p className="mt-0.5 text-[10px] text-on-surface-variant">{p.primaryClinician || 'Dr. Sarah Jenkins'}</p></div>
                 <div className="hidden min-w-0 sm:block"><p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Next step</p><p className="truncate text-xs font-semibold text-on-surface">{p.nextAppointment || (nextAppt ? nextAppt.time : 'No visit scheduled')}</p></div>
                 <div className="flex items-center gap-2"><span className={`hidden rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-wide sm:block ${statusStyle}`}>{p.status}</span><span className="material-symbols-outlined text-base text-on-surface-variant transition-transform group-hover:translate-x-0.5">arrow_forward</span></div>
@@ -488,7 +488,7 @@ export default function PatientsView({
             return (
               <div key={p.id} onClick={() => { setSelectedPatient(p); setActiveProfileTab('info'); }} className="group flex cursor-pointer items-center gap-3 rounded-xl border border-surface-container-highest/70 bg-surface-container-lowest px-3 py-2.5 transition-all hover:border-secondary/50 hover:shadow-sm">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary/10 text-[11px] font-black text-secondary">{p.avatarUrl ? <img className="h-full w-full object-cover" alt={p.name} src={p.avatarUrl} referrerPolicy="no-referrer" /> : p.avatarInitials}</div>
-                <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><h3 className="truncate text-xs font-black text-on-surface">{p.name}</h3>{p.important && <span className="material-symbols-outlined fill text-xs text-amber-600">star</span>}</div><p className="mt-0.5 truncate text-[10px] text-on-surface-variant">{p.careStage || p.status} · {p.nextAppointment || (nextAppt ? nextAppt.time : 'No visit')}</p></div>
+                <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><h3 className="truncate text-xs font-black text-on-surface">{p.name}</h3>{p.important && <span className="material-symbols-outlined text-xs font-black text-amber-600">priority_high</span>}</div><p className="mt-0.5 truncate text-[10px] text-on-surface-variant">{p.careStage || p.status} · {p.nextAppointment || (nextAppt ? nextAppt.time : 'No visit')}</p></div>
                 <span className={`h-2 w-2 shrink-0 rounded-full ${p.blockerBadge ? 'bg-amber-500' : p.status === 'Archived' ? 'bg-surface-container-highest' : 'bg-emerald-500'}`} title={p.blockerBadge || p.status} />
               </div>
             );
@@ -546,7 +546,7 @@ export default function PatientsView({
                       title={p.important ? 'Remove from Needs attention' : 'Add to Needs attention'}
                       className={`w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors ${p.important ? 'bg-amber-500/15 text-amber-700' : 'bg-surface-container-low text-on-surface-variant hover:text-amber-700'}`}
                     >
-                      <span className={`material-symbols-outlined text-lg ${p.important ? 'fill' : ''}`}>star</span>
+                      <span className="material-symbols-outlined text-lg font-black">priority_high</span>
                     </button>
                     <span className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${statusStyle}`}>
                       {p.status}
