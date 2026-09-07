@@ -478,6 +478,24 @@ function buildInvoicePdf({
   const blush = '0.98 0.94 0.94';
   const ink = '0.12 0.12 0.14';
   const muted = '0.38 0.35 0.36';
+  const wrapText = (value: string, maxCharacters: number): string[] => {
+    const words = value.trim().split(/\s+/).filter(Boolean);
+    const wrapped: string[] = [];
+    let current = '';
+    words.forEach(word => {
+      const candidate = current ? `${current} ${word}` : word;
+      if (candidate.length > maxCharacters && current) {
+        wrapped.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    });
+    if (current) wrapped.push(current);
+    return wrapped.length ? wrapped : [''];
+  };
+  const serviceLines = wrapText(serviceDescription, 64).slice(0, 2);
+  const detailLines = repairDetails ? wrapText(repairDetails, 74).slice(0, 2) : [];
   const lines = [
     { text: clinic.clinicName || 'Genfinity O&P', x: 106, y: 725, size: 19, font: 'F2', color: '1 1 1' },
     { text: address, x: 60, y: 641, size: 9, font: 'F1', color: muted },
@@ -494,23 +512,23 @@ function buildInvoicePdf({
     { text: 'SERVICE SUMMARY', x: 60, y: 484, size: 9, font: 'F2', color: brand },
     { text: 'Description', x: 60, y: 456, size: 9, font: 'F2', color: muted },
     { text: 'Amount', x: 475, y: 456, size: 9, font: 'F2', color: muted },
-    { text: serviceDescription.slice(0, 68), x: 60, y: 427, size: 10, font: 'F1', color: ink },
+    ...serviceLines.map((text, index) => ({ text, x: 60, y: 427 - (index * 14), size: 10, font: 'F1', color: ink })),
     { text: moneyForEmail(serviceTotal), x: 475, y: 427, size: 10, font: 'F2', color: ink },
-    { text: `Payer: ${payer || 'Self-pay'}`, x: 60, y: 397, size: 9, font: 'F1', color: muted },
-    { text: `Clinician: ${doctor || 'Not assigned'}`, x: 60, y: 381, size: 9, font: 'F1', color: muted },
-    { text: `Payment method: ${paymentMethod}`, x: 60, y: 365, size: 9, font: 'F1', color: muted },
-    ...(repairDetails ? [{ text: `Details: ${repairDetails.slice(0, 82)}`, x: 60, y: 349, size: 8, font: 'F1', color: muted }] : []),
-    { text: 'TOTAL PAID', x: 366, y: 326, size: 10, font: 'F2', color: muted },
-    { text: money, x: 475, y: 324, size: 17, font: 'F2', color: brand },
-    { text: 'Balance due: $0.00 - PAID IN FULL', x: 366, y: 288, size: 8, font: 'F2', color: '0.08 0.45 0.28' },
-    ...(gratuity > 0 ? [{ text: `Includes voluntary gratuity / tip: ${moneyForEmail(gratuity)}`, x: 366, y: 306, size: 8, font: 'F1', color: muted }] : []),
-    { text: 'Thank you for choosing Genfinity O&P.', x: 60, y: 236, size: 10, font: 'F2', color: ink },
-    { text: `Questions? ${email}`, x: 60, y: 218, size: 9, font: 'F1', color: muted },
-    { text: 'TERMS & CONDITIONS', x: 60, y: 158, size: 9, font: 'F2', color: brand },
-    { text: `Payment is due according to the agreed billing arrangement. Warranty: ${warrantyDays} days on workmanship.`, x: 60, y: 142, size: 8, font: 'F1', color: muted },
-    { text: 'Please retain this invoice for your records. Balances may be subject to payer review.', x: 60, y: 129, size: 8, font: 'F1', color: muted },
-    { text: 'Services, adjustments, and warranties are provided under the clinic policy in effect on the date of service.', x: 60, y: 116, size: 8, font: 'F1', color: muted },
-    { text: 'This document is a payment receipt for the services listed above.', x: 60, y: 82, size: 8, font: 'F1', color: muted }
+    { text: `Payer: ${payer || 'Self-pay'}`, x: 60, y: 385, size: 9, font: 'F1', color: muted },
+    { text: `Clinician: ${doctor || 'Not assigned'}`, x: 60, y: 369, size: 9, font: 'F1', color: muted },
+    { text: `Payment method: ${paymentMethod}`, x: 60, y: 353, size: 9, font: 'F1', color: muted },
+    ...detailLines.map((text, index) => ({ text: `Details: ${text}`, x: 60, y: 337 - (index * 13), size: 8, font: 'F1', color: muted })),
+    { text: 'TOTAL PAID', x: 60, y: 270, size: 10, font: 'F2', color: muted },
+    { text: money, x: 454, y: 266, size: 17, font: 'F2', color: brand },
+    ...(gratuity > 0 ? [{ text: `Includes voluntary gratuity / tip: ${moneyForEmail(gratuity)}`, x: 60, y: 247, size: 8, font: 'F1', color: muted }] : []),
+    { text: 'Balance due: $0.00 - PAID IN FULL', x: 350, y: 247, size: 8, font: 'F2', color: '0.08 0.45 0.28' },
+    { text: 'Thank you for choosing Genfinity O&P.', x: 60, y: 190, size: 10, font: 'F2', color: ink },
+    { text: `Questions? ${email}`, x: 60, y: 172, size: 9, font: 'F1', color: muted },
+    { text: 'TERMS & CONDITIONS', x: 60, y: 132, size: 9, font: 'F2', color: brand },
+    { text: `Payment is due according to the agreed billing arrangement. Warranty: ${warrantyDays} days on workmanship.`, x: 60, y: 116, size: 8, font: 'F1', color: muted },
+    { text: 'Please retain this invoice for your records. Balances may be subject to payer review.', x: 60, y: 103, size: 8, font: 'F1', color: muted },
+    { text: 'Services, adjustments, and warranties are provided under the clinic policy in effect on the date of service.', x: 60, y: 90, size: 8, font: 'F1', color: muted },
+    { text: 'This document is a payment receipt for the services listed above.', x: 60, y: 58, size: 8, font: 'F1', color: muted }
   ];
   const stream = [
     'q',
@@ -520,10 +538,10 @@ function buildInvoicePdf({
     `${blush} rg 42 512 528 92 re f`,
     '1 1 1 rg 42 604 528 1 re f',
     `${blush} rg 42 450 528 1 re f`,
-    `${brand} rg 42 345 528 2 re f`,
-    `${blush} rg 358 294 212 70 re f`,
-    `${blush} rg 42 182 528 1 re f`,
-    `${blush} rg 42 104 528 1 re f`,
+    `${brand} rg 42 300 528 2 re f`,
+    `${blush} rg 42 218 528 70 re f`,
+    `${blush} rg 42 145 528 1 re f`,
+    `${blush} rg 42 74 528 1 re f`,
     'Q',
     ...lines.map(line => `${line.color} rg BT /${line.font} ${line.size} Tf ${line.x} ${line.y} Td (${pdfEscape(line.text)}) Tj ET`)
   ].join('\n');
