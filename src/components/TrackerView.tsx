@@ -83,6 +83,9 @@ export default function TrackerView({
     return filteredPatients.filter(p => p.status === colId);
   };
 
+  const activePatientCount = filteredPatients.filter(p => p.status !== 'Archived').length;
+  const trackedPatientCount = filteredPatients.length;
+
   const handleStatusChange = async (patientId: string, newStatus: Patient['status']) => {
     await onUpdatePatientStatus(patientId, newStatus);
     setActivePickerPatientId(null);
@@ -165,7 +168,7 @@ export default function TrackerView({
               value={trackerSearch}
               onChange={e => setTrackerSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 rounded-full border border-surface-container-highest bg-surface-container-lowest text-xs focus:border-secondary outline-none transition-all placeholder:text-on-surface-variant/55"
-              placeholder="Filter column..."
+              placeholder="Search patient or MRN"
             />
           </div>
 
@@ -199,6 +202,41 @@ export default function TrackerView({
           </button>
         </div>
       </div>
+
+      {/* At-a-glance pipeline summary */}
+      <section className="mb-4 shrink-0 rounded-3xl border border-surface-container-highest/40 bg-surface-container-lowest p-4 shadow-xs">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Patient journey</p>
+            <h3 className="mt-1 text-lg font-extrabold text-on-surface">Every patient, one clear next step</h3>
+          </div>
+          <p className="text-xs font-semibold text-on-surface-variant">{activePatientCount} active · {trackedPatientCount} tracked</p>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {allStatuses.map((stage, index) => {
+            const count = getPatientsByColumn(stage.id).length;
+            const isClosed = stage.id === 'Archived' || stage.id === 'In Progress';
+            return (
+              <button
+                key={stage.id}
+                type="button"
+                onClick={() => setKanbanFilter(isClosed ? 'inactive' : 'active')}
+                className="min-w-[132px] rounded-2xl border border-surface-container-highest/45 bg-surface-container-low/45 px-3 py-2 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-surface"
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${stage.colorClass}`} />
+                  <span className="text-lg font-black text-on-surface">{count}</span>
+                </span>
+                <span className="mt-2 block truncate text-[10px] font-extrabold text-on-surface-variant">{stage.label}</span>
+                <span className="mt-2 block h-1 rounded-full bg-surface-container-high">
+                  <span className={`block h-full rounded-full ${stage.colorClass}`} style={{ width: `${count ? Math.min(100, Math.max(18, count * 16)) : 0}%` }} />
+                </span>
+                {index < allStatuses.length - 1 && <span className="mt-1 block text-[9px] font-bold text-on-surface-variant/60">Stage {index + 1}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Kanban Board Layout */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden kanban-scroll pb-4 -mx-6 px-6">
@@ -246,10 +284,8 @@ export default function TrackerView({
                   {colPatients.length > 0 ? (
                     colPatients.map(p => {
                       const isPickerOpen = activePickerPatientId === p.id;
-                      const isRobertChen = p.name.includes('Robert');
-                      const isThomasWright = p.name.includes('Thomas');
-                      const isJamesWilson = p.name.includes('James');
-                      const isElenaDavis = p.name.includes('Elena');
+                      const stageIndex = Math.max(0, allStatuses.findIndex(status => status.id === p.status));
+                      const progress = Math.round(((stageIndex + 1) / allStatuses.length) * 100);
 
                       return (
                         <div
@@ -259,13 +295,9 @@ export default function TrackerView({
                           }`}
                         >
                           <div className="flex justify-between items-start mb-3">
-                            {isRobertChen ? (
+                            {p.important ? (
                               <span className="bg-primary/10 text-primary font-bold text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[10px] font-bold">priority_high</span> Urgent
-                              </span>
-                            ) : isThomasWright ? (
-                              <span className="bg-primary/10 text-primary font-bold text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[10px] font-bold">warning</span> Denied - Appeal
+                                <span className="material-symbols-outlined text-[10px] font-bold">priority_high</span> Priority
                               </span>
                             ) : (
                               <span className="bg-surface-container-high text-on-surface-variant font-bold text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
@@ -288,43 +320,27 @@ export default function TrackerView({
                             <span className="material-symbols-outlined text-xs">id_card</span> ID: {p.mrn}
                           </p>
 
-                          {isRobertChen && (
+                          {p.blockerBadge && (
                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-on-surface-variant bg-surface p-2 rounded-lg mb-3">
-                              <span className="material-symbols-outlined text-xs text-primary">description</span>
-                              <span>Missing Rx Details</span>
+                              <span className="material-symbols-outlined text-xs text-primary">error_outline</span>
+                              <span>{p.blockerBadge}</span>
                             </div>
                           )}
 
-                          {isJamesWilson && (
-                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-on-surface-variant bg-surface p-2 rounded-lg mb-3">
-                              <span className="material-symbols-outlined text-xs text-secondary">call</span>
-                              <span>Called Dr. Smith 10/24</span>
+                          <div className="mb-3 space-y-1.5">
+                            <div className="flex items-center justify-between text-[9px] font-bold text-on-surface-variant">
+                              <span>Journey progress</span>
+                              <span>{progress}%</span>
                             </div>
-                          )}
-
-                          {isElenaDavis && (
-                            <div className="mb-3 space-y-1">
-                              <div className="flex justify-between items-center text-[9px] font-bold text-on-surface-variant">
-                                <span>Auth Progress</span>
-                                <span>60%</span>
-                              </div>
-                              <div className="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden">
-                                <div className="h-full bg-secondary w-[60%] rounded-full" />
-                              </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high">
+                              <div className="h-full rounded-full bg-secondary transition-all" style={{ width: `${progress}%` }} />
                             </div>
-                          )}
-
-                          {isThomasWright && (
-                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-primary bg-primary/5 p-2 rounded-lg mb-3">
-                              <span className="material-symbols-outlined text-xs">gavel</span>
-                              <span>Appeal drafted 10/26</span>
-                            </div>
-                          )}
+                          </div>
 
                           {/* Footer */}
                           <div className="flex items-center justify-between mt-3 pt-3 border-t border-surface-container/60 shrink-0">
                             <span className="text-[10px] font-semibold text-on-surface-variant opacity-80">
-                              {isRobertChen ? 'Added Today' : isJamesWilson ? 'Waiting 4 days' : isThomasWright ? 'Aetna' : 'Standard Case'}
+                              {p.nextRequiredAction || (p.lastVisit ? `Last visit ${p.lastVisit}` : 'No next action recorded')}
                             </span>
 
                             <div className="w-7 h-7 rounded-full bg-secondary-container/35 text-on-secondary-container flex items-center justify-center font-bold text-[9px] shrink-0">
