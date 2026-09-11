@@ -205,11 +205,8 @@ const intakeObject = z.object({
       .refine(Boolean, "Accept the privacy acknowledgment"),
     printedName: requiredText("Printed name", 160),
     relationship: requiredText("Relationship", 100),
-    signatureDataUrl: z
-      .string()
-      .startsWith("data:image/png;base64,")
-      .max(700_000),
-    signatureMode: z.enum(["drawn", "typed-accessible"]),
+    signatureDataUrl: z.string().default(""),
+    signatureMode: z.enum(["drawn", "typed-accessible"]).default("drawn"),
   }),
 });
 

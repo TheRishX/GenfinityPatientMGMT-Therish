@@ -22,7 +22,6 @@ import {
   stepSchemas,
   type IntakeData,
 } from "../../intake/schema";
-import { SignaturePad } from "./SignaturePad";
 
 const steps = [
   "About you",
@@ -1371,7 +1370,7 @@ export function PatientIntakeForm() {
       key="review"
       eyebrow="Final step"
       title="Review, accept, and sign."
-      copy="Your signed answers become an immutable intake snapshot. Clinic corrections are recorded later as amendments without changing what you signed."
+      copy="Review your answers and acknowledge the required care, financial, and privacy notices before submitting."
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-2xl bg-slate-50 p-5">
@@ -1444,24 +1443,6 @@ export function PatientIntakeForm() {
           error={errors["signature.relationship"]}
           required
         />
-      </div>
-      <div>
-        <p className="mb-3 text-sm font-semibold text-brand-ink">
-          Signature <span className="text-brand-red">*</span>
-        </p>
-        <SignaturePad
-          value={data.signature.signatureDataUrl}
-          printedName={data.signature.printedName}
-          onChange={(value, mode) => {
-            update("signature.signatureDataUrl", value);
-            window.setTimeout(() => update("signature.signatureMode", mode), 0);
-          }}
-        />
-        {errors["signature.signatureDataUrl"] && (
-          <p className="mt-2 text-xs text-brand-red">
-            {errors["signature.signatureDataUrl"]}
-          </p>
-        )}
       </div>
       {errors.submit && (
         <div
@@ -1562,7 +1543,7 @@ export function PatientIntakeForm() {
               disabled={submitting}
               className="inline-flex items-center gap-2 rounded-full bg-brand-red px-6 py-3 font-bold text-white shadow-md shadow-brand-red/20 disabled:opacity-60"
             >
-              {submitting ? "Submitting…" : "Sign & submit"}
+              {submitting ? "Submitting…" : "Submit intake"}
               <FileCheck2 className="h-4 w-4" />
             </button>
           )}
