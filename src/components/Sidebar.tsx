@@ -35,12 +35,12 @@ export default function Sidebar({
   onSignOut
 }: SidebarProps) {
   const navItems = [
-    { id: 'dashboard', label: 'Today', icon: 'today' },
-    { id: 'patients', label: 'Patients', icon: 'groups' },
+    { id: 'dashboard', label: 'Home', icon: 'today' },
     { id: 'appointments', label: 'Appointments', icon: 'event_note' },
-    { id: 'tracker', label: 'Patient Tracking', icon: 'timeline' },
+    { id: 'patients', label: 'Patients', icon: 'groups' },
+    { id: 'tracker', label: 'Patient tracking', icon: 'timeline' },
+    { id: 'communications', label: 'Communication', icon: 'forum' },
     { id: 'billing', label: 'Invoices', icon: 'receipt_long' },
-    { id: 'communications', label: 'Communications', icon: 'forum' },
     { id: 'intake', label: 'Patient Intake', icon: 'assignment' }
   ];
 
