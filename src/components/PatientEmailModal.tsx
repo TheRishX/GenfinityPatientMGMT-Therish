@@ -3,6 +3,8 @@ import { EmailTemplate, Patient } from '../types';
 
 interface PatientEmailModalProps {
   patient: Patient;
+  appointmentDate?: string;
+  appointmentTime?: string;
   onClose: () => void;
   onSent?: () => void;
 }
@@ -14,7 +16,7 @@ const preferredTriggerForStage = (stage?: string) => {
   return 'appointment_booked';
 };
 
-export default function PatientEmailModal({ patient, onClose, onSent }: PatientEmailModalProps) {
+export default function PatientEmailModal({ patient, appointmentDate, appointmentTime, onClose, onSent }: PatientEmailModalProps) {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [templateId, setTemplateId] = useState('');
   const [subject, setSubject] = useState('');
@@ -31,14 +33,14 @@ export default function PatientEmailModal({ patient, onClose, onSent }: PatientE
     clinicPhone: 'Clinic phone',
     supportEmail: 'Clinic support',
     appointmentType: patient.deviceCategory || 'Clinical appointment',
-    appointmentTime: patient.nextAppointment || 'To be confirmed',
+    appointmentTime: appointmentDate && appointmentTime ? `${appointmentDate} at ${appointmentTime}` : patient.nextAppointment || 'To be confirmed',
     deviceName: patient.deviceCategory || 'Custom device',
     fabricationStage: patient.careStage || patient.status,
     payerName: patient.insuranceCompany || 'Insurance provider',
     authNumber: patient.authStatus || 'Current authorization',
     claimNumber: 'Current claim',
     claimAmount: '0.00'
-  }), [patient]);
+  }), [appointmentDate, appointmentTime, patient]);
 
   const renderTemplate = (value: string) => (Object.entries(variables) as Array<[string, string]>).reduce(
     (result, [key, replacement]) => result.replace(new RegExp(`{${key}}`, 'g'), replacement),

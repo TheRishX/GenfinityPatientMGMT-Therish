@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Patient, PatientFile, Appointment, Authorization, Claim, ClinicalNote, TimelineEvent, TimelineEventType, REASONS_FOR_VISIT } from '../types';
+import { Patient, PatientFile, Appointment, Authorization, Claim, ClinicalNote, TimelineEvent, TimelineEventType, REASONS_FOR_VISIT, CLINICIAN_OPTIONS } from '../types';
 import { PatientTimeline } from './PatientTimeline';
 import { compressImageFile } from '../utils/imageCompressor';
 import PatientEmailModal from './PatientEmailModal';
@@ -92,7 +92,7 @@ export default function PatientsView({
   const [newTlOutcome, setNewTlOutcome] = useState('');
   const [newTlNextAction, setNewTlNextAction] = useState('');
   const [newTlStatus, setNewTlStatus] = useState('Completed');
-  const [newTlAuthor, setNewTlAuthor] = useState('Dr. Deepak Kumar Bhardwaj');
+  const [newTlAuthor, setNewTlAuthor] = useState(CLINICIAN_OPTIONS[0]);
 
   // Info Tab States
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -132,7 +132,7 @@ export default function PatientsView({
 
   // Clinical Notes Tab States
   const [newNoteText, setNewNoteText] = useState('');
-  const [newNoteAuthor, setNewNoteAuthor] = useState('Dr. Deepak Kumar Bhardwaj');
+  const [newNoteAuthor, setNewNoteAuthor] = useState(CLINICIAN_OPTIONS[0]);
 
   // Keep selectedPatient state in sync with updated database props
   useEffect(() => {
@@ -171,7 +171,7 @@ export default function PatientsView({
   const [newEmail, setNewEmail] = useState('');
   const [newReferral, setNewReferral] = useState('');
   const [newInsuranceCompany, setNewInsuranceCompany] = useState('');
-  const [newPrimaryClinician, setNewPrimaryClinician] = useState('Dr. Deepak Kumar Bhardwaj');
+  const [newPrimaryClinician, setNewPrimaryClinician] = useState(CLINICIAN_OPTIONS[0]);
 
   // Interactive Checklist states for Profile (Info / checklist on profile)
   const [checklist, setChecklist] = useState<Record<string, boolean>>({
@@ -222,7 +222,7 @@ export default function PatientsView({
       email: newEmail,
       referralSource: newReferral,
       insuranceCompany: newInsuranceCompany || 'Medicare Blue Cross',
-      primaryClinician: newPrimaryClinician || 'Dr. Deepak Kumar Bhardwaj',
+      primaryClinician: newPrimaryClinician || CLINICIAN_OPTIONS[0],
       status: 'In Progress'
     });
 
@@ -233,7 +233,7 @@ export default function PatientsView({
     setNewEmail('');
     setNewReferral('');
     setNewInsuranceCompany('');
-    setNewPrimaryClinician('Dr. Deepak Kumar Bhardwaj');
+    setNewPrimaryClinician(CLINICIAN_OPTIONS[0]);
     setIsNewPatientModalOpen(false);
   };
 
@@ -775,8 +775,7 @@ export default function PatientsView({
                     onChange={e => setNewPrimaryClinician(e.target.value)}
                     className="w-full px-4 py-3 bg-surface rounded-full border-2 border-surface-container-highest text-sm focus:border-secondary outline-none transition-all text-on-surface"
                   >
-                            <option value="Dr. Deepak Kumar Bhardwaj">Dr. Deepak Kumar Bhardwaj</option>
-                            <option value="Dr. Blake Jackson Sanders">Dr. Blake Jackson Sanders</option>
+                            {CLINICIAN_OPTIONS.map(clinician => <option key={clinician} value={clinician}>{clinician}</option>)}
                   </select>
                 </div>
               </div>
@@ -1451,6 +1450,7 @@ export default function PatientsView({
                               className="w-full px-4 py-2 bg-surface rounded-full border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                             >
                               <option value="Initial Consult">Initial Consult</option>
+                              <option value="Measurement / Cast">Measurement / Cast</option>
                               <option value="Device Fitting">Device Fitting</option>
                               <option value="Device Checkout">Device Checkout</option>
                               <option value="Gait Evaluation">Gait Evaluation</option>
@@ -1833,7 +1833,7 @@ export default function PatientsView({
                           const newNote: ClinicalNote = {
                             id: `note_${Date.now()}`,
                             date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                            author: newNoteAuthor || 'Dr. Aris Thorne',
+                            author: newNoteAuthor || CLINICIAN_OPTIONS[0],
                             text: newNoteText,
                             isFinalized: true
                           };
@@ -1868,8 +1868,7 @@ export default function PatientsView({
                             onChange={(e) => setNewNoteAuthor(e.target.value)}
                             className="w-full px-4 py-2 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-primary outline-none"
                           >
-                            <option value="Dr. Deepak Kumar Bhardwaj">Dr. Deepak Kumar Bhardwaj</option>
-                            <option value="Dr. Blake Jackson Sanders">Dr. Blake Jackson Sanders</option>
+                            {CLINICIAN_OPTIONS.map(clinician => <option key={clinician} value={clinician}>{clinician}</option>)}
                           </select>
                         </div>
                         <button

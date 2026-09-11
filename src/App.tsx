@@ -12,8 +12,20 @@ import SettingsView from './components/SettingsView';
 import CommunicationsView from './components/CommunicationsView';
 import BookAppointmentModal from './components/BookAppointmentModal';
 import PasscodeGate from './components/PasscodeGate';
+import { PatientIntakeForm } from './components/intake/PatientIntakeForm';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
 import { getInitials, generateMRN } from './utils/defaultDb';
+
+class IntakeErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  private readonly childContent: React.ReactNode;
+  constructor(props: { children: React.ReactNode }) { super(props); this.childContent = props.children; }
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error) return <div className="m-8 rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800"><h2 className="text-xl font-bold">Patient intake could not load</h2><p className="mt-2 text-sm">{this.state.error.message}</p></div>;
+    return this.childContent;
+  }
+}
 
 export default function App() {
   // Clinical data must always come from the server-backed Hostinger database.
@@ -59,7 +71,8 @@ export default function App() {
         patients: true,
         appointments: true,
         tracker: true,
-        settings: true
+        settings: true,
+        intake: true
       };
     } catch {
       return {
@@ -67,7 +80,8 @@ export default function App() {
         patients: true,
         appointments: true,
         tracker: true,
-        settings: true
+        settings: true,
+        intake: true
       };
     }
   });
@@ -102,6 +116,16 @@ export default function App() {
       setSearchTerm(patientName);
       setActiveTab('patients');
     }
+  };
+
+  const handleSendAppointmentNotification = async (appointmentId: string, channel: 'sms' | 'email') => {
+    const response = await fetch(`/api/appointments/${appointmentId}/notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || data.message || `${channel.toUpperCase()} could not be sent.`);
   };
 
   // Guard legacy call sites while ensuring no clinical data can ever be
@@ -849,6 +873,7 @@ export default function App() {
               onUpdateLabel={handleUpdateLabel}
               onUpdateAppointment={handleUpdateAppointment}
               onBookAppointment={() => setShowDashboardBookingModal(true)}
+              onSendAppointmentNotification={handleSendAppointmentNotification}
             />
             {showDashboardBookingModal && (
               <BookAppointmentModal
@@ -936,6 +961,8 @@ export default function App() {
         );
       case 'communications':
         return <CommunicationsView patients={db.patients} appointments={db.appointments} />;
+      case 'intake':
+        return <IntakeErrorBoundary><PatientIntakeForm /></IntakeErrorBoundary>;
       case 'fabrication':
         return (
           <FabricationView
@@ -992,7 +1019,7 @@ export default function App() {
               : activeTab === 'patients'
               ? getSidebarLabel('patients', 'Patient Database')
               : activeTab === 'appointments'
-              ? getSidebarLabel('appointments', 'Schedule')
+              ? getSidebarLabel('appointments', 'Appointments')
               : activeTab === 'tracker'
               ? getSidebarLabel('tracker', 'Orders')
               : activeTab === 'authorization'
@@ -1005,6 +1032,8 @@ export default function App() {
               ? getSidebarLabel('settings', 'Admin Settings')
               : activeTab === 'communications'
               ? getSidebarLabel('communications', 'Communications')
+              : activeTab === 'intake'
+              ? 'Patient Intake'
               : 'Genfinity Clinical Portal'
           }
           searchTerm={searchTerm}

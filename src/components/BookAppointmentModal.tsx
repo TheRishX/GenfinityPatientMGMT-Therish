@@ -230,7 +230,7 @@ export default function BookAppointmentModal({ patients, onAddPatient, onAddAppo
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="form-label">Appointment date<input required type="date" value={date} onChange={event => setDate(event.target.value)} className="form-input mt-1" /></label>
               <label className="form-label">Appointment time<TimePicker value={time} onChange={setTime} className="mt-1" /></label>
-              <label className="form-label">Visit type<select value={type} onChange={event => setType(event.target.value)} className="form-input mt-1"><option>Initial Consultation</option><option>Evaluation</option><option>Device Fitting</option><option>Follow-up</option><option>Adjustment Session</option><option>Delivery</option></select></label>
+              <label className="form-label">Visit type<select value={type} onChange={event => setType(event.target.value)} className="form-input mt-1"><option>Initial Consultation</option><option>Evaluation</option><option>Measurement / Cast</option><option>Device Fitting</option><option>Follow-up</option><option>Adjustment Session</option><option>Delivery</option></select></label>
               <label className="form-label">Status<select value={status} onChange={event => setStatus(event.target.value as typeof status)} className="form-input mt-1"><option>Scheduled</option><option>Checked In</option></select></label>
               <label className="form-label sm:col-span-2">Notes <span className="font-normal">(optional)</span><textarea value={notes} onChange={event => setNotes(event.target.value)} rows={3} className="form-input mt-1 resize-none" placeholder="Add preparation notes or special instructions" /></label>
             </div>

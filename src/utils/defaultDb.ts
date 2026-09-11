@@ -591,7 +591,7 @@ export const DEFAULT_DATABASE: DatabaseSchema = {
     pinCode: '7770',
     appearance: 'light',
     defaultReferralSource: 'physician',
-    defaultPrimaryClinician: 'Dr. Deepak Kumar Bhardwaj'
+    defaultPrimaryClinician: 'Deepak Kumar Bhardwaj (BOCO)'
   },
   fabrication: [
     {

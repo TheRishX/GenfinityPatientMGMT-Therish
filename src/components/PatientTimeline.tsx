@@ -50,7 +50,7 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
   const [newSummary, setNewSummary] = useState('');
   const [newOutcome, setNewOutcome] = useState('');
   const [newNextAction, setNewNextAction] = useState('');
-  const [newAuthor, setNewAuthor] = useState('Dr. Deepak Kumar Bhardwaj');
+  const [newAuthor, setNewAuthor] = useState('Deepak Kumar Bhardwaj (BOCO)');
   const [newStatus, setNewStatus] = useState('Completed');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -396,7 +396,7 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
 
     await onAddTimelineEntry({
       dateTime: dateStr,
-      author: newAuthor || 'Dr. Sarah Jenkins',
+      author: newAuthor || 'Deepak Kumar Bhardwaj (BOCO)',
       eventType: newEventType,
       title: newTitle.trim(),
       summary: newSummary.trim(),
@@ -921,7 +921,7 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
                     value={newAuthor}
                     onChange={(e) => setNewAuthor(e.target.value)}
                     className="w-full px-3 py-2 bg-surface rounded-xl border border-surface-container-highest text-xs font-semibold focus:border-secondary outline-none"
-                    placeholder="e.g. Dr. Sarah Jenkins"
+                    placeholder="e.g. Deepak Kumar Bhardwaj (BOCO)"
                   />
                 </div>
               </div>

@@ -103,6 +103,12 @@ export interface Patient {
   timeline?: TimelineEvent[];
 }
 
+export const CLINICIAN_OPTIONS = [
+  'Deepak Kumar Bhardwaj (BOCO)',
+  'Blake Jackson Sanders (CPO)',
+  'Briana Caragao (CPO) & MASTECTOMY FITTER'
+] as const;
+
 export const REASONS_FOR_VISIT = [
   { value: 'orthotics', label: 'Orthotics' },
   { value: 'prosthetics', label: 'Prosthetics' },
@@ -253,4 +259,6 @@ export interface DatabaseSchema {
   emailLogs?: EmailLog[];
   smsTemplates?: SmsTemplate[];
   smsLogs?: SmsLog[];
+  intakeDraft?: { data: unknown; currentStep: number; updatedAt: string };
+  intakeSubmissions?: Array<{ reference: string; submittedAt: string; data: unknown; signatureDataUrl?: string }>;
 }

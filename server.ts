@@ -8,8 +8,9 @@ import { createServer as createViteServer } from 'vite';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import mysql, { Pool } from 'mysql2/promise';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, timingSafeEqual, randomBytes } from 'crypto';
 import { DatabaseSchema, Patient, PatientFile, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem, SmtpConfig, EmailTemplate, EmailLog, SmsLog, SmsTemplate } from './src/types.js';
+import { intakeSchema } from './src/intake/schema.js';
 
 // Hostinger deployments can provide a private runtime file alongside standard
 // environment variables. Local development continues to use `.env`.
@@ -21,6 +22,7 @@ const __dirname = path.dirname(__filename);
 
 const PRIVATE_STORAGE_PATH = process.env.PRIVATE_STORAGE_PATH || path.resolve(__dirname, '..', 'private-clinic-storage');
 const LOCAL_DATABASE_PATH = path.join(__dirname, 'src', 'db.json');
+const INTAKE_DRAFT_PATH = path.join(PRIVATE_STORAGE_PATH, 'intake-draft.json');
 const isLocalDevelopment = process.env.NODE_ENV === 'development';
 
 // Hostinger's environment editor can normalize these identifiers to uppercase,
@@ -148,6 +150,29 @@ const generateMRN = (): string => {
   const c2 = chars[Math.floor(Math.random() * 26)];
   return `#${num}-${c1}${c2}`;
 };
+
+type IntakeDraftRecord = { data: unknown; currentStep: number; updatedAt: string };
+
+async function readIntakeDraft(): Promise<IntakeDraftRecord | null> {
+  try {
+    const raw = await fs.readFile(INTAKE_DRAFT_PATH, 'utf8');
+    const draft = JSON.parse(raw) as IntakeDraftRecord;
+    return draft?.data && typeof draft.data === 'object' ? draft : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeIntakeDraft(draft: IntakeDraftRecord): Promise<void> {
+  await fs.mkdir(PRIVATE_STORAGE_PATH, { recursive: true });
+  await fs.writeFile(INTAKE_DRAFT_PATH, JSON.stringify(draft), 'utf8');
+}
+
+async function clearIntakeDraft(): Promise<void> {
+  try { await fs.unlink(INTAKE_DRAFT_PATH); } catch (error: any) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+}
 
 // Default Seed Data
 const DEFAULT_DATABASE: DatabaseSchema = {
@@ -1291,7 +1316,7 @@ Clinical Portal Support Team`;
   app.get('/api/sms/templates', async (_req, res) => {
     const db = await readDatabase();
     const templates: SmsTemplate[] = db.smsTemplates?.length ? db.smsTemplates : [
-      { id: 'sms_appointment', name: 'Appointment reminder', body: 'Hi {patientName}, this is a reminder from {clinicName} about your {appointmentType}. Please call us if you need help.', triggerEvent: 'appointment_booked' },
+      { id: 'sms_appointment', name: 'Appointment reminder', body: 'Hi {patientName}, this is a reminder from {clinicName} about your {appointmentType}.\n📅 Date/Time: {appointmentTime}\nPlease call us if you need help.', triggerEvent: 'appointment_booked' },
       { id: 'sms_documents', name: 'Documents needed', body: 'Hi {patientName}, {clinicName} still needs a document from you before we can continue your care. Please contact us when ready.', triggerEvent: 'documents_needed' },
       { id: 'sms_auth', name: 'Insurance update', body: 'Hi {patientName}, we have an update about your insurance approval. Please contact {clinicName} so we can help with the next step.', triggerEvent: 'auth_status_approved' },
       { id: 'sms_fitting', name: 'Fitting reminder', body: 'Hi {patientName}, your fitting with {clinicName} is coming up. Please call us if you need to reschedule.', triggerEvent: 'fitting_reminder' }
@@ -1307,7 +1332,7 @@ Clinical Portal Support Team`;
       if (!patient) return res.status(404).json({ error: 'Patient not found.' });
       if (!patient.phone) return res.status(400).json({ error: 'This patient does not have a phone number.' });
       const templates: SmsTemplate[] = db.smsTemplates?.length ? db.smsTemplates : [
-        { id: 'sms_appointment', name: 'Appointment reminder', body: 'Hi {patientName}, this is a reminder from {clinicName} about your {appointmentType}. Please call us if you need help.', triggerEvent: 'appointment_booked' },
+        { id: 'sms_appointment', name: 'Appointment reminder', body: 'Hi {patientName}, this is a reminder from {clinicName} about your {appointmentType}.\n📅 Date/Time: {appointmentTime}\nPlease call us if you need help.', triggerEvent: 'appointment_booked' },
         { id: 'sms_documents', name: 'Documents needed', body: 'Hi {patientName}, {clinicName} still needs a document from you before we can continue your care. Please contact us when ready.', triggerEvent: 'documents_needed' },
         { id: 'sms_auth', name: 'Insurance update', body: 'Hi {patientName}, we have an update about your insurance approval. Please contact {clinicName} so we can help with the next step.', triggerEvent: 'auth_status_approved' },
         { id: 'sms_fitting', name: 'Fitting reminder', body: 'Hi {patientName}, your fitting with {clinicName} is coming up. Please call us if you need to reschedule.', triggerEvent: 'fitting_reminder' }
@@ -1337,6 +1362,72 @@ Clinical Portal Support Team`;
         persistence: 'mysql',
         code: err?.code || 'DATABASE_UNAVAILABLE'
       });
+    }
+  });
+
+  // Patient intake: drafts stay in the same server-backed store as the portal,
+  // and a signed submission is converted into a patient record atomically.
+  app.get('/api/intake/draft', async (_req, res) => {
+    try {
+      const draft = await readIntakeDraft();
+      res.json({ configured: true, hasDraft: Boolean(draft), data: draft?.data || null, currentStep: draft?.currentStep || 0, updatedAt: draft?.updatedAt || null });
+    } catch (err: any) {
+      res.status(503).json({ configured: false, hasDraft: false, error: err.message });
+    }
+  });
+
+  app.put('/api/intake/draft', async (req, res) => {
+    try {
+      if (!req.body?.data || typeof req.body.data !== 'object') return res.status(400).json({ error: 'Invalid draft' });
+      await writeIntakeDraft({ data: req.body.data, currentStep: Math.max(0, Math.min(6, Number(req.body.currentStep) || 0)), updatedAt: new Date().toISOString() });
+      res.json({ configured: true, saved: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/intake/submit', async (req, res) => {
+    try {
+      if (req.body?.website) return res.json({ ok: true, reference: 'RECEIVED' });
+      const parsed = intakeSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: 'Please review the highlighted fields.' });
+      const intake = parsed.data;
+      const db = await readDatabase();
+      const reference = `GO-${new Date().getFullYear()}-${randomBytes(4).toString('hex').toUpperCase()}`;
+      const name = intake.demographics.legalName.trim();
+      const existing = db.patients.find(patient => normalizePatientField(patient.name) === normalizePatientField(name) || normalizePatientField(patient.email) === normalizePatientField(intake.demographics.email));
+      if (existing) return res.status(409).json({ error: 'This patient already exists in the portal.', existingPatient: existing });
+      const patientId = `p_${Date.now()}`;
+      const signature = intake.signature.signatureDataUrl;
+      const newPatient: Patient = {
+        id: patientId,
+        name,
+        phone: intake.demographics.mobilePhone,
+        dob: intake.demographics.dateOfBirth,
+        email: intake.demographics.email,
+        referralSource: 'Patient intake',
+        status: 'New Referral',
+        mrn: generateMRN(),
+        avatarInitials: getInitials(name),
+        files: signature ? [{ id: `f_${Date.now()}`, name: `Signed intake - ${reference}.png`, type: 'png', date: new Date().toLocaleDateString('en-US'), size: `${Math.round(signature.length / 1024)} KB`, content: signature, description: 'Patient signature' }] : [],
+        insuranceCompany: intake.insurance.company || intake.insurance.secondaryCarrier || '',
+        insuranceId: intake.insurance.memberId,
+        address: `${intake.demographics.streetAddress}, ${intake.demographics.city}, ${intake.demographics.state} ${intake.demographics.zip}`,
+        gender: intake.demographics.sexAtBirth,
+        diagnosis: intake.contacts.diagnosis || intake.medical.currentProblem,
+        allergies: intake.medical.allergies ? [intake.medical.allergies] : [],
+        communicationPreference: intake.privacy.communicationMethods[0] as Patient['communicationPreference'],
+        consentStatus: 'Signed intake received',
+        careStage: 'Referral',
+        clinicalNotes: [{ id: `note_${Date.now()}`, date: new Date().toISOString(), author: 'Patient intake', text: intake.medical.currentProblem, subjective: intake.medical.currentProblem, goals: intake.function.goals }]
+      };
+      db.patients.unshift(newPatient);
+      db.intakeSubmissions = [{ reference, submittedAt: new Date().toISOString(), data: intake, signatureDataUrl: signature }, ...(db.intakeSubmissions || [])];
+      await clearIntakeDraft();
+      await writeDatabase(db);
+      res.status(201).json({ ok: true, reference, patientId });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Unable to save intake' });
     }
   });
 
@@ -1600,6 +1691,42 @@ Clinical Portal Support Team`;
     }
   });
 
+  app.post('/api/appointments/:id/notify', async (req, res) => {
+    try {
+      const { channel } = req.body;
+      if (channel !== 'sms' && channel !== 'email') return res.status(400).json({ error: 'Notification channel must be sms or email.' });
+      const db = await readDatabase();
+      const appointment = db.appointments.find(item => item.id === req.params.id);
+      if (!appointment) return res.status(404).json({ error: 'Appointment not found.' });
+      const patient = db.patients.find(item => item.id === appointment.patientId)
+        || db.patients.find(item => item.name.trim().toLowerCase() === appointment.patientName.trim().toLowerCase());
+      if (!patient) return res.status(404).json({ error: 'Patient not found for this appointment.' });
+      const appointmentDate = appointment.date && !appointment.date.toLowerCase().includes('today') ? appointment.date : new Date().toISOString().split('T')[0];
+
+      if (channel === 'sms') {
+        if (!patient.phone) return res.status(400).json({ error: 'This patient does not have a phone number.' });
+        const message = appointmentSms(patient, appointmentDate, appointment.time);
+        const result = await sendRingCentralSms(patient.phone, message);
+        const log: SmsLog = { id: `smslog_${Date.now()}`, patientId: patient.id, patientName: patient.name, recipientPhone: patient.phone, message, templateName: 'Automatic appointment confirmation', sentAt: new Date().toLocaleString(), status: 'Sent', providerMessageId: result.messageId };
+        db.smsLogs = [log, ...(db.smsLogs || [])];
+        await writeDatabase(db);
+        return res.json({ success: true, message: 'SMS sent through RingCentral.', logEntry: log });
+      }
+
+      if (!patient.email) return res.status(400).json({ error: 'This patient does not have an email address.' });
+      const emailMessage = appointmentEmail(patient, appointmentDate, appointment.time);
+      const config = db.smtpConfig || { host: BREVO_SMTP_HOST, port: BREVO_SMTP_PORT, user: BREVO_SMTP_USER || '', pass: BREVO_SMTP_PASSWORD || '', secure: false, fromEmail: BREVO_FROM_EMAIL || appointmentClinic.email, senderName: appointmentClinic.name, replyTo: BREVO_REPLY_TO };
+      if (!BREVO_API_KEY && !BREVO_SMTP_PASSWORD && !db.smtpConfig) return res.status(400).json({ error: 'Configure Brevo API or SMTP before sending email.' });
+      const result = await sendEmail(config, patient.email, emailMessage.subject, emailMessage.text, [], emailMessage.html);
+      const log: EmailLog = { id: `log_${Date.now()}`, recipientEmail: patient.email, patientName: patient.name, subject: emailMessage.subject, body: emailMessage.text, templateName: 'Automatic appointment confirmation', sentAt: new Date().toLocaleString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }), status: result.success ? 'Sent' : 'Failed', errorMessage: result.success ? undefined : result.message };
+      db.emailLogs = [log, ...(db.emailLogs || [])];
+      await writeDatabase(db);
+      return res.status(result.success ? 200 : 502).json({ success: result.success, message: result.message, logEntry: log });
+    } catch (err: any) {
+      return res.status(502).json({ error: err.message });
+    }
+  });
+
   // 3d. Delete Patient completely (Admin)
   app.delete('/api/patients/:id', async (req, res) => {
     try {
@@ -1776,7 +1903,7 @@ Clinical Portal Support Team`;
         claimNumber: `INV-2023-0${count}`,
         patientName: matchedPatient.name,
         payer: payer || 'Self',
-        doctor: doctor || 'Dr. Deepak Kumar Bhardwaj',
+        doctor: doctor || 'Deepak Kumar Bhardwaj (BOCO)',
         amount: parseFloat(amount),
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
         status: status || 'Billed',

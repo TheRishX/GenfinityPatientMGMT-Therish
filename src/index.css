@@ -27,6 +27,8 @@
   --radius-lg: 1.25rem;
   --radius-xl: 1.75rem;
   --radius-2xl: 2.25rem;
+  --color-brand-red: #8c000e;
+  --color-brand-ink: #1a1b1c;
 }
 
 @layer base {

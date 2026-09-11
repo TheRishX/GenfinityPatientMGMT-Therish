@@ -11,10 +11,10 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
   const [supportEmail, setSupportEmail] = useState(settings.supportEmail);
   const [appearance, setAppearance] = useState<'light' | 'dark'>(settings.appearance || 'light');
   const [logoUrl, setLogoUrl] = useState(settings.logoUrl || '');
-  const [doctorName, setDoctorName] = useState(settings.doctorName || 'Dr. Deepak Kumar Bhardwaj');
+  const [doctorName, setDoctorName] = useState(settings.doctorName || 'Deepak Kumar Bhardwaj (BOCO)');
   const [doctorImageUrl, setDoctorImageUrl] = useState(settings.doctorImageUrl || '');
   const [defaultReferralSource, setDefaultReferralSource] = useState(settings.defaultReferralSource || '');
-  const [defaultPrimaryClinician, setDefaultPrimaryClinician] = useState(settings.defaultPrimaryClinician || settings.doctorName || 'Dr. Deepak Kumar Bhardwaj');
+  const [defaultPrimaryClinician, setDefaultPrimaryClinician] = useState(settings.defaultPrimaryClinician || settings.doctorName || 'Deepak Kumar Bhardwaj (BOCO)');
   const [pinCode, setPinCode] = useState(settings.pinCode === '1234' ? '7770' : (settings.pinCode || '7770'));
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -68,7 +68,7 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
         <label className="form-label">Appearance<select value={appearance} onChange={e => setAppearance(e.target.value as 'light' | 'dark')} className="form-input mt-1"><option value="light">Light</option><option value="dark">Dark</option></select></label>
         <label className="form-label">Doctor name<input required value={doctorName} onChange={e => setDoctorName(e.target.value)} className="form-input mt-1" /></label>
         <label className="form-label">Default referral source<input value={defaultReferralSource} onChange={e => setDefaultReferralSource(e.target.value)} placeholder="e.g., physician, hospital, website" className="form-input mt-1" /><span className="block mt-1 text-xs font-normal text-on-surface-variant">Used to pre-fill new patient records.</span></label>
-        <label className="form-label">Default primary clinician<input value={defaultPrimaryClinician} onChange={e => setDefaultPrimaryClinician(e.target.value)} placeholder="e.g., Dr. Blake Jackson Sanders" className="form-input mt-1" /><span className="block mt-1 text-xs font-normal text-on-surface-variant">Used to pre-fill the clinician for new patients.</span></label>
+        <label className="form-label">Default primary clinician<input value={defaultPrimaryClinician} onChange={e => setDefaultPrimaryClinician(e.target.value)} placeholder="e.g., Blake Jackson Sanders (CPO)" className="form-input mt-1" /><span className="block mt-1 text-xs font-normal text-on-surface-variant">Used to pre-fill the clinician for new patients.</span></label>
         <label className="form-label">Portal logo URL<input value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="https://... or upload below" className="form-input mt-1" /><input type="file" accept="image/*" onChange={e => e.target.files?.[0] && readImage(e.target.files[0], setLogoUrl)} className="mt-2 block w-full text-xs" /></label>
         <label className="form-label">Doctor profile image URL<input value={doctorImageUrl} onChange={e => setDoctorImageUrl(e.target.value)} placeholder="https://... or upload below" className="form-input mt-1" /><input type="file" accept="image/*" onChange={e => e.target.files?.[0] && readImage(e.target.files[0], setDoctorImageUrl)} className="mt-2 block w-full text-xs" /></label>
         <label className="form-label">Device passcode<input required inputMode="numeric" pattern="[0-9]{4,8}" maxLength={8} value={pinCode} onChange={e => setPinCode(e.target.value.replace(/\D/g, ''))} className="form-input mt-1" /><span className="block mt-1 text-xs font-normal text-on-surface-variant">Required after Sign Out. This device stays unlocked for 30 days.</span></label>

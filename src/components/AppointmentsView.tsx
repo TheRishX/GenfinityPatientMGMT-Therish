@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Patient, Appointment } from '../types';
 import TimePicker from './TimePicker';
+import PatientEmailModal from './PatientEmailModal';
+import PatientSmsModal from './PatientSmsModal';
 
 interface AppointmentsViewProps {
   patients: Patient[];
@@ -47,9 +49,10 @@ export default function AppointmentsView({
   const [editDate, setEditDate] = useState('');
   const [editIsSubmitting, setEditIsSubmitting] = useState(false);
 
-  // Email sending loading / feedback state
-  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
-  const [sentSuccessId, setSentSuccessId] = useState<string | null>(null);
+  // Manual patient notification composer state
+  const [communicationPatient, setCommunicationPatient] = useState<Patient | null>(null);
+  const [communicationAppointment, setCommunicationAppointment] = useState<Appointment | null>(null);
+  const [communicationChannel, setCommunicationChannel] = useState<'email' | 'sms' | null>(null);
 
   // Synchronize edit fields when selected appointment changes
   React.useEffect(() => {
@@ -91,7 +94,7 @@ export default function AppointmentsView({
         phone: matched.phone || '(555) 000-1234',
         mrn: matched.mrn,
         status: matched.status,
-        clinician: matched.primaryClinician || 'Dr. Deepak Kumar Bhardwaj'
+        clinician: matched.primaryClinician || 'Deepak Kumar Bhardwaj (BOCO)'
       };
     }
     return {
@@ -99,7 +102,7 @@ export default function AppointmentsView({
       phone: '(555) 019-2834',
       mrn: '#NEW-APPT',
       status: 'Consultation' as const,
-      clinician: 'Dr. Deepak Kumar Bhardwaj'
+      clinician: 'Deepak Kumar Bhardwaj (BOCO)'
     };
   };
 
@@ -161,31 +164,22 @@ export default function AppointmentsView({
     }
   };
 
-  // One-click email sender
-  const handleOneClickEmail = async (apptId: string, patientName: string, email: string, apptTime: string, apptType: string) => {
-    setSendingEmailId(apptId);
-    try {
-      const res = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          patientName,
-          subject: `Appointment Reminder: ${apptType}`,
-          message: `Dear ${patientName}, this is a reminder for your upcoming ${apptType} appointment scheduled at ${apptTime}. Please arrive 10 minutes early.`
-        })
-      });
-      if (!res.ok) throw new Error('Email server rejected transmission');
-
-      setSentSuccessId(apptId);
-      setTimeout(() => {
-        setSentSuccessId(null);
-      }, 3000);
-    } catch (err: any) {
-      alert(err.message || 'Error sending email');
-    } finally {
-      setSendingEmailId(null);
+  const openCommunication = (appointment: Appointment, channel: 'email' | 'sms') => {
+    const patient = patients.find(item => item.id === appointment.patientId)
+      || patients.find(item => item.name.trim().toLowerCase() === appointment.patientName.trim().toLowerCase());
+    if (!patient) {
+      alert('A patient record is required before sending a message.');
+      return;
     }
+    setCommunicationAppointment(appointment);
+    setCommunicationPatient(patient);
+    setCommunicationChannel(channel);
+  };
+
+  const closeCommunication = () => {
+    setCommunicationPatient(null);
+    setCommunicationAppointment(null);
+    setCommunicationChannel(null);
   };
 
   // Calendar Helper Logic
@@ -302,21 +296,32 @@ export default function AppointmentsView({
           </div>
 
           <button
-            onClick={() => setShowAddForm(prev => !prev)}
+            onClick={() => setShowAddForm(true)}
             className="bg-primary hover:bg-primary-container text-white font-bold text-xs py-2 px-4 rounded-full flex items-center gap-1.5 transition-all shadow-xs cursor-pointer shrink-0"
           >
             <span className="material-symbols-outlined text-sm">calendar_add_on</span>
-            {showAddForm ? 'Close Form' : 'Schedule Appt'}
+            Schedule Appointment
           </button>
         </div>
       </div>
 
       {/* Scheduler Form (if open) */}
       {showAddForm && (
-        <form
-          onSubmit={handleFormSubmit}
-          className="p-6 bg-surface-container-lowest rounded-3xl border border-surface-container-highest/60 shadow-xs grid grid-cols-1 md:grid-cols-5 gap-4 animate-fade-in"
-        >
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-on-surface/45 modal-backdrop-blur" role="dialog" aria-modal="true" aria-labelledby="schedule-appointment-title">
+          <div className="bg-surface-container-lowest w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-3xl shadow-xl border border-surface-container-highest/60 animate-fade-in">
+            <header className="px-6 py-5 flex items-start justify-between gap-4 border-b border-surface-container-highest/60 bg-surface-bright">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-secondary">New appointment</p>
+                <h2 id="schedule-appointment-title" className="text-xl font-black text-on-surface mt-1">Schedule an appointment</h2>
+                <p className="text-xs font-semibold text-on-surface-variant mt-1">Choose a patient, visit type, date, and time.</p>
+              </div>
+              <button type="button" onClick={() => setShowAddForm(false)} aria-label="Close schedule appointment form" className="w-9 h-9 rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface-variant flex items-center justify-center cursor-pointer">
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </header>
+
+            <form onSubmit={handleFormSubmit} className="p-6 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-[10px] font-black uppercase text-on-surface-variant tracking-wider block">Patient Name</label>
             <input
@@ -364,11 +369,11 @@ export default function AppointmentsView({
               <option value="AFO Adjustment">AFO Adjustment</option>
               <option value="KAFO Joint Tuning">KAFO Joint Tuning</option>
               <option value="Initial Consult">Initial Consult</option>
+              <option value="Measurement / Cast">Measurement / Cast</option>
             </select>
           </div>
 
-          <div className="flex items-end gap-3">
-            <div className="space-y-1 flex-1">
+                <div className="space-y-1">
               <label className="text-[10px] font-black uppercase text-on-surface-variant tracking-wider block">Status</label>
               <select
                 value={formStatus}
@@ -378,17 +383,22 @@ export default function AppointmentsView({
                 <option value="Scheduled">Scheduled</option>
                 <option value="Checked In">Checked In</option>
               </select>
-            </div>
-            <button
-              type="submit"
-              disabled={formIsSubmitting}
-              className="px-5 py-2 bg-primary hover:bg-primary-container text-white text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 h-[36px] cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-sm font-bold">check</span>
-              {formIsSubmitting ? 'Saving...' : 'Book'}
-            </button>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-surface-container-highest/60 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
+                <p className="text-[10px] font-semibold text-on-surface-variant">The patient will receive the appointment details after booking.</p>
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setShowAddForm(false)} className="px-5 py-2.5 rounded-xl border border-surface-container-highest text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer">Cancel</button>
+                  <button type="submit" disabled={formIsSubmitting} className="px-6 py-2.5 bg-primary hover:bg-primary-container text-white text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
+                    <span className="material-symbols-outlined text-sm font-bold">check</span>
+                    {formIsSubmitting ? 'Saving...' : 'Book Appointment'}
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
-        </form>
+        </div>
       )}
 
       {/* Filter and Search Bar */}
@@ -434,16 +444,13 @@ export default function AppointmentsView({
                     <th className="py-3.5 px-4">Clinical Visit Type</th>
                     <th className="py-3.5 px-4">Clinician</th>
                     <th className="py-3.5 px-4">Status</th>
-                    <th className="py-3.5 px-4">Email Reminder</th>
+                    <th className="py-3.5 px-4">Contact Patient</th>
                     <th className="py-3.5 px-5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-container-highest/30">
                   {filteredAppointments.map(appt => {
                     const details = getPatientDetails(appt.patientName);
-                    const isSending = sendingEmailId === appt.id;
-                    const isSentSuccess = sentSuccessId === appt.id;
-
                     return (
                       <tr key={appt.id} className="hover:bg-surface-container-low/40 transition-colors">
                         <td className="py-3.5 px-5">
@@ -488,21 +495,14 @@ export default function AppointmentsView({
                         </td>
 
                         <td className="py-3.5 px-4">
-                          <button
-                            type="button"
-                            disabled={isSending}
-                            onClick={() => handleOneClickEmail(appt.id, appt.patientName, details.email, appt.time, appt.type)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black flex items-center gap-1.5 transition-all cursor-pointer ${
-                              isSentSuccess
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-secondary text-white hover:bg-secondary/90'
-                            }`}
-                          >
-                            <span className="material-symbols-outlined text-xs">
-                              {isSending ? 'sync' : isSentSuccess ? 'check' : 'mail'}
-                            </span>
-                            {isSending ? 'Sending...' : isSentSuccess ? 'Sent!' : 'Dispatch Email'}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={() => openCommunication(appt, 'email')} className="px-3 py-1.5 rounded-lg text-[10px] font-black flex items-center gap-1.5 bg-secondary text-white hover:bg-secondary/90 transition-all cursor-pointer" title="Open email composer">
+                              <span className="material-symbols-outlined text-xs">mail</span>Email
+                            </button>
+                            <button type="button" onClick={() => openCommunication(appt, 'sms')} className="px-3 py-1.5 rounded-lg text-[10px] font-black flex items-center gap-1.5 bg-primary/10 text-primary hover:bg-primary/20 transition-all cursor-pointer" title="Open SMS composer">
+                              <span className="material-symbols-outlined text-xs">sms</span>SMS
+                            </button>
+                          </div>
                         </td>
 
                         <td className="py-3.5 px-5 text-right">
@@ -547,9 +547,6 @@ export default function AppointmentsView({
           {filteredAppointments.length > 0 ? (
             filteredAppointments.map(appt => {
               const details = getPatientDetails(appt.patientName);
-              const isSending = sendingEmailId === appt.id;
-              const isSentSuccess = sentSuccessId === appt.id;
-
               return (
                 <div
                   key={appt.id}
@@ -611,19 +608,14 @@ export default function AppointmentsView({
                       </button>
                     </div>
 
-                    <button
-                      type="button"
-                      disabled={isSending}
-                      onClick={() => handleOneClickEmail(appt.id, appt.patientName, details.email, appt.time, appt.type)}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                        isSentSuccess ? 'bg-emerald-600 text-white' : 'bg-secondary text-white hover:bg-secondary/90'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-xs">
-                        {isSending ? 'sync' : isSentSuccess ? 'check' : 'send'}
-                      </span>
-                      {isSending ? 'Sending...' : isSentSuccess ? 'Sent!' : 'Email'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => openCommunication(appt, 'email')} className="px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 bg-secondary text-white hover:bg-secondary/90 transition-all cursor-pointer" title="Open email composer">
+                        <span className="material-symbols-outlined text-xs">mail</span>Email
+                      </button>
+                      <button type="button" onClick={() => openCommunication(appt, 'sms')} className="px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 bg-primary/10 text-primary hover:bg-primary/20 transition-all cursor-pointer" title="Open SMS composer">
+                        <span className="material-symbols-outlined text-xs">sms</span>SMS
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -913,6 +905,7 @@ export default function AppointmentsView({
                   <option value="AFO Adjustment">AFO Adjustment</option>
                   <option value="KAFO Joint Tuning">KAFO Joint Tuning</option>
                   <option value="Initial Consult">Initial Consult</option>
+                  <option value="Measurement / Cast">Measurement / Cast</option>
                 </select>
               </div>
 
@@ -948,6 +941,23 @@ export default function AppointmentsView({
             </form>
           </div>
         </div>
+      )}
+      {communicationPatient && communicationAppointment && communicationChannel === 'email' && (
+        <PatientEmailModal
+          patient={communicationPatient}
+          appointmentDate={communicationAppointment.date || 'Today'}
+          appointmentTime={communicationAppointment.time}
+          onClose={closeCommunication}
+        />
+      )}
+      {communicationPatient && communicationAppointment && communicationChannel === 'sms' && (
+        <PatientSmsModal
+          patient={communicationPatient}
+          appointmentType={communicationAppointment.type}
+          appointmentDate={communicationAppointment.date || 'Today'}
+          appointmentTime={communicationAppointment.time}
+          onClose={closeCommunication}
+        />
       )}
     </div>
   );

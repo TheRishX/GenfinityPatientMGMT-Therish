@@ -21,7 +21,7 @@ export default function Header({
   searchTerm,
   setSearchTerm,
   onSyncClick,
-  doctorName = 'Dr. Deepak Kumar Bhardwaj',
+  doctorName = 'Deepak Kumar Bhardwaj (BOCO)',
   clinicName,
   doctorImageUrl,
   isOfflineMode = false,

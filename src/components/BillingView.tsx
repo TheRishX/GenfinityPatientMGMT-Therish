@@ -75,7 +75,7 @@ export default function BillingView({
       patientName: invoicePatient.name,
       payer: newClaimPayer || 'Self',
       amount: newClaimAmount,
-      doctor: newClaimDoc || 'Dr. Deepak Kumar Bhardwaj',
+      doctor: newClaimDoc || 'Deepak Kumar Bhardwaj (BOCO)',
       status: 'Billed',
       sendInvoice,
       invoicePurpose,
@@ -428,7 +428,7 @@ export default function BillingView({
                   value={newClaimDoc}
                   onChange={e => setNewClaimDoc(e.target.value)}
                   className="w-full px-4 py-2.5 bg-surface rounded-full border border-surface-container-highest text-xs focus:border-secondary outline-none"
-                  placeholder="Dr. Deepak Kumar Bhardwaj"
+                  placeholder="Deepak Kumar Bhardwaj (BOCO)"
                 />
               </div>
 

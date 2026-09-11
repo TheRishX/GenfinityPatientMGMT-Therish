@@ -25,7 +25,7 @@ export default function Sidebar({
   clinicName = 'Genfinity O&P',
   logoUrl,
   doctorImageUrl,
-  doctorName = 'Dr. Deepak Kumar Bhardwaj',
+  doctorName = 'Deepak Kumar Bhardwaj (BOCO)',
   isWorkspaceEditMode = false,
   setIsWorkspaceEditMode,
   customLabels = {},
@@ -37,9 +37,11 @@ export default function Sidebar({
   const navItems = [
     { id: 'dashboard', label: 'Today', icon: 'today' },
     { id: 'patients', label: 'Patients', icon: 'groups' },
+    { id: 'appointments', label: 'Appointments', icon: 'event_note' },
     { id: 'tracker', label: 'Patient Tracking', icon: 'timeline' },
     { id: 'billing', label: 'Invoices', icon: 'receipt_long' },
-    { id: 'communications', label: 'Communications', icon: 'forum' }
+    { id: 'communications', label: 'Communications', icon: 'forum' },
+    { id: 'intake', label: 'Patient Intake', icon: 'assignment' }
   ];
 
   const getLabel = (id: string, defaultLabel: string) => {

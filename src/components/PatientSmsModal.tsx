@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Patient, SmsTemplate } from '../types';
 
-interface Props { patient: Patient; appointmentType?: string; onClose: () => void; onSent?: () => void; }
+interface Props { patient: Patient; appointmentType?: string; appointmentDate?: string; appointmentTime?: string; onClose: () => void; onSent?: () => void; }
 
 const preferredTrigger = (stage?: string) => {
   if (stage === 'Authorization') return 'auth_status_approved';
@@ -10,7 +10,7 @@ const preferredTrigger = (stage?: string) => {
   return 'appointment_booked';
 };
 
-export default function PatientSmsModal({ patient, appointmentType, onClose, onSent }: Props) {
+export default function PatientSmsModal({ patient, appointmentType, appointmentDate, appointmentTime, onClose, onSent }: Props) {
   const [templates, setTemplates] = useState<SmsTemplate[]>([]);
   const [templateId, setTemplateId] = useState('');
   const [body, setBody] = useState('');
@@ -18,7 +18,7 @@ export default function PatientSmsModal({ patient, appointmentType, onClose, onS
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const variables = useMemo(() => ({ patientName: patient.name, clinicName: 'Genfinity O&P', appointmentType: appointmentType || patient.deviceCategory || 'appointment' }), [appointmentType, patient]);
+  const variables = useMemo(() => ({ patientName: patient.name, clinicName: 'Genfinity O&P', appointmentType: appointmentType || patient.deviceCategory || 'appointment', appointmentTime: appointmentDate && appointmentTime ? `${appointmentDate} at ${appointmentTime}` : patient.nextAppointment || 'To be confirmed' }), [appointmentDate, appointmentTime, appointmentType, patient]);
   const render = (value: string) => Object.entries(variables).reduce<string>((text, [key, replacement]) => text.replace(new RegExp(`{${key}}`, 'g'), String(replacement)), value);
   const apply = (template: SmsTemplate) => { setTemplateId(template.id); setBody(render(template.body)); setError(''); setSuccess(''); };
 
