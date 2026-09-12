@@ -126,6 +126,17 @@ export interface Appointment {
   status: 'Checked In' | 'Scheduled';
   initials: string;
   date?: string;
+  reminderStatus?: {
+    oneDay?: AppointmentReminderDelivery;
+    fourHours?: AppointmentReminderDelivery;
+  };
+}
+
+export interface AppointmentReminderDelivery {
+  emailSentAt?: string;
+  smsSentAt?: string;
+  emailAttemptedAt?: string;
+  smsAttemptedAt?: string;
 }
 
 export interface Authorization {

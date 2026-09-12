@@ -58,6 +58,7 @@ const RC_APP_CLIENT_ID = process.env.RC_APP_CLIENT_ID?.trim();
 const RC_APP_CLIENT_SECRET = process.env.RC_APP_CLIENT_SECRET?.trim();
 const RC_USER_JWT = process.env.RC_USER_JWT?.trim();
 const RC_FROM_PHONE_NUMBER = process.env.RC_FROM_PHONE_NUMBER?.trim();
+const APPOINTMENT_TIMEZONE = process.env.APPOINTMENT_TIMEZONE?.trim() || 'America/Los_Angeles';
 let ringCentralToken: { accessToken: string; expiresAt: number } | null = null;
 
 let mysqlPool: Pool | null = null;
@@ -764,6 +765,108 @@ async function sendRingCentralSms(to: string, text: string): Promise<{ messageId
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || `RingCentral rejected the SMS (HTTP ${response.status}).`);
   return { messageId: data.id ? String(data.id) : undefined };
+}
+
+function appointmentDateTime(value: string | undefined, time: string): Date | null {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const timeMatch = String(time || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match || !timeMatch) return null;
+  let hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2]);
+  const meridiem = timeMatch[3]?.toUpperCase();
+  if (minute > 59 || hour > 23 || (meridiem && hour > 12)) return null;
+  if (meridiem === 'AM' && hour === 12) hour = 0;
+  if (meridiem === 'PM' && hour !== 12) hour += 12;
+
+  // Convert the clinic's wall-clock appointment time to an absolute instant.
+  // This keeps reminders correct even when the Hostinger process runs in UTC.
+  const utcGuess = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), hour, minute);
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: APPOINTMENT_TIMEZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  });
+  const parts = Object.fromEntries(formatter.formatToParts(new Date(utcGuess)).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+  const timezoneAsUtc = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute));
+  return new Date(utcGuess - (timezoneAsUtc - utcGuess));
+}
+
+function appointmentReminderSms(patient: Patient, date: string, time: string, leadTime: string): string {
+  return `Hi ${appointmentFirstName(patient.name)}, this is a reminder that your appointment with ${appointmentClinic.provider} at ${appointmentClinic.name} is ${leadTime}.\n📅 ${appointmentDateLabel(date)} at ${time}\n📍 ${appointmentClinic.address}\nNeed to reschedule? Call us at ${appointmentClinic.phone}.\n— ${appointmentClinic.name}`;
+}
+
+function appointmentReminderEmail(patient: Patient, date: string, time: string, leadTime: string): { subject: string; text: string; html: string } {
+  const firstName = appointmentFirstName(patient.name);
+  const subject = `Appointment reminder - ${appointmentClinic.name}`;
+  const text = `Hi ${firstName},\n\nThis is a reminder that your appointment with ${appointmentClinic.provider} at ${appointmentClinic.name} is ${leadTime}.\n\nAPPOINTMENT DETAILS\nDate: ${appointmentDateLabel(date)}\nTime: ${time}\nLocation: ${appointmentClinic.name}\nAddress: ${appointmentClinic.address}\n\nIf you need to reschedule, please call us at ${appointmentClinic.phone}.\n\nWarm regards,\n${appointmentClinic.name}`;
+  const safe = (value: string) => escapeHtml(value);
+  const html = `<div style="font-family:Arial,sans-serif;color:#202124;line-height:1.6"><h2 style="color:#8f0011">Appointment reminder</h2><p>Hi ${safe(firstName)},</p><p>This is a reminder that your appointment with <strong>${safe(appointmentClinic.provider)}</strong> at <strong>${safe(appointmentClinic.name)}</strong> is ${safe(leadTime)}.</p><p><strong>Date:</strong> ${safe(appointmentDateLabel(date))}<br><strong>Time:</strong> ${safe(time)}<br><strong>Location:</strong> ${safe(appointmentClinic.name)}<br><strong>Address:</strong> ${safe(appointmentClinic.address)}</p><p>If you need to reschedule, please call us at <strong>${safe(appointmentClinic.phone)}</strong>.</p><p>Warm regards,<br>${safe(appointmentClinic.name)}</p></div>`;
+  return { subject, text, html };
+}
+
+let reminderWorkerRunning = false;
+
+async function runAppointmentReminderWorker(): Promise<void> {
+  if (reminderWorkerRunning) return;
+  reminderWorkerRunning = true;
+  try {
+    const db = await readDatabase();
+    const now = Date.now();
+    let changed = false;
+    for (const appointment of db.appointments) {
+      if (appointment.status !== 'Scheduled') continue;
+      const appointmentAt = appointmentDateTime(appointment.date, appointment.time);
+      if (!appointmentAt || appointmentAt.getTime() <= now) continue;
+      const patient = db.patients.find(item => item.id === appointment.patientId)
+        || db.patients.find(item => item.name.trim().toLowerCase() === appointment.patientName.trim().toLowerCase());
+      if (!patient) continue;
+
+      const reminders = [
+        { key: 'oneDay' as const, offset: 24 * 60 * 60 * 1000, leadTime: 'in 1 day', label: '24-hour appointment reminder' },
+        { key: 'fourHours' as const, offset: 4 * 60 * 60 * 1000, leadTime: 'in 4 hours', label: '4-hour appointment reminder' }
+      ];
+      for (const reminder of reminders) {
+        if (now < appointmentAt.getTime() - reminder.offset) continue;
+        const state = appointment.reminderStatus ||= {};
+        const delivery = state[reminder.key] ||= {};
+        const retryAfter = 15 * 60 * 1000;
+        const canRetry = (attemptedAt?: string) => !attemptedAt || now - new Date(attemptedAt).getTime() >= retryAfter;
+        const date = appointment.date!;
+
+        if (patient.email && !delivery.emailSentAt && canRetry(delivery.emailAttemptedAt)) {
+          delivery.emailAttemptedAt = new Date().toISOString();
+          changed = true;
+          const emailMessage = appointmentReminderEmail(patient, date, appointment.time, reminder.leadTime);
+          const config = db.smtpConfig || { host: BREVO_SMTP_HOST, port: BREVO_SMTP_PORT, user: BREVO_SMTP_USER || '', pass: BREVO_SMTP_PASSWORD || '', secure: false, fromEmail: BREVO_FROM_EMAIL || appointmentClinic.email, senderName: appointmentClinic.name, replyTo: BREVO_REPLY_TO };
+          const result = await sendEmail(config, patient.email, emailMessage.subject, emailMessage.text, [], emailMessage.html);
+          if (result.success) delivery.emailSentAt = new Date().toISOString();
+          const log: EmailLog = { id: `log_${Date.now()}`, recipientEmail: patient.email, patientName: patient.name, subject: emailMessage.subject, body: emailMessage.text, templateName: reminder.label, sentAt: new Date().toLocaleString(), status: result.success ? 'Sent' : 'Failed', errorMessage: result.success ? undefined : result.message };
+          db.emailLogs = [log, ...(db.emailLogs || [])];
+          await writeDatabase(db);
+          changed = false;
+        }
+
+        if (patient.phone && !delivery.smsSentAt && canRetry(delivery.smsAttemptedAt)) {
+          delivery.smsAttemptedAt = new Date().toISOString();
+          changed = true;
+          const message = appointmentReminderSms(patient, date, appointment.time, reminder.leadTime);
+          try {
+            const result = await sendRingCentralSms(patient.phone, message);
+            delivery.smsSentAt = new Date().toISOString();
+            db.smsLogs = [{ id: `smslog_${Date.now()}`, patientId: patient.id, patientName: patient.name, recipientPhone: patient.phone, message, templateName: reminder.label, sentAt: new Date().toLocaleString(), status: 'Sent', providerMessageId: result.messageId }, ...(db.smsLogs || [])];
+          } catch (error: any) {
+            db.smsLogs = [{ id: `smslog_${Date.now()}`, patientId: patient.id, patientName: patient.name, recipientPhone: patient.phone, message, templateName: reminder.label, sentAt: new Date().toLocaleString(), status: 'Failed', errorMessage: error.message || 'SMS could not be sent.' }, ...(db.smsLogs || [])];
+          }
+          await writeDatabase(db);
+          changed = false;
+        }
+      }
+    }
+    if (changed) await writeDatabase(db);
+  } catch (error) {
+    console.error('Appointment reminder worker failed:', error);
+  } finally {
+    reminderWorkerRunning = false;
+  }
 }
 
 // Database Accessor Helpers
@@ -1677,13 +1780,20 @@ Clinical Portal Support Team`;
         return res.status(404).json({ error: 'Appointment not found' });
       }
       if (status !== undefined) appt.status = status;
+      const timeChanged = time !== undefined && time !== appt.time;
       if (time !== undefined) appt.time = time;
       if (type !== undefined) appt.type = type;
       if (patientName !== undefined) {
         appt.patientName = patientName;
         appt.initials = getInitials(patientName);
       }
-      if (appt_date !== undefined) appt.date = appt_date;
+      if (appt_date !== undefined && appt_date !== appt.date) {
+        appt.date = appt_date;
+        appt.reminderStatus = undefined;
+      }
+      if (timeChanged) {
+        appt.reminderStatus = undefined;
+      }
       await writeDatabase(db);
       res.json(appt);
     } catch (err: any) {
@@ -2176,7 +2286,13 @@ Clinical Portal Support Team`;
 
   const httpServer = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
+    console.log(`Appointment reminders enabled for ${APPOINTMENT_TIMEZONE} (24 hours and 4 hours before each scheduled appointment).`);
   });
+  // Run once at startup, then check every minute. Persisted delivery markers
+  // make this safe across restarts and prevent duplicate reminders.
+  void runAppointmentReminderWorker();
+  const reminderInterval = setInterval(() => { void runAppointmentReminderWorker(); }, 60 * 1000);
+  reminderInterval.unref?.();
   httpServer.on('error', (error: NodeJS.ErrnoException) => {
     if (error.code === 'EADDRINUSE') {
       console.error(`Port ${PORT} is already in use. The existing Genfinity server may already be running.`);
