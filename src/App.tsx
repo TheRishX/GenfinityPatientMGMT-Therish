@@ -1132,10 +1132,14 @@ export default function App() {
       <div className="min-h-screen bg-[#fbf9f8]">
         <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-            <div>
+            <a
+              href="https://genfinityoandp.com"
+              aria-label="Go to Genfinity O&P homepage"
+              className="rounded-sm transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
               <p className="text-lg font-black tracking-tight text-brand-ink">Genfinity O&amp;P</p>
               <p className="text-xs font-semibold text-slate-500">Secure patient intake</p>
-            </div>
+            </a>
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500"><span className="material-symbols-outlined text-sm">lock</span>Private submission</span>
           </div>
         </header>
