@@ -16,6 +16,8 @@ interface SidebarProps {
   enabledModules?: Record<string, boolean>;
   onToggleModule?: (moduleId: string) => void;
   onSignOut?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export default function Sidebar({
@@ -32,7 +34,9 @@ export default function Sidebar({
   onUpdateLabel,
   enabledModules = {},
   onToggleModule,
-  onSignOut
+  onSignOut,
+  collapsed = false,
+  onToggleCollapse
 }: SidebarProps) {
   const navItems = [
     { id: 'dashboard', label: 'Home', icon: 'today' },
@@ -48,33 +52,44 @@ export default function Sidebar({
   };
 
   return (
-    <nav id="app-sidebar" aria-label="Main navigation" className="bg-surface-container-low dark:bg-surface-container-low shadow-sm h-screen w-64 md:w-72 flex-shrink-0 fixed left-0 top-0 h-full flex flex-col py-6 z-20 border-r border-surface-container-highest/30">
+    <nav id="app-sidebar" aria-label="Main navigation" className={`bg-surface-container-low dark:bg-surface-container-low shadow-sm h-screen ${collapsed ? 'w-20 md:w-24' : 'w-64 md:w-72'} flex-shrink-0 fixed left-0 top-0 flex flex-col py-6 z-20 border-r border-surface-container-highest/30 transition-[width] duration-300`}>
       {/* Brand area */}
-      <div className="px-5 mb-5 flex items-center">
-        <ClinicLogo size="md" clinicName={clinicName} logoUrl={logoUrl} onClick={() => setActiveTab('dashboard')} />
-      </div>
-
-      {/* New Patient CTA */}
-      <div className="px-4 mb-4">
+      <div className={`mb-5 flex items-center ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
+        <ClinicLogo size={collapsed ? 'sm' : 'md'} clinicName={clinicName} logoUrl={logoUrl} onClick={() => setActiveTab('dashboard')} className={collapsed ? 'w-12 overflow-hidden' : ''} />
         <button
-          id="sidebar-new-patient-cta"
-          onClick={onNewPatientClick}
-          className="w-full bg-primary-container text-white rounded-full py-3 text-sm font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+          type="button"
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface ${collapsed ? 'absolute right-2 top-4' : ''}`}
         >
-          <span className="material-symbols-outlined text-sm">add</span>
-          New Patient
+          <span className="material-symbols-outlined text-[20px]">{collapsed ? 'left_panel_open' : 'left_panel_close'}</span>
         </button>
       </div>
 
-      <div className="px-4 mb-4">
+      {/* New Patient CTA */}
+      <div className={`${collapsed ? 'px-3' : 'px-4'} mb-4`}>
+        <button
+          id="sidebar-new-patient-cta"
+          onClick={onNewPatientClick}
+          title={collapsed ? 'New Patient' : undefined}
+          className={`w-full bg-primary-container text-white rounded-full py-3 text-sm font-bold hover:opacity-90 transition-opacity flex items-center justify-center shadow-sm cursor-pointer ${collapsed ? 'gap-0' : 'gap-2'}`}
+        >
+          <span className="material-symbols-outlined text-sm">add</span>
+          {!collapsed && 'New Patient'}
+        </button>
+      </div>
+
+      <div className={`${collapsed ? 'px-3' : 'px-4'} mb-4`}>
         <a
           href="https://clinic.genfinityoandp.com/intake"
           target="_blank"
           rel="noopener noreferrer"
-          className="w-full bg-secondary text-white rounded-full py-3 text-sm font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-sm"
+          title={collapsed ? 'Share intake form' : undefined}
+          className={`w-full bg-secondary text-white rounded-full py-3 text-sm font-bold hover:opacity-90 transition-opacity flex items-center justify-center shadow-sm ${collapsed ? 'gap-0' : 'gap-2'}`}
         >
           <span className="material-symbols-outlined text-sm">share</span>
-          Share intake form
+          {!collapsed && 'Share intake form'}
         </a>
       </div>
 
@@ -104,7 +119,7 @@ export default function Sidebar({
           return (
             <div
               key={item.id}
-              className={`group flex items-center justify-between rounded-full px-3 py-1.5 transition-all duration-200 ${
+                className={`group flex items-center justify-between rounded-full ${collapsed ? 'px-1.5' : 'px-3'} py-1.5 transition-all duration-200 ${
                 isWorkspaceEditMode ? 'border border-dashed border-primary/20 bg-surface/20' : ''
               } ${!isEnabled ? 'opacity-40 bg-surface-container-high/25' : ''}`}
             >
@@ -117,7 +132,8 @@ export default function Sidebar({
                     }
                   }}
                   disabled={!isEnabled && !isWorkspaceEditMode}
-                  className={`flex items-center gap-3.5 rounded-full px-3 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer text-left flex-1 min-w-0 ${
+                  title={collapsed ? getLabel(item.id, item.label) : undefined}
+                  className={`flex items-center rounded-full ${collapsed ? 'justify-center gap-0 px-2' : 'gap-3.5 px-3'} py-2 text-sm font-semibold transition-all duration-150 cursor-pointer text-left flex-1 min-w-0 ${
                     isActive && isEnabled
                       ? 'bg-secondary-container text-on-secondary-container dark:bg-secondary dark:text-white font-bold shadow-xs'
                       : 'text-on-surface-variant hover:text-on-surface'
@@ -127,7 +143,7 @@ export default function Sidebar({
                     {item.icon}
                   </span>
 
-                  {isWorkspaceEditMode ? (
+                  {!collapsed && isWorkspaceEditMode ? (
                     <input
                       type="text"
                       value={getLabel(item.id, item.label)}
@@ -135,9 +151,9 @@ export default function Sidebar({
                       onChange={(e) => onUpdateLabel?.(`sidebar_${item.id}`, e.target.value)}
                       className="bg-surface border border-primary text-xs text-on-surface font-extrabold px-1.5 py-0.5 rounded outline-none w-full"
                     />
-                  ) : (
+                  ) : !collapsed ? (
                     <span className="truncate">{getLabel(item.id, item.label)}</span>
-                  )}
+                  ) : null}
                 </button>
               </div>
 
@@ -164,24 +180,26 @@ export default function Sidebar({
       <div className="mt-auto px-2 pt-4 border-t border-surface-container-highest/40 space-y-1">
         <button
           onClick={() => setActiveTab('settings')}
-          className="w-full flex items-center gap-4 rounded-full px-5 py-3 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
+          title={collapsed ? 'Settings' : undefined}
+          className={`w-full flex items-center rounded-full py-3 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer ${collapsed ? 'justify-center gap-0 px-2' : 'gap-4 px-5'}`}
         >
           <span className="material-symbols-outlined">settings</span>
-          <span>Settings</span>
+          {!collapsed && <span>Settings</span>}
         </button>
 
         <button
           onClick={() => {
             onSignOut?.();
           }}
-          className="w-full flex items-center gap-4 rounded-full px-5 py-2.5 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
+          title={collapsed ? 'Sign Out' : undefined}
+          className={`w-full flex items-center rounded-full py-2.5 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer ${collapsed ? 'justify-center gap-0 px-2' : 'gap-4 px-5'}`}
         >
           <span className="material-symbols-outlined">logout</span>
-          <span>Sign Out</span>
+          {!collapsed && <span>Sign Out</span>}
         </button>
 
         {/* Lead Doctor info block */}
-        <div className="mt-3 px-4 py-2 flex items-center gap-3 bg-surface-container-lowest/50 rounded-2xl mx-2 border border-surface-container/20">
+        <div className={`mt-3 py-2 flex items-center bg-surface-container-lowest/50 rounded-2xl mx-2 border border-surface-container/20 ${collapsed ? 'justify-center px-1' : 'gap-3 px-4'}`} title={collapsed ? doctorName : undefined}>
           {!doctorImageUrl && <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black shrink-0">{doctorName.split(' ').map(part => part[0]).slice(0, 2).join('')}</div>}
           <img
             className={`${doctorImageUrl ? '' : 'hidden '}w-10 h-10 rounded-full object-cover border border-surface shadow-xs shrink-0`}
@@ -189,10 +207,10 @@ export default function Sidebar({
             referrerPolicy="no-referrer"
             src={doctorImageUrl || ''}
           />
-          <div className="min-w-0">
+          {!collapsed && <div className="min-w-0">
             <p className="text-xs font-bold text-on-surface truncate">{doctorName}</p>
             <p className="text-[10px] text-on-surface-variant truncate">Lead Orthotist</p>
-          </div>
+          </div>}
         </div>
       </div>
     </nav>

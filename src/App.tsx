@@ -49,12 +49,21 @@ function PortalApp() {
 
   // Layout navigation & search
   const [activeTab, setActiveTabState] = useState<string>(() => tabForPath(window.location.pathname));
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('genfinity_sidebar_collapsed') === 'true');
   const setActiveTab = (tab: string) => {
     setActiveTabState(tab);
     const nextPath = TAB_PATHS[tab] || TAB_PATHS.dashboard;
     if (window.location.pathname !== nextPath) {
       window.history.pushState({ tab }, '', nextPath);
     }
+  };
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed(current => {
+      const next = !current;
+      localStorage.setItem('genfinity_sidebar_collapsed', String(next));
+      return next;
+    });
   };
   const [searchTerm, setSearchTerm] = useState<string>('');
 
@@ -1009,6 +1018,8 @@ function PortalApp() {
       <Sidebar
         activeTab={activeTab === 'documents' ? 'patients' : activeTab}
         setActiveTab={setActiveTab}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
         onNewPatientClick={() => {
           setActiveTab('patients');
           setIsNewPatientModalOpen(true);
@@ -1027,7 +1038,7 @@ function PortalApp() {
       />
 
       {/* Main Content Area */}
-      <div className="min-w-0 max-w-full flex-1 flex flex-col overflow-x-hidden pl-64 md:pl-72 min-h-screen bg-[#fbf9f8] text-[#1b1c1c]">
+      <div className={`min-w-0 max-w-full flex-1 flex flex-col overflow-x-hidden min-h-screen bg-[#fbf9f8] text-[#1b1c1c] transition-[padding] duration-300 ${sidebarCollapsed ? 'pl-20 md:pl-24' : 'pl-64 md:pl-72'}`}>
         {/* App bar search / user utility */}
         <Header
           title={
