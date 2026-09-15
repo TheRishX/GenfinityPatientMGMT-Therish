@@ -1120,6 +1120,15 @@ ${invalid ? '<p class="error">Incorrect password. Please try again.</p>' : ''}<i
     });
 
     app.use((req, res, next) => {
+      // Patient intake is intentionally a separate public surface. It may
+      // submit only intake data; the portal session and all other API routes
+      // remain protected by this middleware.
+      const isPublicIntakeRequest =
+        req.path === '/intake' ||
+        req.path === '/intake/' ||
+        req.path === '/api/intake/submit';
+      if (isPublicIntakeRequest) return next();
+
       const cookieAuthenticated = (req.headers.cookie || '')
         .split(';')
         .map(value => value.trim())

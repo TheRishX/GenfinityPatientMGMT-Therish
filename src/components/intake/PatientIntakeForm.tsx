@@ -470,7 +470,7 @@ function clearLocalDraft() {
   }
 }
 
-export function PatientIntakeForm() {
+export function PatientIntakeForm({ publicMode = false }: { publicMode?: boolean }) {
   const [data, setData] = useState<IntakeData>(defaultIntakeData);
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<ErrorMap>({});
@@ -500,6 +500,10 @@ export function PatientIntakeForm() {
         Math.max(0, Math.min(steps.length - 1, localDraft.currentStep)),
       );
       setLoaded(true);
+    }
+    if (publicMode) {
+      setLoaded(true);
+      return;
     }
     fetch("/api/intake/draft", { cache: "no-store" })
       .then((response) => response.json())
@@ -535,7 +539,7 @@ export function PatientIntakeForm() {
         }
       })
       .finally(() => setLoaded(true));
-  }, []);
+  }, [publicMode]);
 
   useEffect(() => {
     if (!loaded || reference) return;
@@ -560,7 +564,7 @@ export function PatientIntakeForm() {
   }, [data, loaded, reference, step]);
 
   useEffect(() => {
-    if (!loaded || !configured || reference) return;
+    if (publicMode || !loaded || !configured || reference) return;
     const timer = window.setTimeout(() => {
       setSaveState("saving");
       fetch("/api/intake/draft", {
@@ -573,7 +577,7 @@ export function PatientIntakeForm() {
         .catch(() => setSaveState("idle"));
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [configured, data, loaded, reference, step]);
+  }, [configured, data, loaded, publicMode, reference, step]);
 
   const progress = Math.round(((step + 1) / steps.length) * 100);
   const update = (path: Path, value: unknown) => {

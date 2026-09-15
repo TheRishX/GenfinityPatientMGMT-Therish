@@ -27,7 +27,7 @@ class IntakeErrorBoundary extends React.Component<{ children: React.ReactNode },
   }
 }
 
-export default function App() {
+function PortalApp() {
   // Clinical data must always come from the server-backed Hostinger database.
   // Do not initialize this state from browser storage: another browser/device
   // would otherwise see a different database.
@@ -962,7 +962,12 @@ export default function App() {
       case 'communications':
         return <CommunicationsView patients={db.patients} appointments={db.appointments} />;
       case 'intake':
-        return <IntakeErrorBoundary><PatientIntakeForm /></IntakeErrorBoundary>;
+        return (
+          <>
+            <IntakeShareCard />
+            <IntakeErrorBoundary><PatientIntakeForm /></IntakeErrorBoundary>
+          </>
+        );
       case 'fabrication':
         return (
           <FabricationView
@@ -1055,4 +1060,56 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+function IntakeShareCard() {
+  const [copied, setCopied] = useState(false);
+  const publicLink = `${window.location.origin}/intake`;
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(publicLink);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2200);
+    } catch {
+      window.prompt('Copy this public patient intake link:', publicLink);
+    }
+  };
+
+  return (
+    <div className="mx-5 mt-5 max-w-7xl rounded-2xl border border-primary/15 bg-primary/5 p-4 sm:mx-8 md:mx-10">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-extrabold text-on-surface">Share with a patient</p>
+          <p className="mt-1 text-xs text-on-surface-variant">This link opens the intake form without portal authentication.</p>
+        </div>
+        <button onClick={copyLink} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-xs font-bold text-white hover:bg-primary-container">
+          <span className="material-symbols-outlined text-sm">{copied ? 'check' : 'content_copy'}</span>
+          {copied ? 'Link copied' : 'Copy public link'}
+        </button>
+      </div>
+      <p className="mt-3 break-all rounded-xl bg-white/70 px-3 py-2 font-mono text-[11px] text-on-surface-variant">{publicLink}</p>
+    </div>
+  );
+}
+
+export default function App() {
+  const isPublicIntake = window.location.pathname === '/intake' || window.location.pathname === '/intake/';
+  if (isPublicIntake) {
+    return (
+      <div className="min-h-screen bg-[#fbf9f8]">
+        <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+            <div>
+              <p className="text-lg font-black tracking-tight text-brand-ink">Genfinity O&amp;P</p>
+              <p className="text-xs font-semibold text-slate-500">Secure patient intake</p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500"><span className="material-symbols-outlined text-sm">lock</span>Private submission</span>
+          </div>
+        </header>
+        <PatientIntakeForm publicMode />
+      </div>
+    );
+  }
+  return <PortalApp />;
 }
