@@ -1051,7 +1051,7 @@ function PortalApp() {
       />
 
       {/* Main Content Area */}
-      <div className={`min-w-0 max-w-full flex-1 flex flex-col overflow-x-hidden min-h-screen bg-[#fbf9f8] text-[#1b1c1c] transition-[padding] duration-300 ${sidebarCollapsed ? 'pl-20 md:pl-24' : 'pl-64 md:pl-72'}`}>
+      <div className="min-w-0 max-w-full flex-1 flex flex-col overflow-x-hidden min-h-screen bg-[#fbf9f8] text-[#1b1c1c]">
         {/* App bar search / user utility */}
         <Header
           title={
