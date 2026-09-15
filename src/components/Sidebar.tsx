@@ -40,8 +40,7 @@ export default function Sidebar({
     { id: 'patients', label: 'Patients', icon: 'groups' },
     { id: 'tracker', label: 'Patient tracking', icon: 'timeline' },
     { id: 'communications', label: 'Communication', icon: 'forum' },
-    { id: 'billing', label: 'Invoices', icon: 'receipt_long' },
-    { id: 'intake', label: 'Patient Intake', icon: 'assignment' }
+    { id: 'billing', label: 'Invoices', icon: 'receipt_long' }
   ];
 
   const getLabel = (id: string, defaultLabel: string) => {
@@ -65,6 +64,18 @@ export default function Sidebar({
           <span className="material-symbols-outlined text-sm">add</span>
           New Patient
         </button>
+      </div>
+
+      <div className="px-4 mb-4">
+        <a
+          href="https://clinic.genfinityoandp.com/intake"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full bg-secondary text-white rounded-full py-3 text-sm font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-sm"
+        >
+          <span className="material-symbols-outlined text-sm">share</span>
+          Share intake form
+        </a>
       </div>
 
       {/* Customizable Workspace Banner Indicator */}

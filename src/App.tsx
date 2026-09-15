@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import DashboardView from './components/DashboardView';
@@ -16,7 +16,6 @@ import { PatientIntakeForm } from './components/intake/PatientIntakeForm';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
 import { getInitials, generateMRN } from './utils/defaultDb';
 
-const PUBLIC_CLINIC_ORIGIN = 'https://clinic.genfinityoandp.com';
 const TAB_PATHS: Record<string, string> = {
   dashboard: '/',
   appointments: '/appointments',
@@ -26,24 +25,12 @@ const TAB_PATHS: Record<string, string> = {
   billing: '/billing',
   authorization: '/authorization',
   fabrication: '/fabrication',
-  settings: '/settings',
-  intake: '/portal/intake'
+  settings: '/settings'
 };
 
 function tabForPath(pathname: string): string {
   const match = Object.entries(TAB_PATHS).find(([, path]) => path === pathname);
   return match?.[0] || 'dashboard';
-}
-
-class IntakeErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-  private readonly childContent: React.ReactNode;
-  constructor(props: { children: React.ReactNode }) { super(props); this.childContent = props.children; }
-  static getDerivedStateFromError(error: Error) { return { error }; }
-  render() {
-    if (this.state.error) return <div className="m-8 rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800"><h2 className="text-xl font-bold">Patient intake could not load</h2><p className="mt-2 text-sm">{this.state.error.message}</p></div>;
-    return this.childContent;
-  }
 }
 
 function PortalApp() {
@@ -993,13 +980,6 @@ function PortalApp() {
         );
       case 'communications':
         return <CommunicationsView patients={db.patients} appointments={db.appointments} />;
-      case 'intake':
-        return (
-          <>
-            <IntakeShareCard />
-            <IntakeErrorBoundary><PatientIntakeForm /></IntakeErrorBoundary>
-          </>
-        );
       case 'fabrication':
         return (
           <FabricationView
@@ -1069,8 +1049,6 @@ function PortalApp() {
               ? getSidebarLabel('settings', 'Admin Settings')
               : activeTab === 'communications'
               ? getSidebarLabel('communications', 'Communications')
-              : activeTab === 'intake'
-              ? 'Patient Intake'
               : 'Genfinity Clinical Portal'
           }
           searchTerm={searchTerm}
@@ -1090,37 +1068,6 @@ function PortalApp() {
           {renderTabContent()}
         </main>
       </div>
-    </div>
-  );
-}
-
-function IntakeShareCard() {
-  const [copied, setCopied] = useState(false);
-  const publicLink = `${PUBLIC_CLINIC_ORIGIN}/intake`;
-
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(publicLink);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2200);
-    } catch {
-      window.prompt('Copy this public patient intake link:', publicLink);
-    }
-  };
-
-  return (
-    <div className="mx-5 mt-5 max-w-7xl rounded-2xl border border-primary/15 bg-primary/5 p-4 sm:mx-8 md:mx-10">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-extrabold text-on-surface">Share with a patient</p>
-          <p className="mt-1 text-xs text-on-surface-variant">This link opens the intake form without portal authentication.</p>
-        </div>
-        <button onClick={copyLink} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-xs font-bold text-white hover:bg-primary-container">
-          <span className="material-symbols-outlined text-sm">{copied ? 'check' : 'content_copy'}</span>
-          {copied ? 'Link copied' : 'Copy public link'}
-        </button>
-      </div>
-      <p className="mt-3 break-all rounded-xl bg-white/70 px-3 py-2 font-mono text-[11px] text-on-surface-variant">{publicLink}</p>
     </div>
   );
 }
