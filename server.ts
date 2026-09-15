@@ -1477,6 +1477,27 @@ Clinical Portal Support Team`;
     }
   });
 
+  app.put('/api/data/import', async (req, res) => {
+    try {
+      const candidate = req.body as Partial<DatabaseSchema>;
+      const requiredArrays = ['patients', 'appointments', 'authorizations', 'claims', 'fabrication', 'alerts'] as const;
+      if (!candidate || typeof candidate !== 'object' || !candidate.settings || requiredArrays.some(key => !Array.isArray(candidate[key]))) {
+        return res.status(400).json({ error: 'The backup is missing required clinic data collections.' });
+      }
+      if ((candidate.patients || []).some(patient => !patient || typeof patient.id !== 'string' || typeof patient.name !== 'string' || !Array.isArray(patient.files))) {
+        return res.status(400).json({ error: 'The backup contains an invalid patient record.' });
+      }
+      const patientIds = new Set<string>();
+      if ((candidate.patients || []).some(patient => patientIds.has(patient.id) || !patientIds.add(patient.id))) {
+        return res.status(400).json({ error: 'The backup contains duplicate patient IDs.' });
+      }
+      await writeDatabase(candidate as DatabaseSchema);
+      res.json({ ok: true, importedAt: new Date().toISOString(), patientCount: candidate.patients?.length || 0 });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Unable to import clinic backup.' });
+    }
+  });
+
   // Patient intake: drafts stay in the same server-backed store as the portal,
   // and a signed submission is converted into a patient record atomically.
   app.get('/api/intake/draft', async (_req, res) => {

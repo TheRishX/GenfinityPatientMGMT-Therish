@@ -729,6 +729,17 @@ function PortalApp() {
     }
   };
 
+  const handleImportDatabase = async (database: DatabaseSchema) => {
+    const res = await fetch('/api/data/import', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(database)
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload.error || 'The clinic backup could not be imported.');
+    await fetchState();
+  };
+
   const handleSignOut = () => {
     localStorage.removeItem('genfinity_device_unlock_until');
     setDeviceUnlocked(false);
@@ -1000,7 +1011,9 @@ function PortalApp() {
         return (
           <SettingsView
             settings={db.settings}
+            database={db}
             onSaveSettings={handleSaveSettings}
+            onImportDatabase={handleImportDatabase}
           />
         );
       default:

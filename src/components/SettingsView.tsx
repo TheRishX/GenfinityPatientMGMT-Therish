@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import ClinicLogo from './ClinicLogo';
-import { ClinicSettings, EmailTemplate } from '../types';
+import { ClinicSettings, DatabaseSchema, EmailTemplate } from '../types';
+import { ClinicBackupPreview, createClinicBackup, downloadClinicBackup, readClinicBackup } from '../utils/clinicBackup';
 
-interface SettingsViewProps { settings: ClinicSettings; onSaveSettings: (settings: ClinicSettings) => Promise<void>; }
+interface SettingsViewProps {
+  settings: ClinicSettings;
+  database: DatabaseSchema;
+  onSaveSettings: (settings: ClinicSettings) => Promise<void>;
+  onImportDatabase: (database: DatabaseSchema) => Promise<void>;
+}
 
-export default function SettingsView({ settings, onSaveSettings }: SettingsViewProps) {
+export default function SettingsView({ settings, database, onSaveSettings, onImportDatabase }: SettingsViewProps) {
   const [clinicName, setClinicName] = useState(settings.clinicName);
   const [primaryAddress, setPrimaryAddress] = useState(settings.primaryAddress);
   const [contactPhone, setContactPhone] = useState(settings.contactPhone);
@@ -25,6 +31,44 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
   const [recipient, setRecipient] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [transferMessage, setTransferMessage] = useState('');
+  const [transferError, setTransferError] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [pendingImport, setPendingImport] = useState<{ database: DatabaseSchema; preview: ClinicBackupPreview; fileName: string } | null>(null);
+
+  const exportBackup = async () => {
+    setExporting(true); setTransferError(''); setTransferMessage('');
+    try {
+      const backup = await createClinicBackup(database);
+      downloadClinicBackup(backup);
+      setTransferMessage('Backup created. It includes the Excel workbook, complete restore data, and uploaded documents.');
+    } catch (error: any) {
+      setTransferError(error?.message || 'Unable to create the clinic backup.');
+    } finally { setExporting(false); }
+  };
+
+  const inspectImport = async (file: File) => {
+    setTransferError(''); setTransferMessage(''); setPendingImport(null); setImporting(true);
+    try {
+      const imported = await readClinicBackup(file);
+      setPendingImport({ ...imported, fileName: file.name });
+    } catch (error: any) {
+      setTransferError(error?.message || 'This backup could not be validated.');
+    } finally { setImporting(false); }
+  };
+
+  const confirmImport = async () => {
+    if (!pendingImport) return;
+    setImporting(true); setTransferError('');
+    try {
+      await onImportDatabase(pendingImport.database);
+      setTransferMessage(`Imported ${pendingImport.preview.patients} patients and ${pendingImport.preview.documents} documents successfully.`);
+      setPendingImport(null);
+    } catch (error: any) {
+      setTransferError(error?.message || 'The clinic backup could not be imported. No changes were applied.');
+    } finally { setImporting(false); }
+  };
 
   const loadEmail = async () => {
     try {
@@ -74,6 +118,37 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
         <label className="form-label">Device passcode<input required inputMode="numeric" pattern="[0-9]{4,8}" maxLength={8} value={pinCode} onChange={e => setPinCode(e.target.value.replace(/\D/g, ''))} className="form-input mt-1" /><span className="block mt-1 text-xs font-normal text-on-surface-variant">Required after Sign Out. This device stays unlocked for 30 days.</span></label>
       </div><button type="submit" className="primary-button">Save clinic profile</button>
     </form>
+    <section className="workspace-section space-y-5 p-5 sm:p-6" aria-labelledby="data-transfer-title">
+      <div>
+        <h3 id="data-transfer-title" className="flex items-center gap-2 text-lg font-extrabold text-on-surface"><span className="material-symbols-outlined text-primary">database</span>Data transfer</h3>
+        <p className="mt-1 text-sm text-on-surface-variant">Create a complete clinic backup or restore one from an authorized backup package.</p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-2xl border border-surface-container-highest/60 bg-surface-container-low/40 p-4">
+          <p className="text-sm font-extrabold text-on-surface">Export all patient data</p>
+          <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">Downloads one ZIP package with Excel, lossless restore data, and uploaded documents.</p>
+          <button type="button" onClick={exportBackup} disabled={exporting} className="primary-button mt-4 inline-flex items-center gap-2 disabled:opacity-60"><span className="material-symbols-outlined text-sm">download</span>{exporting ? 'Preparing backup…' : 'Export clinic backup'}</button>
+        </div>
+        <div className="rounded-2xl border border-surface-container-highest/60 bg-surface-container-low/40 p-4">
+          <p className="text-sm font-extrabold text-on-surface">Import clinic backup</p>
+          <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">Choose a Genfinity ZIP or JSON backup. The existing database is not changed until you confirm the validated preview.</p>
+          <label className="secondary-button mt-4 inline-flex cursor-pointer items-center gap-2"><span className="material-symbols-outlined text-sm">upload</span>{importing ? 'Reading backup…' : 'Choose backup'}<input type="file" accept=".zip,.json,application/zip,application/json" className="sr-only" disabled={importing} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void inspectImport(file); }} /></label>
+        </div>
+      </div>
+      {pendingImport && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div><p className="text-sm font-extrabold">Ready to import: {pendingImport.fileName}</p><p className="mt-1 text-xs">This will replace the current clinic database after confirmation.</p></div>
+            <span className="rounded-full bg-amber-200 px-3 py-1 text-[10px] font-black uppercase tracking-wide">Validated</span>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4"><span><strong>{pendingImport.preview.patients}</strong> patients</span><span><strong>{pendingImport.preview.appointments}</strong> appointments</span><span><strong>{pendingImport.preview.claims}</strong> claims</span><span><strong>{pendingImport.preview.documents}</strong> documents</span></div>
+          <button type="button" onClick={() => void confirmImport()} disabled={importing} className="mt-4 rounded-full bg-amber-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60">{importing ? 'Importing…' : 'Confirm and replace database'}</button>
+        </div>
+      )}
+      {transferMessage && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800" role="status">{transferMessage}</p>}
+      {transferError && <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800" role="alert">{transferError}</p>}
+      <p className="text-[11px] font-semibold text-on-surface-variant">Backups contain protected health information. Store them securely and share only with authorized clinic staff.</p>
+    </section>
     <section className="workspace-section space-y-5 p-5 sm:p-6" aria-labelledby="email-settings-title">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"><div className="min-w-0"><h3 id="email-settings-title" className="text-lg font-extrabold text-on-surface flex items-center gap-2"><span className="material-symbols-outlined text-primary">mail</span>Brevo email</h3><p className="text-sm text-on-surface-variant mt-1">Manage patient email templates and test delivery.</p></div><span className={`status-badge shrink-0 ${configured ? 'status-badge-success' : 'status-badge-warning'}`}><span className="h-2 w-2 rounded-full bg-current" />{configured ? `${provider} connected` : 'Brevo setup needed'}</span></div>
       {!configured && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Add the Brevo API key and verified sender in Hostinger environment settings, then restart the app.</div>}
