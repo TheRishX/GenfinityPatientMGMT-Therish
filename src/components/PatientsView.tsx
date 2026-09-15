@@ -447,7 +447,7 @@ export default function PatientsView({
       </div>
 
       {/* Scan-friendly patient records */}
-      <div className={patientView === 'list' ? 'space-y-2' : patientView === 'compact' ? 'grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}>
+      <div className={patientView === 'list' ? 'space-y-2' : patientView === 'compact' ? 'grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(250px,1fr))]' : 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(280px,1fr))]'}>
         {filteredPatients.map(p => {
           // Determine status color theme
           let statusStyle = 'bg-secondary/10 text-secondary border-secondary/20';

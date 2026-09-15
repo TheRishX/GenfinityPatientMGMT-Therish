@@ -180,7 +180,7 @@ export default function Header({
   const unreadCount = notificationsList.length;
 
   return (
-    <header id="app-header" className="bg-surface/90 backdrop-blur-md flex justify-between items-center w-full h-20 px-8 z-10 sticky top-0 border-b border-surface-container-highest/30">
+    <header id="app-header" className="bg-surface/90 backdrop-blur-md flex justify-between items-center w-full h-20 px-5 sm:px-6 z-10 sticky top-0 border-b border-surface-container-highest/30">
       {/* Dynamic Context Title or Search */}
       <div className="flex-1 flex items-center gap-6">
         <h2 className="hidden md:block text-xl font-black text-on-surface mr-2 shrink-0 tracking-tight">
