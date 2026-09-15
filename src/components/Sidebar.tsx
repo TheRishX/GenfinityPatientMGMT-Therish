@@ -52,7 +52,7 @@ export default function Sidebar({
   };
 
   return (
-    <nav id="app-sidebar" aria-label="Main navigation" className={`relative sticky top-0 bg-surface-container-low dark:bg-surface-container-low shadow-sm h-screen ${collapsed ? 'w-20 md:w-24' : 'w-64 md:w-72'} flex-shrink-0 flex flex-col py-6 z-20 border-r border-surface-container-highest/30 transition-[width] duration-300`}>
+    <nav id="app-sidebar" aria-label="Main navigation" className={`relative sticky top-0 max-h-screen overflow-hidden bg-surface-container-low dark:bg-surface-container-low shadow-sm h-screen ${collapsed ? 'w-20 md:w-24' : 'w-64 md:w-72'} flex-shrink-0 flex flex-col py-6 z-20 border-r border-surface-container-highest/30 transition-[width] duration-300`}>
       {/* Brand area */}
       <div className={`mb-5 flex items-center ${collapsed ? 'flex-col justify-center gap-2 px-2' : 'justify-between px-5'}`}>
         <ClinicLogo size={collapsed ? 'sm' : 'md'} clinicName={clinicName} logoUrl={logoUrl} onClick={() => setActiveTab('dashboard')} className={collapsed ? 'w-12 overflow-hidden' : ''} />
@@ -106,7 +106,7 @@ export default function Sidebar({
       )}
 
       {/* Nav List */}
-      <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-none">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 space-y-1 scrollbar-none">
         {navItems.map(item => {
           const isActive = activeTab === item.id;
           const isEnabled = enabledModules[item.id] !== false;
@@ -177,7 +177,7 @@ export default function Sidebar({
       </div>
 
       {/* Admin and account controls stay outside the clinical workflow. */}
-      <div className="mt-auto px-2 pt-4 border-t border-surface-container-highest/40 space-y-1">
+      <div className="mt-auto shrink-0 px-2 pt-4 border-t border-surface-container-highest/40 space-y-1">
         <button
           onClick={() => setActiveTab('settings')}
           title={collapsed ? 'Settings' : undefined}
