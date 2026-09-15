@@ -16,6 +16,8 @@ import { PatientIntakeForm } from './components/intake/PatientIntakeForm';
 import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSettings, FabricationItem, AlertItem } from './types';
 import { getInitials, generateMRN } from './utils/defaultDb';
 
+const PUBLIC_CLINIC_ORIGIN = 'https://clinic.genfinityoandp.com';
+
 class IntakeErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
   private readonly childContent: React.ReactNode;
@@ -1064,7 +1066,7 @@ function PortalApp() {
 
 function IntakeShareCard() {
   const [copied, setCopied] = useState(false);
-  const publicLink = `${window.location.origin}/intake`;
+  const publicLink = `${PUBLIC_CLINIC_ORIGIN}/intake`;
 
   const copyLink = async () => {
     try {
