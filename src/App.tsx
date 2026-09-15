@@ -17,6 +17,23 @@ import { DatabaseSchema, Patient, Appointment, Authorization, Claim, ClinicSetti
 import { getInitials, generateMRN } from './utils/defaultDb';
 
 const PUBLIC_CLINIC_ORIGIN = 'https://clinic.genfinityoandp.com';
+const TAB_PATHS: Record<string, string> = {
+  dashboard: '/',
+  appointments: '/appointments',
+  patients: '/patients',
+  tracker: '/tracker',
+  communications: '/communications',
+  billing: '/billing',
+  authorization: '/authorization',
+  fabrication: '/fabrication',
+  settings: '/settings',
+  intake: '/portal/intake'
+};
+
+function tabForPath(pathname: string): string {
+  const match = Object.entries(TAB_PATHS).find(([, path]) => path === pathname);
+  return match?.[0] || 'dashboard';
+}
 
 class IntakeErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -44,7 +61,14 @@ function PortalApp() {
   const isOfflineMode = false;
 
   // Layout navigation & search
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [activeTab, setActiveTabState] = useState<string>(() => tabForPath(window.location.pathname));
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab);
+    const nextPath = TAB_PATHS[tab] || TAB_PATHS.dashboard;
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({ tab }, '', nextPath);
+    }
+  };
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   // New patient modal trigger inside PatientsView
@@ -162,6 +186,12 @@ function PortalApp() {
 
   useEffect(() => {
     fetchState();
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => setActiveTabState(tabForPath(window.location.pathname));
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   // API Call: Add Patient
