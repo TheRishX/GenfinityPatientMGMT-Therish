@@ -506,7 +506,7 @@ export default function PatientsView({
               {/* Card Header: Avatar, Name, MRN, Status */}
               <div>
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3.5">
+                  <div className="flex min-w-0 flex-1 items-center gap-3.5">
                     <div className="w-11 h-11 rounded-full bg-secondary/10 text-secondary flex items-center justify-center font-black text-sm overflow-hidden shrink-0 border border-secondary/20">
                       {p.avatarUrl ? (
                         <img
@@ -526,8 +526,8 @@ export default function PatientsView({
                         <span>{p.avatarInitials}</span>
                       )}
                     </div>
-                    <div>
-                      <h3 className="font-black text-base text-on-surface group-hover:text-secondary transition-colors line-clamp-1">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="break-words font-black text-base leading-tight text-on-surface group-hover:text-secondary transition-colors line-clamp-2">
                         {p.name}
                       </h3>
                         <p className="text-[10.5px] font-extrabold text-on-surface-variant font-mono mt-0.5">

@@ -1064,6 +1064,11 @@ function PortalApp() {
           }
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
+          patients={db.patients}
+          onPatientSelect={(patient) => {
+            setSelectedPatient(patient);
+            setActiveTab('patients');
+          }}
           onSyncClick={fetchState}
           clinicName={db?.settings.clinicName}
           doctorName={db?.settings.doctorName}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Appointment, AlertItem } from '../types';
+import { Appointment, AlertItem, Patient } from '../types';
 
 interface HeaderProps {
   title: string;
@@ -11,6 +11,8 @@ interface HeaderProps {
   doctorImageUrl?: string;
   isOfflineMode?: boolean;
   appointments?: Appointment[];
+  patients?: Patient[];
+  onPatientSelect?: (patient: Patient) => void;
   alerts?: AlertItem[];
   onAlertAction?: (target: string, id: string) => void;
   onDismissAlert?: (id: string) => void;
@@ -26,6 +28,8 @@ export default function Header({
   doctorImageUrl,
   isOfflineMode = false,
   appointments = [],
+  patients = [],
+  onPatientSelect,
   alerts = [],
   onAlertAction,
   onDismissAlert
@@ -37,6 +41,15 @@ export default function Header({
   // Notifications dropdown state
   const [showNotifications, setShowNotifications] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const searchSuggestions = searchTerm.trim()
+    ? patients
+        .filter(patient => {
+          const term = searchTerm.trim().toLowerCase();
+          return patient.name.toLowerCase().includes(term) || patient.mrn.toLowerCase().includes(term);
+        })
+        .slice(0, 6)
+    : [];
 
   const checkStatus = async () => {
     setIsChecking(true);
@@ -64,6 +77,16 @@ export default function Header({
     const interval = setInterval(checkStatus, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    function handleSearchOutside(event: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setSearchTerm('');
+      }
+    }
+    document.addEventListener('mousedown', handleSearchOutside);
+    return () => document.removeEventListener('mousedown', handleSearchOutside);
+  }, [setSearchTerm]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -165,7 +188,7 @@ export default function Header({
         </h2>
 
         {/* Search input bar */}
-        <div className="relative w-full max-w-md">
+        <div ref={searchRef} className="relative w-full max-w-md">
           <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/70 text-sm">
             search
           </span>
@@ -176,6 +199,33 @@ export default function Header({
             className="w-full pl-11 pr-4 py-2 rounded-full border border-surface-container-highest/80 bg-surface-container-lowest focus:border-secondary focus:ring-2 focus:ring-secondary/10 text-xs font-semibold outline-none transition-all placeholder:text-on-surface-variant/50 shadow-2xs"
             placeholder="Search patients by name, MRN, status..."
           />
+          {searchSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-2xl border border-surface-container-highest/70 bg-surface-container-lowest shadow-lg">
+              <div className="border-b border-surface-container px-4 py-2 text-[10px] font-black uppercase tracking-wider text-on-surface-variant">
+                Patients matching “{searchTerm.trim()}”
+              </div>
+              {searchSuggestions.map(patient => (
+                <button
+                  type="button"
+                  key={patient.id}
+                  onClick={() => {
+                    setSearchTerm(patient.name);
+                    onPatientSelect?.(patient);
+                  }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-container-low"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary/10 text-xs font-black text-secondary">
+                    {patient.avatarInitials || patient.name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-extrabold text-on-surface">{patient.name}</span>
+                    <span className="mt-0.5 block truncate text-[11px] font-semibold text-on-surface-variant">{patient.mrn} · {patient.status}</span>
+                  </span>
+                  <span className="material-symbols-outlined text-base text-on-surface-variant">arrow_forward</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

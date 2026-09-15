@@ -54,14 +54,14 @@ export default function Sidebar({
   return (
     <nav id="app-sidebar" aria-label="Main navigation" className={`relative bg-surface-container-low dark:bg-surface-container-low shadow-sm h-screen ${collapsed ? 'w-20 md:w-24' : 'w-64 md:w-72'} flex-shrink-0 fixed left-0 top-0 flex flex-col py-6 z-20 border-r border-surface-container-highest/30 transition-[width] duration-300`}>
       {/* Brand area */}
-      <div className={`mb-5 flex items-center ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
+      <div className={`mb-5 flex items-center ${collapsed ? 'flex-col justify-center gap-2 px-2' : 'justify-between px-5'}`}>
         <ClinicLogo size={collapsed ? 'sm' : 'md'} clinicName={clinicName} logoUrl={logoUrl} onClick={() => setActiveTab('dashboard')} className={collapsed ? 'w-12 overflow-hidden' : ''} />
         <button
           type="button"
           onClick={onToggleCollapse}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-surface-container-highest/50 bg-surface-container-lowest text-on-surface-variant shadow-xs transition-colors hover:bg-surface-container-high hover:text-on-surface ${collapsed ? 'absolute right-1/2 top-[4.5rem] translate-x-1/2' : ''}`}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-surface-container-highest/50 bg-surface-container-lowest text-on-surface-variant shadow-xs transition-colors hover:bg-surface-container-high hover:text-on-surface"
         >
           <span className="material-symbols-outlined text-[18px]">{collapsed ? 'chevron_right' : 'chevron_left'}</span>
         </button>
