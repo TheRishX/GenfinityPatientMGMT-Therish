@@ -1133,7 +1133,7 @@ export default function App() {
         <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
             <a
-              href="https://genfinityoandp.com"
+              href="https://genfinityonadp.com"
               aria-label="Go to Genfinity O&P homepage"
               className="rounded-sm transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
