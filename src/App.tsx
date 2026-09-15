@@ -1093,7 +1093,7 @@ function PortalApp() {
         />
 
         {/* Inner Content stage */}
-        <main className="flex-1 overflow-y-auto p-5 sm:p-8 md:p-10 max-w-7xl mx-auto w-full">
+        <main className="flex-1 overflow-y-auto p-5 sm:p-8 md:p-10 w-full">
           {renderTabContent()}
         </main>
       </div>

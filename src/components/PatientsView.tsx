@@ -447,7 +447,7 @@ export default function PatientsView({
       </div>
 
       {/* Scan-friendly patient records */}
-      <div className={patientView === 'list' ? 'space-y-2' : patientView === 'compact' ? 'grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3' : 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3'}>
+      <div className={patientView === 'list' ? 'space-y-2' : patientView === 'compact' ? 'grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}>
         {filteredPatients.map(p => {
           // Determine status color theme
           let statusStyle = 'bg-secondary/10 text-secondary border-secondary/20';
@@ -505,7 +505,7 @@ export default function PatientsView({
             >
               {/* Card Header: Avatar, Name, MRN, Status */}
               <div>
-                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start justify-between gap-3">
                   <div className="flex min-w-0 flex-1 items-center gap-3.5">
                     <div className="w-11 h-11 rounded-full bg-secondary/10 text-secondary flex items-center justify-center font-black text-sm overflow-hidden shrink-0 border border-secondary/20">
                       {p.avatarUrl ? (
@@ -536,8 +536,8 @@ export default function PatientsView({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${statusStyle}`}>
+                  <div className="flex max-w-[48%] shrink-0 items-center gap-1.5">
+                    <span className={`max-w-full truncate px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${statusStyle}`}>
                       {p.status}
                     </span>
                   </div>
